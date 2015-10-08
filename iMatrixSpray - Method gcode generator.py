@@ -117,7 +117,6 @@ else:
 
 ############## Constant values
 coordinates_of_spray_z_axis = -80 + abs(height_of_the_needle) # Calculated
-amount_of_solvent_per_spray = 11.9760479042 #?????? calculate
 max_speed_of_movement = 200
 max_height_of_the_needle = 80
 max_matrix_density = 5
