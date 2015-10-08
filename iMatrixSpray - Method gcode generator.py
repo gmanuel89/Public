@@ -5,18 +5,77 @@ import sys
 
 
 
+######################################################################## GTK GUI (requires Tkinter)
+from Tkinter import *
+import tkFileDialog
+import tkMessageBox
+########### Where to save the output file
+Tk().withdraw()
+tkMessageBox.showinfo(title="File selection", message="Select where to save the gcode file")
+# Where to save the CSV file
+Tk().withdraw()
+outputfile = tkFileDialog.asksaveasfilename (defaultextension='.gcode', filetypes=[('gcode files','.gcode')])
+### Add the extension to the file automatically
+if ".gcode" not in outputfile:
+    outputfile = str(outputfile) + ".gcode"
+
+
+
+########### Input values (raw input)
+coordinates_of_spray_x_axis1 = float (raw_input ("Sett the first x-axis coordinates of spraying (default: -30)\n"))
+coordinates_of_spray_x_axis2 = float (raw_input ("Set the second x-axis coordinates of spraying (default: 30)\n"))
+coordinates_of_spray_y_axis1 = float (raw_input ("Set the first y-axis coordinates of spraying (default: 40)\n"))
+coordinates_of_spray_y_axis2 = float (raw_input ("Set the second y-axis coordinates of spraying (default: 80)\n"))
+coordinates_of_spray_x_axis = [coordinates_of_spray_x_axis1, coordinates_of_spray_x_axis2]
+coordinates_of_spray_y_axis = [coordinates_of_spray_y_axis1, coordinates_of_spray_y_axis2]
+height_of_the_needle = float (raw_input ("Set the height of the needle (default: 50)\n"))
+distance_between_lines = float (raw_input ("Set the distance between lines when spraying (default: 5)\n"))
+speed_of_movement = float (raw_input ("Set the speed of movement (max: 200)\n"))
+matrix_density = float (raw_input ("Set the density of the matrix on-tissue (in microlitres per squared centimeter) (max: 5)\n"))
+number_of_spray_cycles = int (raw_input ("Set the number of spraying cycles\n"))
+number_of_valve_rinsing_cycles = int (raw_input ("Set the number of valve rinsing cycles (default: 5)\n"))
+number_of_initial_wash_cycles = int (raw_input ("Set the number of initial wash cycles (default: 5)\n"))
+horizontal_spraying = raw_input ("Spray horizontally? (y or n, default: y)\n")
+if horizontal_spraying == "y":
+    horizontal_spraying = True
+else:
+    horizontal_spraying == False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ########### Input values
-coordinates_of_spray_x_axis = [-30, 30]
-coordinates_of_spray_y_axis = [40, 80]
-height_of_the_needle = 50
-distance_between_lines = 3
-amount_of_solvent = 500
-speed_of_movement = 80
-matrix_density = 1
-number_of_spray_cycles = 10
-number_of_valve_rinsing_cycles = 5
-number_of_initial_wash_cycles = 5
-horizontal_spraying = True
+#coordinates_of_spray_x_axis = [-30, 30]
+#coordinates_of_spray_y_axis = [40, 80]
+#height_of_the_needle = 50
+#distance_between_lines = 2
+#speed_of_movement = 100
+#matrix_density = 1
+#number_of_spray_cycles = 2
+#number_of_valve_rinsing_cycles = 5
+#number_of_initial_wash_cycles = 5
+#horizontal_spraying = True
 
 
 
@@ -39,7 +98,7 @@ initial_z_coordinates = 0
 max_x_coordinates = [-60, 60]
 max_y_coordinates = [-80, 80]
 max_z_coordinates = [-75, 0]
-
+spray_syringe_volume_per_travel = 16.7
 
 
 
@@ -83,19 +142,6 @@ if coordinates_of_spray_y_axis[1] > max_y_coordinates[1]:
 
 
 
-######################################################################## GTK GUI (requires Tkinter)
-from Tkinter import *
-import tkFileDialog
-import tkMessageBox
-########### Where to save the output file
-Tk().withdraw()
-tkMessageBox.showinfo(title="File selection", message="Select where to save the gcode file")
-# Where to save the CSV file
-Tk().withdraw()
-outputfile = tkFileDialog.asksaveasfilename (defaultextension='.gcode', filetypes=[('gcode files','.gcode')])
-### Add the extension to the file automatically
-if ".gcode" not in outputfile:
-    outputfile = str(outputfile) + ".gcode"
 
 
 
@@ -103,6 +149,7 @@ if ".gcode" not in outputfile:
 
 ################################################################################
 ################################################################### CODE BLOCKS
+########################################################### Go to wash position
 go_to_wash_position = [";;;;; go to wash position\n"]
 go_to_wash_position_subblock = ["G1 Z%s F%s\n" %(float(coordinates_of_z_axis_during_movement), max_speed_of_movement), "G1 X%s Y%s Z%s F%s\n" %(float(coordinates_of_washing_x_axis), float(coordinates_of_washing_y_axis), float(coordinates_of_z_axis_during_movement), max_speed_of_movement), "G1 Z%s\n" %float(coordinates_of_washing_z_axis)]
 # Generate the definitive block
@@ -256,25 +303,51 @@ for s in parking_spray_block:
 ################################################################### Spray block
 # First part of the block
 spray_block = [";;;;;;;;;; spraying phase\n"]
-spray_subblock1 = ["M106\n", "M82\n", "G1 V3 F%s\n" %max_speed_of_movement, "G4 S1\n", "G1 P%s F%s\n" %(amount_of_solvent_per_spray+2, max_speed_of_movement), "G1 V1 F%s\n" %max_speed_of_movement, "G4 S1\n", "G1 F0.1\n", "G1 P%s\n" %amount_of_solvent_per_spray, "\n", ";;; where to start spraying\n", "G1 Z%s F%s\n" %(float(coordinates_of_z_axis_during_movement), max_speed_of_movement), "G1 X%s Y%s F%s\n" %(float(coordinates_of_spray_x_axis[0]), float(coordinates_of_spray_y_axis[0]), max_speed_of_movement), "G1 Z%s F%s\n" %(float(coordinates_of_spray_z_axis), max_speed_of_movement), "\n", "M83\n", "\n"]
-for s in spray_subblock1:
-    spray_block.append(s)
-
 ################### The X-axis stays fixed
 if horizontal_spraying == True:
     ################# Generate the vector of x and y positions
     ###### Y positions
     y_positions = []
-    # Calculate the number of Y positions (according to the y length and the distance between lines) (since the path is an S, each y coordinate is reported twice, so the number of positions must be doubled)
+    ### Calculate the number of Y positions (according to the y length and the distance between lines) (since the path is an S, each y coordinate is reported twice, so the number of positions must be doubled)
     # One is negative and the other positive
     if coordinates_of_spray_y_axis[0] < 0 and coordinates_of_spray_y_axis[1] >= 0:
         number_of_y_positions = abs(int((coordinates_of_spray_y_axis[1] - coordinates_of_spray_y_axis[0]) / distance_between_lines) * 2)
+        number_of_lines = abs(int((coordinates_of_spray_y_axis[1] - coordinates_of_spray_y_axis[0]) / distance_between_lines))
+        y_line_length = coordinates_of_spray_y_axis[1] - coordinates_of_spray_y_axis[0]
     # Both are positive
     if coordinates_of_spray_y_axis[0] >= 0 and coordinates_of_spray_y_axis[1] > 0:
         number_of_y_positions = abs(int((coordinates_of_spray_y_axis[1] - coordinates_of_spray_y_axis[0]) / distance_between_lines) * 2)
+        number_of_lines = abs(int((coordinates_of_spray_y_axis[1] - coordinates_of_spray_y_axis[0]) / distance_between_lines))
+        y_line_length = coordinates_of_spray_y_axis[1] - coordinates_of_spray_y_axis[0]
     # Both are negative
     if coordinates_of_spray_y_axis[0] < 0 and coordinates_of_spray_y_axis[1] <= 0:
-        number_of_y_positions = abs(int((abs(coordinates_of_spray_y_axis[0]) - abs(coordinates_of_spray_y_axis[0])) / distance_between_lines) * 2)
+        number_of_y_positions = abs(int((abs(coordinates_of_spray_y_axis[0]) - abs(coordinates_of_spray_y_axis[1])) / distance_between_lines) * 2)
+        number_of_lines = abs(int((abs(coordinates_of_spray_y_axis[0]) - abs(coordinates_of_spray_y_axis[1])) / distance_between_lines))
+        y_line_length = abs(coordinates_of_spray_y_axis[0]) - abs(coordinates_of_spray_y_axis[1])
+    ### Calculate the spray travel on X
+    # One is negative and the other positive
+    if coordinates_of_spray_x_axis[0] < 0 and coordinates_of_spray_x_axis[1] >= 0:
+        x_line_length = coordinates_of_spray_x_axis[1] - coordinates_of_spray_x_axis[0]
+    # Both are positive
+    if coordinates_of_spray_x_axis[0] >= 0 and coordinates_of_spray_x_axis[1] > 0:
+        x_line_length = coordinates_of_spray_x_axis[1] - coordinates_of_spray_x_axis[0]
+    # Both are negative
+    if coordinates_of_spray_y_axis[0] < 0 and coordinates_of_spray_y_axis[1] <= 0:
+        x_line_length = abs(coordinates_of_spray_x_axis[0]) - abs(coordinates_of_spray_x_axis[1])
+    ### Calculate the spray travel distance
+    spray_travel = number_of_lines * x_line_length + y_line_length
+    ### Calculate the spray time
+    spray_time = spray_travel / speed_of_movement
+    ### Calculate the spray density
+    spray_density = float(matrix_density) / 100 * distance_between_lines
+    ### Calculate the spray syringe volume
+    spray_syringe_volume = spray_travel * spray_density
+    ### Calculate the spray syringe travel
+    spray_syringe_travel = spray_syringe_volume / spray_syringe_volume_per_travel
+    ### Spray syringe volume in X
+    spray_syringe_x = x_line_length * spray_density / spray_syringe_volume_per_travel
+    ### Spray syringe volume in Y
+    spray_syringe_y = distance_between_lines * spray_density / spray_syringe_volume_per_travel
     # Calculate the other positions (since the path is an S, each y coordinate is reported twice)
     for i in range(number_of_y_positions-1):
         # The first position is where to start spraying (since the path is an S, each y coordinate is reported twice)
@@ -286,37 +359,38 @@ if horizontal_spraying == True:
     ###### X positions
     x_positions = []
     # Calculate the other positions (since the path is an S, each x coordinate is reported twice)
-    for i in range(number_of_y_positions/2):
+    for i in range(number_of_y_positions):
         # The first position and the last position are on the opposite side of the starting position (where to go spraying, along the x axis) (since the path is an S, each y coordinate is reported twice)
         if len(x_positions) == 0:
             x_positions.append(float(coordinates_of_spray_x_axis[1]))
-        elif i%2 != 0:
+        elif len(x_positions) == 1:
             x_positions.append(float(coordinates_of_spray_x_axis[0]))
-            x_positions.append(float(coordinates_of_spray_x_axis[0]))
-        elif i%2 == 0:
-            x_positions.append(float(coordinates_of_spray_x_axis[1]))
-            x_positions.append(float(coordinates_of_spray_x_axis[1]))
-        if len(x_positions) == (len(y_positions)-1):
-            x_positions.append(float(coordinates_of_spray_x_axis[1]))
+        elif x_positions[i-1] != x_positions[i-2]:
+            x_positions.append(x_positions[i-1])
+        elif x_positions[i-1] == x_positions[i-2]:
+            x_positions.append(x_positions[i-3])
     ###### Values of P
     p_values = []
     for i in range(number_of_y_positions/2):
-        p_values.append (float(-amount_of_solvent_per_spray*0.00125))
-        p_values.append (float(-amount_of_solvent_per_spray*0.03))
+        p_values.append (float(-spray_syringe_y))
+        p_values.append (float(-spray_syringe_x))
     ###### Generate the final spray ssubblock
-    spray_subblock = [";;; spray\n"]
+    spray_subblock2 = [";;; spray\n"]
     for i in range(number_of_y_positions):
         # Create the line and append it to the list of the block lines
         line = "G1 X%s Y%s P%s F%s\n" %(x_positions[i], y_positions[i], p_values[i], speed_of_movement)
-        spray_subblock.append (line)
+        spray_subblock2.append (line)
+    spray_subblock2.append ("G1 Y%s Z%s F%s\n" %(float(coordinates_of_spray_y_axis[0]), float(coordinates_of_z_axis_during_movement), max_speed_of_movement))
+    # Generate the first part of the block
+    spray_subblock1 = ["M106\n", "M82\n", "G1 V3 F%s\n" %max_speed_of_movement, "G4 S1\n", "G1 P%s F%s\n" %(spray_syringe_travel+2, max_speed_of_movement), "G1 V1 F%s\n" %max_speed_of_movement, "G4 S1\n", "G1 F0.1\n", "G1 P%s\n" %spray_syringe_travel, "\n", ";;; where to start spraying\n", "G1 Z%s F%s\n" %(float(coordinates_of_z_axis_during_movement), max_speed_of_movement), "G1 X%s Y%s F%s\n" %(float(coordinates_of_spray_x_axis[0]), float(coordinates_of_spray_y_axis[0]), max_speed_of_movement), "G1 Z%s F%s\n" %(float(coordinates_of_spray_z_axis), max_speed_of_movement), "\n", "M83\n", "\n"]
+    # Attach the spray sub-block to the global spray block
+    for s in spray_subblock1:
+        spray_block.append(s)
+    for s in spray_subblock2:
+        spray_block.append (s)
 ################### The Y-axis stays fixed
 else:
     pass
-
-spray_subblock.append ("G1 Y%s Z%s F%s\n" %(float(coordinates_of_spray_y_axis[0]), float(coordinates_of_z_axis_during_movement), max_speed_of_movement))
-# Attach the spray sub-block to the global spray block
-for s in spray_subblock:
-    spray_block.append (s)
 
 # Leave a white line between blocks
 spray_block.append ("\n")
