@@ -21,60 +21,71 @@ if ".gcode" not in outputfile:
 
 
 
+
+
 ########### Input values (raw input)
 ###
 try:
-    coordinates_of_spray_x_axis1 = float (raw_input ("Set the first x-axis coordinates of spraying (default: -30)\n"))
+    coordinates_of_spray_x_axis1 = float(raw_input ("Set the first x-axis coordinates of spraying (default: -60)\n"))
 except:
-    coordinates_of_spray_x_axis1 = -30
+    coordinates_of_spray_x_axis1 = -60
+
 
 try:
-    coordinates_of_spray_x_axis2 = float (raw_input ("Set the second x-axis coordinates of spraying (default: 30)\n"))
+    coordinates_of_spray_x_axis2 = float(raw_input ("Set the second x-axis coordinates of spraying (default: 60)\n"))
 except:
-    coordinates_of_spray_x_axis2 = 30
+    coordinates_of_spray_x_axis2 = 60
+
 
 try:
-    coordinates_of_spray_y_axis1 = float (raw_input ("Set the first y-axis coordinates of spraying (default: 40)\n"))
+    coordinates_of_spray_y_axis1 = float(raw_input ("Set the first y-axis coordinates of spraying (default: -80)\n"))
 except:
-    coordinates_of_spray_y_axis1 = 40
+    coordinates_of_spray_y_axis1 = -80
+
 
 try:
-    coordinates_of_spray_y_axis2 = float (raw_input ("Set the second y-axis coordinates of spraying (default: 80)\n"))
+    coordinates_of_spray_y_axis2 = float(raw_input ("Set the second y-axis coordinates of spraying (default: 80)\n"))
 except:
     coordinates_of_spray_y_axis2 = 80
 
-coordinates_of_spray_x_axis = [coordinates_of_spray_x_axis1, coordinates_of_spray_x_axis2]
-coordinates_of_spray_y_axis = [coordinates_of_spray_y_axis1, coordinates_of_spray_y_axis2]
+
+coordinates_of_spray_x_axis = [float(coordinates_of_spray_x_axis1), float(coordinates_of_spray_x_axis2)]
+coordinates_of_spray_y_axis = [float(coordinates_of_spray_y_axis1), float(coordinates_of_spray_y_axis2)]
 
 ###
 try:
-    height_of_the_needle = float (raw_input ("Set the height of the needle (default: 50)\n"))
+    height_of_the_needle = float(raw_input ("Set the height of the needle (default: 50)\n"))
 except:
-    height_of_the_needle = 50
+    height_of_the_needle = 50.0
+
 
 ###
 try:
     distance_between_lines = float (raw_input ("Set the distance between lines when spraying (default: 5)\n"))
 except:
-    distance_between_lines = 5
+    distance_between_lines = 5.0
+
 
 ###
 try:
-    speed_of_movement = float (raw_input ("Set the speed of movement (max: 200, default: 100)\n"))
+    speed_of_movement = float (raw_input ("Set the speed of movement (max: 200, default: 150)\n"))
 except:
-    speed_of_movement = 100
+    speed_of_movement = 150.0
+
 
 ###
 try:
     matrix_density = float (raw_input ("Set the density of the matrix on-tissue (in microlitres per squared centimeter) (max: 5, default: 1)\n"))
 except:
-    matrix_density = 1
+    matrix_density = 1.0
+
 
 ###
 try:
-    number_of_spray_cycles = int (raw_input ("Set the number of spraying cycles (default:10)\n"))
+    number_of_spray_cycles = int (raw_input ("Set the number of spraying cycles (default:2)\n"))
 except:
-    number_of_spray_cycles = 10
+    number_of_spray_cycles = 2
+
 
 ###
 try:
@@ -82,16 +93,17 @@ try:
 except:
     number_of_valve_rinsing_cycles = 5
 
+
 ###
 try:
     number_of_initial_wash_cycles = int (raw_input ("Set the number of initial wash cycles (default: 5)\n"))
 except:
     number_of_initial_wash_cycles = 5
 
+
 ###
-try:
-    horizontal_spraying = raw_input ("Spray horizontally? (y or n, default: y)\n")
-except:
+horizontal_spraying = raw_input ("Spray horizontally? (y or n, default: y)\n")
+if horizontal_spraying == "":
     horizontal_spraying = "y"
 
 if horizontal_spraying == "y":
