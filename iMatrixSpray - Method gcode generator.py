@@ -7,11 +7,11 @@ import sys
 
 ########### Input values
 coordinates_of_spray_x_axis = [-30, 30]
-coordinates_of_spray_y_axis = [-80, 80]
-height_of_the_needle = 60
-distance_between_lines = 1.81
+coordinates_of_spray_y_axis = [40, 80]
+height_of_the_needle = 50
+distance_between_lines = 3
 amount_of_solvent = 500
-speed_of_movement = 100
+speed_of_movement = 80
 matrix_density = 1
 number_of_spray_cycles = 10
 number_of_valve_rinsing_cycles = 5
@@ -46,10 +46,13 @@ max_z_coordinates = [-75, 0]
 
 ################################################# Avoid that the machine breaks
 # Speed
+if speed_of_movement < 0:
+    speed_of_movement = abs(speed_of_movement)
+
 if speed_of_movement > max_speed_of_movement:
     speed_of_movement = max_speed_of_movement
 
-if speed_of_movement <= 0:
+if speed_of_movement == 0:
     speed_of_movement = 1
 
 # Needle height (Z coordinate)
@@ -80,26 +83,7 @@ if coordinates_of_spray_y_axis[1] > max_y_coordinates[1]:
 
 
 
-######################################################################## Qt4 GUI (requires pyQt4)
-from PyQt4.QtGui import *
-########### Where to save the output file
-# Create a PyQt4 Application Object
-a = QApplication(sys.argv)
-# Message for selection (open)
-w = QWidget()
-selectionMessage = QMessageBox.information (w, "File selection", "Select where to save the gcode file")
-# Where to save the CSV file
-w = QWidget()
-outputfile = QFileDialog.getSaveFileName (w, 'Save gcode file', '', 'gcode files (*.gcode)')
-### Add the extension to the file automatically
-if ".gcode" not in outputfile:
-    outputfile = str(outputfile) + ".gcode"
-
-
-
-
-
-######################################################################## GTK GUI
+######################################################################## GTK GUI (requires Tkinter)
 from Tkinter import *
 import tkFileDialog
 import tkMessageBox
@@ -282,7 +266,15 @@ if horizontal_spraying == True:
     ###### Y positions
     y_positions = []
     # Calculate the number of Y positions (according to the y length and the distance between lines) (since the path is an S, each y coordinate is reported twice, so the number of positions must be doubled)
-    number_of_y_positions = int((abs(coordinates_of_spray_y_axis[0]) + abs(coordinates_of_spray_y_axis[1])) / distance_between_lines) * 2
+    # One is negative and the other positive
+    if coordinates_of_spray_y_axis[0] < 0 and coordinates_of_spray_y_axis[1] >= 0:
+        number_of_y_positions = abs(int((coordinates_of_spray_y_axis[1] - coordinates_of_spray_y_axis[0]) / distance_between_lines) * 2)
+    # Both are positive
+    if coordinates_of_spray_y_axis[0] >= 0 and coordinates_of_spray_y_axis[1] > 0:
+        number_of_y_positions = abs(int((coordinates_of_spray_y_axis[1] - coordinates_of_spray_y_axis[0]) / distance_between_lines) * 2)
+    # Both are negative
+    if coordinates_of_spray_y_axis[0] < 0 and coordinates_of_spray_y_axis[1] <= 0:
+        number_of_y_positions = abs(int((abs(coordinates_of_spray_y_axis[0]) - abs(coordinates_of_spray_y_axis[0])) / distance_between_lines) * 2)
     # Calculate the other positions (since the path is an S, each y coordinate is reported twice)
     for i in range(number_of_y_positions-1):
         # The first position is where to start spraying (since the path is an S, each y coordinate is reported twice)
@@ -354,12 +346,7 @@ with open(outputfile, "w") as f:
 
 
 
-####################################################################### Qt4 GUI
-# Gcode file generated!
-w = QWidget()
-selectionMessage = QMessageBox.information (w, "gcode file generated", "The gcode file has been successfully generated!")
-
-####################################################################### GTK GUI
+####################################################################### GTK GUI (requires Tkinter)
 # Gcode file generated!
 Tk().withdraw()
 tkMessageBox.showinfo(title="gcode file generated", message="The gcode file has been successfully generated!")
