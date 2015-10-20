@@ -1,42 +1,7 @@
 ###INSTALL THE REQUIRED PACKAGES
-required_packages <- c ("parallel", "MALDIquant", "MALDIquantForeign", "caret", "tcltk", "beepr")
-installed_packages <- installed.packages () [,1]
-missing_packages <- character()
-for (p in 1:length(required_packages)) {
-	if ((required_packages[p] %in% installed_packages) == FALSE) {
-		missing_packages <- append(missing_packages, required_packages[p])
-	}
-}
-if (length(missing_packages) > 0) {
-	install.packages (missing_packages)
-}
-
-### LOAD THE REQUIRED PACKAGES
-library (parallel)
-library (MALDIquant)
-library (MALDIquantForeign)
-library (tcltk)
-library (caret)
-#library (e1071)
-library (beepr)
-#library (gWidgets)
-#library (gWidgetstcltk)
-
-
 ##### MEMORY LIMIT
 # Set the memory (RAM) limit to 100GB (100000MB)
 memory.limit (100000)
-
-
-
-######### PARALLELISATION
-# Detect the number of cores
-cpu_thread_Number <- detectCores (logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
-##############################
-
-
-
 
 ####################################### READ (SOURCE) SCRIPT FROM URL
 source_github <- function(url, ...) {
@@ -68,7 +33,7 @@ if (length(missing_packages) > 0) {
 	install.packages (missing_packages)
 }
 for (i in 1:length(required_packages)) {
-	library (required_packages[i])
+	library (required_packages[i], character.only=TRUE)
 }
 }
 
@@ -96,25 +61,28 @@ print(paste("Flat spectra in the dataset:", length(flat_spectra)))
 
 
 ######################################### REPLACE THE metaData$file WITH THE SAMPLE NAME (SPECTRA or PEAKS)
-replace_sample_name <- function (spectra, folder, file_format="imzml") {
-setwd(folder)
-# Read the files in the folder
-folder_files <- read_spectra_files(folder, file_format=file_format, full_path=FALSE)
+replace_sample_name <- function (spectra, file_format="imzml") {
 if (file_format == "imzml" | file_format == "imzML") {
-	for (s in 1:length(folder_files)) {
-		for (i in 1:length(spectra)) {
-			if (length(grep(folder_files[s],spectra[[i]]@metaData$file, fixed=TRUE)) != 0) {
-				spectra[[i]]@metaData$file <- folder_files[s]
-				spectra[[i]]@metaData$file <- unlist(strsplit(spectra[[i]]@metaData$file, split=(".imzML")))[1]
-			}
-		}
-	}
+    for (i in 1:length(spectra)) {
+        sample_name <- unlist(strsplit(spectra[[i]]@metaData$file,"/"))
+        sample_name <- sample_name[length(sample_name)]
+        sample_name <- unlist(strsplit(sample_name, ".imzML"))
+        sample_name <- sample_name[1]
+        spectra[[i]]@metaData$file <- sample_name
+    }
 }
+#setwd(folder)
+################## Read the files in the folder
+#folder_files <- read_spectra_files(folder, file_format=file_format, full_path=FALSE)
 #if (file_format == "imzml" | file_format == "imzML") {
-#	for (i in 1:length(spectra)) {
-#		spectra[[i]]@metaData$file <- unlist(strsplit(spectra[[i]]@metaData$file, split=(folder)))[2]
-#		spectra[[i]]@metaData$file <- unlist(strsplit(spectra[[i]]@metaData$file, split=(".imzML")))[1]
- #   }
+#	for (s in 1:length(folder_files)) {
+#		for (i in 1:length(spectra)) {
+#			if (length(grep(folder_files[s],spectra[[i]]@metaData$file, fixed=TRUE)) != 0) {
+#				spectra[[i]]@metaData$file <- folder_files[s]
+#				spectra[[i]]@metaData$file <- unlist(strsplit(spectra[[i]]@metaData$file, split=(".imzML")))[1]
+#			}
+#		}
+#	}
 #}
 return (spectra)
 }
@@ -166,7 +134,10 @@ return (spectra)
 ######################################### SPECTRA PRE-PROCESSING
 # Preprocess spectra
 preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra)) {
-if (process_in_packages_of <= 0 || preprocess_in_packages_of > length(spectra)) {
+# Load the required libraries
+install_and_load_required_packages (c("MALDIquant", "caret", "parallel"))
+#
+if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
 	process_in_packages_of <- length(spectra)
 }
 # Create the list containing the processed spectra
@@ -174,7 +145,7 @@ preprocessed_spectra <- list()
 # Calculate the k_fold
 k_fold <- floor(length(spectra) / process_in_packages_of)
 # Determine the spectra to be randomly allocated into processing folds
-index <- createFolds (y=seq(1:length(spectra)), k=k_fold)
+index <- createFolds(y=seq(1:length(spectra)), k=k_fold)
 for (i in 1:length(index)) {
 	# Make the cluster (one for each core/thread)
 	cl <- makeCluster(cpu_core_number)
@@ -249,8 +220,11 @@ return (preprocessed_spectra)
 
 ######################################### AVERAGE SIGNAL NUMBER
 # Average number of signals with that S/N in the peaklist set
-average_signal_number_with_selected_snr <- function (spectra, snr=5) {
-peaks <- detectPeaks(spectra, method="MAD", snr=snr)
+average_signal_number_with_selected_SNR <- function (spectra, SNR=5) {
+# Load the required libraries
+install_and_load_required_packages ("MALDIquant")
+#
+peaks <- detectPeaks(spectra, method="MAD", SNR=SNR)
 average_signal_number <- numeric()
 signal_number_vector <- numeric()
 # For each peaklist
@@ -274,11 +248,14 @@ return (average_signal_number)
 
 
 ######################################### REPRESENTATIVE SPECTRA (one imzML per patient)
-# Number of spectra with more than a defined number of signals with that snr
-number_of_representative_spectra <- function (spectra, snr=15, signal_number_threshold=20) {
+# Number of spectra with more than a defined number of signals with that SNR
+number_of_representative_spectra <- function (spectra, SNR=15, signal_number_threshold=20) {
+# Load the required libraries
+install_and_load_required_packages ("MALDIquant")
+#
 counter <- 0
 ## Peak picking
-peaks <- detectPeaks (spectra, method="MAD", snr=snr)
+peaks <- detectPeaks(spectra, method="MAD", SNR=SNR)
 # For each peaklist
 for (p in 1:length(peaks)) {
 	# Increase the counter if the number of peaks is more than the defined threshold
@@ -300,9 +277,11 @@ return (counter)
 
 
 ######################################### REPRESENTATIVE SPECTRA DATASET (one imzML per patient)
-# Average number of spectra with more than a defined number of signals with that snr
-average_number_of_representative_spectra <- function (filepath, snr=15, signal_number_threshold=20, tof_mode="linear",
-	file_format="imzml") {
+# Average number of spectra with more than a defined number of signals with that SNR
+average_number_of_representative_spectra <- function (filepath, SNR=15, signal_number_threshold=20, tof_mode="linear", file_format="imzml") {
+# Load the required libraries
+install_and_load_required_packages (c("MALDIquant", "MALDIquantForeign"))
+#
 counter_vector <- numeric()
 for (f in 1:length(filepath)) {
 	# Import Spectra
@@ -317,7 +296,7 @@ for (f in 1:length(filepath)) {
 	# Counter
 	counter <- 0
 	## Peak picking
-	peaks <- detectPeaks(spectra, method="MAD", snr=snr)
+	peaks <- detectPeaks(spectra, method="MAD", SNR=SNR)
 	# For each peaklist
 	for (p in 1:length(peaks)) {
 		# Increase the counter if the number of peaks is more than the defined threshold
@@ -342,14 +321,17 @@ return (counter_vector)
 
 
 ########################################## SPECTRA FILTERING
-# Remove all the bad spectra, keep only the best ones (Number of signals with a certain snr)
-filter_spectra_signal_number <- function (spectra, snr_filter=15, signal_number_threshold=15) {
-	# Make the cluster (one for each core/thread)
-	cl <- makeCluster(cpu_core_number)
-	clusterEvalQ (cl, {library(MALDIquant)})
+# Remove all the bad spectra, keep only the best ones (Number of signals with a certain SNR)
+filter_spectra_signal_number <- function (spectra, SNR_filter=15, signal_number_threshold=15) {
+# Load the required libraries
+install_and_load_required_packages ("parallel")
+#
+# Make the cluster (one for each core/thread)
+cl <- makeCluster(cpu_core_number)
+clusterEvalQ (cl, {library(MALDIquant)})
 ##################################################### FILTERING FUNCTION
 spectra_filtering_function <- function (spectra) {
-	peaks <- detectPeaks (spectra, method="MAD", snr=snr_filter)
+	peaks <- detectPeaks (spectra, method="MAD", SNR=SNR_filter)
 	####### Select only the desired peaklists, based upon the threshold characteristics
 		if (length(peaks@mass) < signal_number_threshold) {
 			# Remove the bad spectrum from the list
@@ -380,6 +362,9 @@ spectra_filtering_function <- function (spectra) {
 ########################################## SPECTRA GROUPING (PATIENTS) (one imzML file per patient)
 # Obtain a certain number of spectra per patient -> Representative spectra
 group_spectra <- function (spectra, spectra_per_patient=1, file_format="imzml", tof_mode="linear", seed=0, algorithm="random", discarded_nodes=1, balanced=TRUE, method="mean") {
+# Load the required libraries
+install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
+#
 ### Create the file Vector
 if (file_format == "imzml" | file_format == "imzML") {
 	# Put the filenames in a vector
@@ -504,7 +489,7 @@ if (spectra_per_patient > 1) {
 				}
 				# Store the plot into the list
 				plotMsiSlice (spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[1], tolerance=1, legend=FALSE)
-				msi_plots [[p]] <- recordPlot ()
+				msi_plots [[p]] <- recordPlot()
 			}
 			######################################### SIMILARITY
 			############################ HCA
@@ -513,17 +498,17 @@ if (spectra_per_patient > 1) {
 				spectra_per_patient <- spectra_per_patient + discarded_nodes
 				# Detect and align peaks
 				if (tof_mode=="linear") {
-					peaks <- detectPeaks (patient_spectra, method="MAD", snr=3, halfWindowSize=20)
-					peaks <- align_and_filter_peaks (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
+					peaks <- detectPeaks(patient_spectra, method="MAD", SNR=3, halfWindowSize=20)
+					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
 				}
 				if (tof_mode=="reflectron" | tof_mode=="reflector") {
-					peaks <- detectPeaks (patient_spectra, method="MAD", snr=3, halfWindowSize=5)
-					peaks <- align_and_filter_peaks (peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
+					peaks <- detectPeaks (patient_spectra, method="MAD", SNR=3, halfWindowSize=5)
+					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
 				}
 				# Generate the peaklist matrix
-				peaklist <- intensityMatrix (peaks, patient_spectra)
+				peaklist <- intensityMatrix(peaks, patient_spectra)
 				# Compute the distance matrix
-				distance_matrix <- dist (peaklist, method="euclidean")
+				distance_matrix <- dist(peaklist, method="euclidean")
 				hca <- hclust(distance_matrix)
 				# Store the plot
 				plot(hca, xlab="MSI elements", main="Hierarchical clustering analysis", sub="")
@@ -597,7 +582,7 @@ if (spectra_per_patient > 1) {
 					spectra_for_plotting <- append(spectra_for_plotting, spectra_hca_for_plotting)
 					# Average the spectra in this HCA subgroup
 					if (method == "mean") {
-						spectra_average <- averageMassSpectra (spectra_hca, method="mean")
+						spectra_average <- averageMassSpectra(spectra_hca, method="mean")
 					}
 					if (method == "skyline") {
 						spectra_average <- generate_skyline_spectrum (spectra_hca)
@@ -616,11 +601,11 @@ if (spectra_per_patient > 1) {
 				spectra_per_patient <- spectra_per_patient + discarded_nodes
 				# Detect and align peaks
 				if (tof_mode=="linear") {
-					peaks <- detectPeaks (patient_spectra, method="MAD", snr=3, halfWindowSize=20)
+					peaks <- detectPeaks (patient_spectra, method="MAD", SNR=3, halfWindowSize=20)
 					peaks <- align_and_filter_peaks (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
 				}
 				if (tof_mode=="reflectron" | tof_mode=="reflector") {
-					peaks <- detectPeaks (patient_spectra, method="MAD", snr=3, halfWindowSize=5)
+					peaks <- detectPeaks (patient_spectra, method="MAD", SNR=3, halfWindowSize=5)
 					peaks <- align_and_filter_peaks (peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
 				}
 				# Generate the peaklist matrix
@@ -710,8 +695,8 @@ if (spectra_per_patient > 1) {
 	}
 }
 # Processing before returning
-patient_spectra_final <- removeBaseline (patient_spectra_final, method="TopHat")
-patient_spectra_final <- calibrateIntensity (patient_spectra_final, method="TIC")
+patient_spectra_final <- removeBaseline(patient_spectra_final, method="TopHat")
+patient_spectra_final <- calibrateIntensity(patient_spectra_final, method="TIC")
 #
 return (list(spectra=patient_spectra_final, ms_images=msi_plots, discarded_spectra=discarded_spectra, discarded_average_spectra=discarded_spectra_average, plots=plots))
 }
@@ -748,7 +733,7 @@ if (file_format == "imzml" | file_format == "imzML") {
 			}
 		}
 		# Create the average spectrum of the spectra in the list (with the same path)
-		skyline_spectrum  <- generate_skyline_spectrum (spectra_list)
+		skyline_spectrum  <- generate_skyline_spectrum(spectra_list)
 		# Add the average spectrum to another final list of average spectra
 		spectra_grouped <- append(spectra_grouped, skyline_spectrum)
 	}
@@ -777,7 +762,7 @@ if (file_format == "brukerflex") {
 			}
 		}
 		# Create the average spectrum of the spectra in the list (with the same path)
-		skyline_spectrum  <- generate_skyline_spectrum (spectra_list)
+		skyline_spectrum  <- generate_skyline_spectrum(spectra_list)
 		# Add the average spectrum to another final list of average spectra
 		spectra_grouped <- append(spectra_grouped, skyline_spectrum )
 	}
@@ -801,7 +786,7 @@ group_spectra_class <- function (spectra, class_list, file_format="imzml") {
 class_list <- sort(class_list)
 if (file_format == "imzml" | file_format == "imzML") {
 	## REPLACE THE filepath PARAMETER FOR EACH SPECTRUM WITH THE CLASS
-	spectra <- replace_class_name (spectra, class_list=class_list, file_format="imzml")
+	spectra <- replace_class_name(spectra, class_list=class_list, file_format="imzml")
 	# Put the filenames/classes in a vector
 	# Create the empty vector
 	class_vector <- vector(length=0)
@@ -809,11 +794,11 @@ if (file_format == "imzml" | file_format == "imzML") {
 	for (i in 1:length(spectra)) {
 		class_vector <- append(class_vector, spectra[[i]]@metaData$file)
 	}
-	class_spectra_grouped <- averageMassSpectra (spectra, labels=class_vector, method="mean")
+	class_spectra_grouped <- averageMassSpectra(spectra, labels=class_vector, method="mean")
 }
 if (file_format == "brukerflex") {
 	## REPLACE THE filepath PARAMETER FOR EACH SPECTRUM WITH THE CLASS
-	spectra <- replace_class_name (spectra, class_list=class_list, file_format="brukerflex")
+	spectra <- replace_class_name(spectra, class_list=class_list, file_format="brukerflex")
 	# Put the filenames/classes in a vector
 	# Create the empty vector
 	class_vector <- vector(length=0)
@@ -821,7 +806,7 @@ if (file_format == "brukerflex") {
 	for (i in 1:length(spectra)) {
 		class_vector <- append(class_vector, spectra[[i]]@metaData$sampleName)
 	}
-	class_spectra_grouped <- averageMassSpectra (spectra, labels=class_vector, method="mean")
+	class_spectra_grouped <- averageMassSpectra(spectra, labels=class_vector, method="mean")
 }
 return (class_spectra_grouped)
 }
@@ -842,7 +827,7 @@ group_spectra_class_skyline <- function (spectra, class_list, file_format="imzml
 class_list <- sort(class_list)
 if (file_format == "imzml" | file_format == "imzML") {
 	## REPLACE THE filepath PARAMETER FOR EACH SPECTRUM WITH THE CLASS
-	spectra <- replace_class_name (spectra, class_list=class_list, file_format="imzml")
+	spectra <- replace_class_name(spectra, class_list=class_list, file_format="imzml")
 	# Put the filenames/classes in a vector
 	# Create the empty vector
 	class_vector <- vector(length=0)
@@ -866,14 +851,14 @@ if (file_format == "imzml" | file_format == "imzML") {
 			}
 		}
 		# Create the average spectrum of the spectra in the list (with the same class)
-		skyline_spectrum  <- generate_skyline_spectrum (spectra_list)
+		skyline_spectrum  <- generate_skyline_spectrum(spectra_list)
 		# Add the average spectrum to another final list of average spectra
 		class_spectra_grouped <- append(class_spectra_grouped, skyline_spectrum )
 	}
 }
 if (file_format == "brukerflex") {
 	## REPLACE THE filepath PARAMETER FOR EACH SPECTRUM WITH THE CLASS
-	spectra <- replace_class_name (spectra, class_list=class_list, file_format="brukerflex")
+	spectra <- replace_class_name(spectra, class_list=class_list, file_format="brukerflex")
 	# Put the filenames/classes in a vector
 	# Create the empty vector
 	class_vector <- vector(length=0)
@@ -897,7 +882,7 @@ if (file_format == "brukerflex") {
 			}
 		}
 		# Create the average spectrum of the spectra in the list (with the same class)
-		skyline_spectrum  <- generate_skyline_spectrum (spectra_list)
+		skyline_spectrum  <- generate_skyline_spectrum(spectra_list)
 		# Add the average spectrum to another final list of average spectra
 		class_spectra_grouped <- append(class_spectra_grouped, skyline_spectrum )
 	}
@@ -1054,13 +1039,16 @@ return (signal_matrix)
 
 ###################################### NO HEMOGLOBIN
 no_hemoglobin <- function (spectra, hemoglobin_mass=15400, tolerance_ppm=2000, average_spectrum_evaluation=FALSE) {
+# Load the required libraries
+install_and_load_required_packages (c("parallel", "MALDIquant"))
+#
 # Make the cluster (one for each core/thread)
 cl <- makeCluster(cpu_core_number)
 clusterEvalQ (cl, {library(MALDIquant)})
 #################################################### FILTERING FUNCTION
 hemoglobin_removal_function <- function (spectra, hemoglobin_mass, tolerance_ppm) {
 ## Peak picking
-peaks <- detectPeaks (spectra, method="MAD", snr=3)
+peaks <- detectPeaks(spectra, method="MAD", SNR=3)
 hemoglobin_bin <- numeric()
 # Do this if there are peaks
 if (length(peaks@mass) > 0) {
@@ -1100,9 +1088,9 @@ spectra_no_hemoglobin <- spectra_no_hemoglobin [!sapply(spectra_no_hemoglobin, i
 # Evaluate the average spectrum
 if (average_spectrum_evaluation == TRUE) {
 	# Compute the average spectrum of this filtered dataset
-	average_spectrum <- averageMassSpectra (spectra_no_hemoglobin, method="mean")
+	average_spectrum <- averageMassSpectra(spectra_no_hemoglobin, method="mean")
 	## Peak picking on the AVG
-	peaks_average <- detectPeaks (average_spectrum, method="MAD", snr=3)
+	peaks_average <- detectPeaks(average_spectrum, method="MAD", SNR=3)
 	hemoglobin_bin <- numeric()
 	# Do this if there are peaks
 	if (length(peaks_average@mass) > 0) {
@@ -1277,15 +1265,17 @@ return (test_performance)
 
 
 ################# PLOT THE MEAN SPECTRUM WITH THE SD BARS ON THE AVERAGE
-average_spectrum_bars <- function (spectra, snr=5, tolerance_ppm=2000, mass_range_plot=c(4000,15000), graph_title="Spectrum", average_spectrum_colour="black", peak_points="yes", points_colour="red", bar_width=40, bar_colour="blue") {
+average_spectrum_bars <- function (spectra, SNR=5, tolerance_ppm=2000, mass_range_plot=c(4000,15000), graph_title="Spectrum", average_spectrum_colour="black", peak_points="yes", points_colour="red", bar_width=40, bar_colour="blue") {
+# Load the required libraries
+install_and_load_required_packages ("MALDIquant")
+#
 # Generate the average spectrum
-average_spectrum <- averageMassSpectra (spectra, method="mean")
-average_spectrum <- removeBaseline (average_spectrum, method="TopHat")
+average_spectrum <- averageMassSpectra(spectra, method="mean")
+average_spectrum <- removeBaseline(average_spectrum, method="TopHat")
 # Peak picking on the average spectrum (for plotting)
-peaks_average <- detectPeaks (average_spectrum, method="MAD", snr=snr)
+peaks_average <- detectPeaks(average_spectrum, method="MAD", SNR=SNR)
 # Peak picking on the dataset
-peaks <- detectPeaks (spectra, method="MAD", snr=snr)
-peaks <- removeEmptyMassObjects (peaks)
+peaks <- detectPeaks(spectra, method="MAD", SNR=SNR)
 # Alignment: merge the two lists and align them all
 peaks_global <- list()
 peaks_global <- peaks
@@ -1351,14 +1341,17 @@ for (i in 1:length(peaks_average@mass)) {
 
 
 ################# PLOT THE SIGNALS OF INTEREST WITH THE SD BARS ON THE AVERAGE
-average_spectrum_bars_signals_of_interest <- function (spectra, snr=5, signals_of_interest=peaks_average@mass, tolerance_ppm=2000, half_window_plot=1000, graph_title="Spectrum", average_spectrum_colour="black", peak_points=TRUE, points_colour="red", bar_width=40, bar_colour="blue") {
+average_spectrum_bars_signals_of_interest <- function (spectra, SNR=5, signals_of_interest=peaks_average@mass, tolerance_ppm=2000, half_window_plot=1000, graph_title="Spectrum", average_spectrum_colour="black", peak_points=TRUE, points_colour="red", bar_width=40, bar_colour="blue") {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 # Generate the average spectrum
 average_spectrum <- averageMassSpectra (spectra, method="mean")
 average_spectrum <- removeBaseline (average_spectrum, method="TopHat")
 # Peak picking on the average spectrum (for plotting)
-peaks_average <- detectPeaks (average_spectrum, method="MAD", snr=snr)
+peaks_average <- detectPeaks (average_spectrum, method="MAD", SNR=SNR)
 # Peak picking on the dataset
-peaks <- detectPeaks (spectra, method="MAD", snr=snr)
+peaks <- detectPeaks (spectra, method="MAD", SNR=SNR)
 peaks <- removeEmptyMassObjects (peaks)
 ######## Generate a vector with the standard deviations of the peaks of interest
 # For each peak in the average peaklist
@@ -1420,7 +1413,10 @@ for (a in 1:length(signals_of_interest)) {
 
 ################################### MEMORY EFFICIENT IMPORTING
 ################## FOR EACH PATIENT: IMPORT, PREPROCESS, FILTER, AVERAGE, REPRESENTATIVE SPECTRA
-memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", mass_range=c(0,0), preprocess_spectra=TRUE, process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=5, algorithm_for_representative_spectra="hca", discarded_nodes=1, average_patient=FALSE, skyline=FALSE, align_spectra=FALSE, alignment_tolerance_ppm=2000, file_format="imzml") {
+memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", mass_range=c(0,0), preprocess_spectra=TRUE, process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=5, algorithm_for_representative_spectra="hca", discarded_nodes=1, average_patient=FALSE, skyline=FALSE, spectra_alignment=FALSE, alignment_tolerance_ppm=2000, file_format="imzml") {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant", "MALDIquantForeign")
+#
 setwd(folder)
 folder_files <- read_spectra_files (folder, file_format=file_format, full_path=FALSE)
 spectra_dataset <- list ()
@@ -1485,30 +1481,32 @@ for (i in 1:length(folder_files)) {
 	gc()
 }
 ### Trimming the entire dataset
-	if (mass_range[1] == 0 && mass_range[2] == 0) {
-		spectra_dataset <- trim(spectra_dataset)
-	}
-	if ((mass_range[1] != 0 || mass_range[2] == 0) && mass_range[2] != 0) {
-		spectra_dataset <- trim(spectra_dataset, range=mass_range)
-	}
-	if (mass_range[1] != 0 && mass_range[2] == 0) {
-		upperCroppingBoundary <- Inf
-		spectra_dataset <- trim(spectra_dataset, range=mass_range)
-	}
-	spectra_dataset <- calibrateIntensity (spectra_dataset, method="TIC")
+if (mass_range[1] == 0 && mass_range[2] == 0) {
+	spectra_dataset <- trim(spectra_dataset)
+}
+if (mass_range[1] == 0 && mass_range[2] != 0) {
+	spectra_dataset <- trim(spectra_dataset, range=mass_range)
+}
+if (mass_range[1] != 0 && mass_range[2] == 0) {
+	mass_range[2] <- Inf
+	spectra_dataset <- trim(spectra_dataset, range=mass_range)
+}
+if (mass_range[1] != 0 && mass_range[2] != 0) {
+	spectra_dataset <- trim(spectra_dataset, range=mass_range)
+}
+spectra_dataset <- calibrateIntensity (spectra_dataset, method="TIC")
 ### Spectral alignment
-if (align_spectra==TRUE) {
-	# Determine the warping function
-	peaks <- detectPeaks (spectra_dataset, snr=5)
-	reference_for_alignment <- referencePeaks (peaks, method="relaxed", tolerance=(alignment_tolerance_ppm/10^6), minFrequency=0.9)
+if (spectra_alignment==TRUE) {
+	# Average the spectra: the avg spectrum peaks will be used as reference
+    spectra_avg_ref <- averageMassSpectra (spectra_dataset, method="mean")
+	peaks_avg_ref <- detectPeaks(spectra_avg_ref, SNR=5)
+	reference_for_alignment <- peaks_avg_ref@mass
 	if (length(reference_for_alignment@mass) > 0) {
 		if (tof_mode == "linear") {
-			spectra_dataset <- align_spectra (spectra_dataset, halfWindowSize=20, noiseMethod="MAD", snr=3,
-					reference=reference_for_alignment, tolerance=(alignment_tolerance_ppm/10^6), warpingMethod="lowess")
+			spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=20, noiseMethod="MAD", SNR=3, reference=reference_for_alignment, tolerance=(alignment_tolerance_ppm/10^6), warpingMethod="cubic")
 		}
 		if (tof_mode == "reflector" | tof_mode == "reflectron") {
-			spectra_dataset <- align_spectra (spectra_dataset, halfWindowSize=5, noiseMethod="MAD", snr=3,
-					reference=reference_for_alignment, tolerance=(alignment_tolerance_ppm/10^6), warpingMethod="lowess")
+			spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=5, noiseMethod="MAD", SNR=3, reference=reference_for_alignment, tolerance=(alignment_tolerance_ppm/10^6), warpingMethod="cubic")
 		}
 	}
 }
@@ -1537,11 +1535,14 @@ return (spectra_dataset)
 
 #################### SIGNAL COUNTER IN THE AVERAGE SPECTRUM
 ##### Count signals in a mass range
-countSignalsRangeAverageSpectrum <- function (spectra, snr=5, lower=4000, interval_width=1000, max=20000) {
+countSignalsRangeAverageSpectrum <- function (spectra, SNR=5, lower=4000, interval_width=1000, max=20000) {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 average_spectrum <- averageMassSpectra (spectra, method="mean")
 average_spectrum <- removeBaseline (average_spectrum, method="TopHat")
 # Peak picking on the average_spectrum
-peaks_average <- detectPeaks (average_spectrum, method="MAD", snr=snr)
+peaks_average <- detectPeaks (average_spectrum, method="MAD", SNR=SNR)
 # Vector with signals
 peak_vector <- peaks_average@mass
 #Create the result_matrix
@@ -1583,8 +1584,11 @@ return (result_matrix)
 
 #################### SIGNAL COUNTER IN THE AVERAGE SPECTRUM
 ##### Count signals in a mass range
-count_signals_range_spectra <- function (spectra, snr=5, lower=4000, interval_width=1000, max=20000) {
-peaks <- detectPeaks (spectra, method="MAD", snr=snr)
+count_signals_range_spectra <- function (spectra, SNR=5, lower=4000, interval_width=1000, max=20000) {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
+peaks <- detectPeaks (spectra, method="MAD", SNR=SNR)
 #Create the result_matrix
 result_matrix <- matrix ("Number of signals", ncol=(((max-lower)/interval_width)+1), nrow=1)
 # Count the signals in the specified mass range, with a counter
@@ -1640,6 +1644,9 @@ return (result_matrix)
 
 ################################## GENERATE A SKYLINE SPECTRUM
 generate_skyline_spectrum <- function (spectra) {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 # Generate the matrix containing all the intensities of the data points for each spectrum
 spectra_matrix <- matrix (0, nrow=(length(spectra)+1), ncol=length(spectra[[1]]@mass))
 colnames(spectra_matrix) <- spectra[[1]]@mass
@@ -1693,6 +1700,9 @@ return (lowest_data_points)
 
 ###################### SPECTRA BINNING
 resample_spectra <- function (spectra, final_data_points=lowest_data_points, binning_method="sum") {
+# Load the required libraries
+install_and_load_required_packages("parallel")
+#
 ####################################################### BINNING FUNCTION
 binning_function <- function (spectra, final_data_points, binning_method) {
 	# Create the new spectra_binned list
@@ -1784,12 +1794,15 @@ print(paste("Equal distance between datapoints", (all(sapply(spectra_binned, isR
 ########################################################################
 ###### SORT THE SIGNALS AND TAKE ONLY THE N MOST INTENSE
 most_intense_signals <- function (spectra, signals_to_take=20) {
+# Load the required libraries
+install_and_load_required_packages(c("parallel", "MALDIquant"))
+#
 ####################################################### PICKING FUNCTION
 picking_function <- function (peaks, signals_to_take) {
 	# Create a dataframe with mass and intensity
-	peaks_data_frame <- data.frame (mass = peaks@mass, intensity = peaks@intensity, snr = peaks@snr)
-	# Sort the dataframe according to the snr
-	peaks_data_frame <- peaks_data_frame [order(-peaks_data_frame$snr),]
+	peaks_data_frame <- data.frame (mass = peaks@mass, intensity = peaks@intensity, SNR = peaks@SNR)
+	# Sort the dataframe according to the SNR
+	peaks_data_frame <- peaks_data_frame [order(-peaks_data_frame$SNR),]
 	# Select only the first most intense signals
 	selected_signals <- peaks_data_frame [1:signals_to_take,]
 	# Sort the dataframe back according to mass
@@ -1797,12 +1810,12 @@ picking_function <- function (peaks, signals_to_take) {
 	# Put these signals back into the peaklist
 	peaks@mass <- selected_signals$mass
 	peaks@intensity <- selected_signals$intensity
-	peaks@snr <- selected_signals$snr
+	peaks@SNR <- selected_signals$SNR
 	return (peaks)
 }
 ########################################################################
 # Peak picking
-peaks <- detectPeaks (spectra, method="MAD", snr=3)
+peaks <- detectPeaks (spectra, method="MAD", SNR=3)
 most_intense_peaks <- mclapply(peaks, FUN= function (peaks) picking_function (peaks, signals_to_take=signals_to_take))
 return (most_intense_peaks)
 }
@@ -1814,13 +1827,16 @@ return (most_intense_peaks)
 
 ########################################################################
 ###### SORT THE SIGNALS AND TAKE ONLY THE N LESS INTENSE
-less_intense_signals <- function (spectra, base_snr=2, signals_to_take=20) {
+less_intense_signals <- function (spectra, base_SNR=2, signals_to_take=20) {
+# Load the required libraries
+install_and_load_required_packages(c("parallel", "MALDIquant"))
+#
 ############################################################
 picking_function <- function (peaks, signals_to_take) {
 	# Create a dataframe with mass and intensity
-	peaks_data_frame <- data.frame (mass = peaks@mass, intensity = peaks@intensity, snr = peaks@snr)
-	# Sort the dataframe according to the snr
-	peaks_data_frame <- peaks_data_frame [order(peaks_data_frame$snr),]
+	peaks_data_frame <- data.frame (mass = peaks@mass, intensity = peaks@intensity, SNR = peaks@SNR)
+	# Sort the dataframe according to the SNR
+	peaks_data_frame <- peaks_data_frame [order(peaks_data_frame$SNR),]
 	# Select only the first most intense signals
 	selected_signals <- peaks_data_frame [1:signals_to_take,]
 	# Sort the dataframe back according to mass
@@ -1828,12 +1844,12 @@ picking_function <- function (peaks, signals_to_take) {
 	# Put these signals back into the peaklist
 	peaks@mass <- selected_signals$mass
 	peaks@intensity <- selected_signals$intensity
-	peaks@snr <- selected_signals$snr
+	peaks@SNR <- selected_signals$SNR
 	return (peaks)
 }
 ###########################################################
 # Peak picking
-peaks <- detectPeaks (spectra, method="MAD", snr=base_snr)
+peaks <- detectPeaks (spectra, method="MAD", SNR=base_SNR)
 less_intense_peaks <- mclapply(peaks, FUN= function (peaks) picking_function (peaks, signals_to_take=signals_to_take))
 return (less_intense_peaks)
 }
@@ -1844,16 +1860,19 @@ return (less_intense_peaks)
 
 ########################################################################
 ####### LESS AND MOST INTENSE SIGNALS
-highest_and_lowest_intensity_signals <- function (spectra, base_snr=3, signals_to_take) {
+highest_and_lowest_intensity_signals <- function (spectra, base_SNR=3, signals_to_take) {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 # Peak picking
-peaks <- detectPeaks (spectra, method="MAD", snr=base_snr)
+peaks <- detectPeaks (spectra, method="MAD", SNR=base_SNR)
 # For each peaklist...
 for (p in 1:length(peaks)) {
 	# Create a dataframe with mass and intensity
-	peaks_data_frame <- data.frame (mass = peaks[[p]]@mass, intensity = peaks[[p]]@intensity, snr = peaks[[p]]@snr)
-	# Sort the dataframe according to the snr
-	most_intense_peaks_data_frame <- peaks_data_frame [order(-peaks_data_frame$snr),]
-	less_intense_peaks_data_frame <- peaks_data_frame [order(peaks_data_frame$snr),]
+	peaks_data_frame <- data.frame (mass = peaks[[p]]@mass, intensity = peaks[[p]]@intensity, SNR = peaks[[p]]@SNR)
+	# Sort the dataframe according to the SNR
+	most_intense_peaks_data_frame <- peaks_data_frame [order(-peaks_data_frame$SNR),]
+	less_intense_peaks_data_frame <- peaks_data_frame [order(peaks_data_frame$SNR),]
 	# Select only the first most intense signals
 	selected_signals_most_intense <- most_intense_peaks_data_frame [1:(signals_to_take/2),]
 	selected_signals_less_intense <- less_intense_peaks_data_frame [1:(signals_to_take/2),]
@@ -1863,10 +1882,10 @@ for (p in 1:length(peaks)) {
 	# Put these signals back into the peaklist
 	peaks[[p]]@mass <- selected_signals_less_intense$mass
 	peaks[[p]]@intensity <- selected_signals_less_intense$intensity
-	peaks[[p]]@snr <- selected_signals_less_intense$snr
+	peaks[[p]]@SNR <- selected_signals_less_intense$SNR
 	peaks[[p]]@mass <- append(peaks[[p]]@mass, selected_signals_most_intense$mass)
 	peaks[[p]]@intensity <- append(peaks[[p]]@intensity, selected_signals_most_intense$intensity)
-	peaks[[p]]@snr <- append(peaks[[p]]@snr, selected_signals_most_intense$snr)
+	peaks[[p]]@SNR <- append(peaks[[p]]@SNR, selected_signals_most_intense$SNR)
 }
 return (peaks)
 }
@@ -1977,6 +1996,9 @@ return (spectra_list)
 
 ########################### ALIGN THE DATAPOINTS AFTER TRUNCATION OR BINNING
 align_data_points_after_truncation <- function (spectra, tof_mode="linear") {
+# Load the required libraries
+install_and_load_required_packages("parallel")
+#
 # Make the cluster (one for each core/thread)
 cl <- makeCluster(cpu_core_number)
 ########################################################################
@@ -2013,6 +2035,9 @@ return (spectra)
 
 ##################################### BIOTYPER SCORE
 biotyper_score <- function (filepath_samples, peaks_test, peaks_library, class_list, tolerance_ppm=2000, intensity_tolerance_percent=50, file_format="brukerflex", spectra_path_output=TRUE, replicates_average=FALSE, score_only=TRUE, standard_deviation_evaluation=FALSE, number_of_st_dev=1) {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 number_of_samples <- length(peaks_test)
 library_size <- length(peaks_library)
 # Create the sample vector
@@ -2185,7 +2210,7 @@ if (standard_deviation_evaluation == FALSE) {
 	}
 }
 ####################################################### SCORE (FR-STDEV)
-############################ peaks_library SHULD HAVE snr REPLACED BY SD!
+############################ peaks_library SHULD HAVE SNR REPLACED BY SD!
 if (standard_deviation_evaluation == TRUE) {
 	# Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
 	# COUNTER 1 - FIT
@@ -2252,7 +2277,7 @@ if (standard_deviation_evaluation == TRUE) {
 					# Count the number of closely matching signals with the reference in the sample peaklist
 					if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
 						# Evaluate the difference in intensity
-						if ((peaks_test[[s]]@intensity[i] <= (peaks_library[[l]]@intensity[j] + (number_of_st_dev * peaks_library[[l]]@snr[j]))) && (peaks_test[[s]]@intensity[i] >= (peaks_library[[l]]@intensity[j] - (number_of_st_dev * peaks_library[[l]]@snr[j])))) {
+						if ((peaks_test[[s]]@intensity[i] <= (peaks_library[[l]]@intensity[j] + (number_of_st_dev * peaks_library[[l]]@SNR[j]))) && (peaks_test[[s]]@intensity[i] >= (peaks_library[[l]]@intensity[j] - (number_of_st_dev * peaks_library[[l]]@SNR[j])))) {
 							counter3[s,l] <- counter3[s,l] + 1
 						}
 					}
@@ -2327,7 +2352,10 @@ return (output)
 
 
 ###################### SIGNAL FOLLOWER
-signal_follower_statistics <- function (filepath, signal_list, mass_labels=list(), snr=5, file_format="imzml") {
+signal_follower_statistics <- function (filepath, signal_list, mass_labels=list(), SNR=5, file_format="imzml") {
+# Load the required libraries
+install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
+#
 # Define the column and row headers (if mass labels are provided or not)
 if (length(mass_labels) != 0) {
 	column_names_st_dev <- vector(length=length(signal_list))
@@ -2379,7 +2407,7 @@ for (lib in 1:length(filepath)) {
 	### Normalisation (TIC)
 	spectra <- calibrateIntensity (spectra, method="TIC")
 	### Peak Picking and alignment
-	peaks <- detectPeaks (spectra, method="MAD", snr=snr)
+	peaks <- detectPeaks (spectra, method="MAD", SNR=SNR)
 	#### Create the partial result matrices
 	st_dev_matrix <- matrix (ncol=length(signal_list), nrow=1)
 	colnames(st_dev_matrix) <- column_names_st_dev
@@ -2476,6 +2504,9 @@ return (spectra_files)
 
 ################### AVERAGE THE REPLICATES (BY NAME)
 average_replicates_by_name <- function (spectra, pattern_for_replicates="name_of_the_file", number_of_characters_for_similarity=10, file_format="brukerflex") {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 ## Put the filenames in a vector
 # Create the empty vector
 sample_vector <- vector(length=0)
@@ -2529,16 +2560,19 @@ return (spectra_replicates_averaged)
 
 ########################################## PEAKLIST FILTERING
 # Remove all the bad peaklists, keep only the best ones
-filter_peaklist <- function (peaks, snr_filter=15, signal_number_threshold=15) {
-if (snr_filter != 0 && signal_number_threshold != 0) {
+filter_peaklist <- function (peaks, SNR_filter=15, signal_number_threshold=15) {
+# Load the required libraries
+install_and_load_required_packages("parallel")
+#
+if (SNR_filter != 0 && signal_number_threshold != 0) {
 	# Create the clusters
 	cl <- makeCluster(cpu_core_number)
 	############################################# FILTERING FUNCTION
-	peak_filtering_function <- function (peaks, snr_filter, signal_number_threshold) {
-		### Create a dataframe with the snr
-		peaks_data_frame <- data.frame (snr = peaks@snr)
-		### elect only the snr more than the threshold
-		peaks_data_frame <- peaks_data_frame [peaks_data_frame$snr >= snr_filter,]
+	peak_filtering_function <- function (peaks, SNR_filter, signal_number_threshold) {
+		### Create a dataframe with the SNR
+		peaks_data_frame <- data.frame (SNR = peaks@SNR)
+		### elect only the SNR more than the threshold
+		peaks_data_frame <- peaks_data_frame [peaks_data_frame$SNR >= SNR_filter,]
 		### Select only the desired peaklists, based upon the threshold characteristics
 			if (length(peaks_data_frame) < signal_number_threshold) {
 				# Remove the bad spectrum from the list
@@ -2547,7 +2581,7 @@ if (snr_filter != 0 && signal_number_threshold != 0) {
 		return (peaks)
 	}
 	################################################################
-	peaks_purified <- parLapply(cl, peaks, fun=function(peaks) peak_filtering_function(peaks, snr_filter=snr_filter, signal_number_threshold=signal_number_threshold))
+	peaks_purified <- parLapply(cl, peaks, fun=function(peaks) peak_filtering_function(peaks, SNR_filter=SNR_filter, signal_number_threshold=signal_number_threshold))
 	### Keep only the elements that are different from NULL
 	peaks_purified <- peaks_purified [!sapply(peaks_purified, is.null)]
 	# Stop the clusters
@@ -2568,6 +2602,9 @@ if (snr_filter != 0 && signal_number_threshold != 0) {
 
 #################################### SPECTRA GROUPING (PEAKLIST MERGING)
 merge_peaklist <- function (peaks, file_format="imzml", tof_mode="linear") {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 ### Alignment
 if (tof_mode == "linear") {
 peaks <- binPeaks(peaks, method="relaxed", tolerance=0.002)
@@ -2618,6 +2655,9 @@ return (peaks_merged)
 
 ############## SPECTRA GROUPING CLASS (PEAKLIST MERGING)
 merge_peaklist_class <- function (peaks, class_list, file_format="imzml", tof_mode="linear") {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 ### Alignment
 if (tof_mode == "linear") {
 peaks <- binPeaks(peaks, method="relaxed", tolerance=0.002)
@@ -2725,6 +2765,9 @@ return (peak_intensity_plot)
 
 ##################### AVERAGE THE REPLICATES (BY FOLDER)
 average_replicates_by_folder <- function (spectra, folder, file_format="brukerflex") {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 # List the spectra files
 folder_files <- read_spectra_files (folder, file_format=file_format, full_path=TRUE)
 # Split the path into individual folders
@@ -2760,7 +2803,10 @@ return (spectra_replicates_averaged)
 
 
 ######################################## LIBRARY CREATION (for Biotyper)
-library_creation <- function (filepath_library, class_list=list(), class_grouping=TRUE, mass_range=c(3000,15000), replicates_average=FALSE, patients_average=FALSE, snr=5, most_intense_peaks=TRUE, signals_to_take=20, standard_deviation=FALSE, coeff_of_var=FALSE, low_intensity_peak_removal=FALSE, intensity_threshold_percent=0.1, tof_mode="linear", file_format="brukerflex") {
+library_creation <- function (filepath_library, class_list=list(), class_grouping=TRUE, mass_range=c(3000,15000), replicates_average=FALSE, patients_average=FALSE, SNR=5, most_intense_peaks=TRUE, signals_to_take=20, standard_deviation=FALSE, coeff_of_var=FALSE, low_intensity_peak_removal=FALSE, intensity_threshold_percent=0.1, tof_mode="linear", file_format="brukerflex") {
+# Load the required libraries
+install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
+#
 if (tof_mode == "linear") {
 	tolerance_ppm <- 2000
 }
@@ -2808,25 +2854,25 @@ if (most_intense_peaks == TRUE) {
 	peaks_library <- most_intense_signals (spectra, signals_to_take=signals_to_take)
 }
 if (most_intense_peaks == FALSE) {
-	peaks_library <- detectPeaks (spectra, method="MAD", snr=snr)
+	peaks_library <- detectPeaks (spectra, method="MAD", SNR=SNR)
 }
 ###########################
 if (standard_deviation == TRUE && coeff_of_var == FALSE) {
 	# For each peaklist in the library, compute the SD
 	for (j in 1:length(peaks_library)) {
-		peaks_library[[j]] <- replace_snr_with_st_dev_in_peaklist (peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format)
+		peaks_library[[j]] <- replace_SNR_with_st_dev_in_peaklist (peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format)
 	}
 }
 if (standard_deviation == FALSE && coeff_of_var == TRUE) {
 	# For each peaklist in the library, compute the CV
 	for (j in 1:length(peaks_library)) {
-		peaks_library[[j]] <- replace_snr_with_cv_in_peaklist (peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format)
+		peaks_library[[j]] <- replace_SNR_with_cv_in_peaklist (peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format)
 	}
 }
 if (standard_deviation == TRUE && coeff_of_var == TRUE) {
 	# For each peaklist in the library, compute the SD
 	for (j in 1:length(peaks_library)) {
-		peaks_library[[j]] <- replace_snr_with_st_dev_in_peaklist (peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format)
+		peaks_library[[j]] <- replace_SNR_with_st_dev_in_peaklist (peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format)
 	}
 }
 ############
@@ -2850,6 +2896,9 @@ return (library_list)
 
 ######################## PEAK ALIGNMENT
 align_and_filter_peaks <- function (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1) {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
 peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
 peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
@@ -2859,7 +2908,7 @@ if (peaks_filtering == TRUE) {
 	peaks_aligned <- filterPeaks(peaks_aligned, minFrequency=frequency_threshold)
 }
 if (low_intensity_peaks_removal == TRUE) {
-	peaks_aligned <- remove_low_intensity_peaks (peaks_aligned, intensity_threshold_percent=intensity_threshold_percent)
+	peaks_aligned <- remove_low_intensity_peaks(peaks_aligned, intensity_threshold_percent=intensity_threshold_percent)
 }
 return (peaks_aligned)
 }
@@ -2876,6 +2925,9 @@ return (peaks_aligned)
 
 ############################ PEAK FILTERING
 discard_peaks <- function (peaks, list_of_peaks=list(), mass_type="monoisotopic", cluster_size=4, tof_mode="reflectron") {
+# Load the required libraries
+install_and_load_required_packages("parallel")
+#
 if (mass_type == "monoisotopic") {
 	# For each peak in the peaklist of interest
 	for (p in 1:length(list_of_peaks)) {
@@ -2904,7 +2956,7 @@ if (tof_mode == "reflectron" || tof_mode == "reflector") {
 ###################################################### ERASING FUNCTION
 peaks_erasing_function <- function (peaks, list_of_peaks) {
 	# Create a dataframe with mass and intensity
-	peaks_data_frame <- data.frame (mass = peaks@mass, intensity = peaks@intensity, snr = peaks@snr)
+	peaks_data_frame <- data.frame (mass = peaks@mass, intensity = peaks@intensity, SNR = peaks@SNR)
 	# Select the peaks of interest and remove them from the peaklist
 	for (p in 1: length(list_of_peaks)) {
 		for (s in 1:length(peaks_data_frame$mass)) {
@@ -2918,7 +2970,7 @@ peaks_erasing_function <- function (peaks, list_of_peaks) {
 	# Put these signals back into the peaklist
 	peaks@mass <- peaks_data_frame$mass
 	peaks@intensity <- peaks_data_frame$intensity
-	peaks@snr <- peaks_data_frame$snr
+	peaks@SNR <- peaks_data_frame$SNR
 	return (peaks)
 }
 #######################################################################
@@ -2944,22 +2996,25 @@ return (peaks)
 
 
 ########################## FILTER SPECTRA
-filter_spectra_noise <- function (spectra, snr_filter=20, percentage_above_threshold=10) {
+filter_spectra_noise <- function (spectra, SNR_filter=20, percentage_above_threshold=10) {
+# Load the required libraries
+install_and_load_required_packages(c("parallel", "MALDIquant"))
+#
 cl <- makeCluster(cpu_core_number)
 clusterEvalQ (cl, {library(MALDIquant)})
 ################################################## NOISY SPECTRA REMOVAL
-noisy_spectra_removal_function <- function (spectra, snr_filter, percentage_above_threshold) {
+noisy_spectra_removal_function <- function (spectra, SNR_filter, percentage_above_threshold) {
 	# Peak picking
-	peaks <- detectPeaks (spectra, method="MAD", snr=3)
+	peaks <- detectPeaks (spectra, method="MAD", SNR=3)
 	# Keep only the spectra with a certain percentage of signals above the threshold
-	peaks_new <- detectPeaks (spectra, method="MAD", snr=snr_filter)
+	peaks_new <- detectPeaks (spectra, method="MAD", SNR=SNR_filter)
 	if ((length(peaks_new@mass) / length(peaks@mass))*100 < percentage_above_threshold) {
 		spectra <- NULL
 	}
 	return (spectra)
 }
 ########################################################################
-spectra <- parLapply(cl, spectra, fun=function (spectra) noisy_spectra_removal_function (spectra, snr_filter, percentage_above_threshold))
+spectra <- parLapply(cl, spectra, fun=function (spectra) noisy_spectra_removal_function (spectra, SNR_filter, percentage_above_threshold))
 stopCluster(cl)
 ### Keep only the elements that are different from NULL
 spectra <- spectra [!sapply(spectra, is.null)]
@@ -2976,11 +3031,10 @@ return (spectra)
 
 
 
-######################### REPLACE THE snr WITH THE STDEV IN THE PEAKS
+######################### REPLACE THE SNR WITH THE STDEV IN THE PEAKS
 ### Compute the standard deviation of each peak of a average spectrum peaklist,
-# by replacing the existing snr slot with the SD (each peak of the average peaklist
-# is searched across the dataset
-replace_snr_with_st_dev_in_peaklist <- function (peaks_average, peaks, tolerance_ppm=2000, file_format="imzml") {
+# by replacing the existing SNR slot with the SD (each peak of the average peaklist is searched across the dataset
+replace_SNR_with_st_dev_in_peaklist <- function (peaks_average, peaks, tolerance_ppm=2000, file_format="imzml") {
 	# Scroll the peaks of the average peaklist
 	for (p in 1:length(peaks_average@mass)) {
 		# Create an empty vector where to allocate the intensity of this peak into the dataset
@@ -3015,8 +3069,8 @@ replace_snr_with_st_dev_in_peaklist <- function (peaks_average, peaks, tolerance
 		}
 		# Calculate the standard deviation of the peak (whose intensities are in the vector)
 		st_dev <- sd(intensity_vector)
-		# Replace the snr slot with the st_dev (for the peak)
-		peaks_average@snr[p] <- st_dev
+		# Replace the SNR slot with the st_dev (for the peak)
+		peaks_average@SNR[p] <- st_dev
 	}
 return (peaks_average)
 }
@@ -3030,11 +3084,11 @@ return (peaks_average)
 
 
 
-######################### REPLACE THE snr WITH THE CV IN THE PEAKS
+######################### REPLACE THE SNR WITH THE CV IN THE PEAKS
 ### Compute the coefficient of variation of each peak of a average spectrum peaklist,
-# by replacing the existing snr slot with the CV (each peak of the average peaklist
+# by replacing the existing SNR slot with the CV (each peak of the average peaklist
 # is searched across the dataset
-replace_snr_with_cv_in_peaklist <- function (peaks_average, peaks, tolerance_ppm=2000, file_format="imzml") {
+replace_SNR_with_cv_in_peaklist <- function (peaks_average, peaks, tolerance_ppm=2000, file_format="imzml") {
 	# Scroll the peaks of the average peaklist
 	for (p in 1:length(peaks_average@mass)) {
 		# Create an empty vector where to allocate the intensity of this peak into the dataset
@@ -3072,8 +3126,8 @@ replace_snr_with_cv_in_peaklist <- function (peaks_average, peaks, tolerance_ppm
 		mean_intensity <- mean(intensity_vector)
 		# Calculate the coefficient of variation
 		coeff_var_intensity <- (st_dev / mean_intensity) * 100
-		# Replace the snr slot with the CV (for the peak)
-		peaks_average@snr[p] <- coeff_var_intensity
+		# Replace the SNR slot with the CV (for the peak)
+		peaks_average@SNR[p] <- coeff_var_intensity
 	}
 return (peaks_average)
 }
@@ -3089,9 +3143,12 @@ return (peaks_average)
 
 
 ######## RICHEST PEAKLIST AS REFERENCE FOR THE SPECTRA ALIGNMENT/WARPING
-richest_peaklist_for_alignment <- function (spectra, snr=5, tolerance_ppm=2000) {
+richest_peaklist_for_alignment <- function (spectra, SNR=5, tolerance_ppm=2000) {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+#
 # Peak picking
-peaks <- detectPeaks (spectra, method="MAD", snr=snr)
+peaks <- detectPeaks (spectra, method="MAD", SNR=SNR)
 # Define the indexes
 index <- 0
 max_length <- 0
@@ -3106,7 +3163,7 @@ for (i in 1:length(peaks)) {
 # Create the vector containing the richest peaklist
 reference_peaklist <- peaks[[index]]
 # SPECTRA WARPING / ALIGNMENT
-spectra <- align_spectra (spectra, reference=reference_peaklist, tolerance=(tolerance_ppm/10^6), noiseMethod="MAD", snr=snr, warpingMethod="quadratic")
+spectra <- alignSpectra(spectra, reference=reference_peaklist, tolerance=(tolerance_ppm/10^6), noiseMethod="MAD", SNR=SNR, warpingMethod="quadratic")
 return (spectra)
 }
 
@@ -3123,6 +3180,9 @@ return (spectra)
 ############################# MATRIX ZERO FILLING
 # Replace the NA values with a zero
 matrix_zero_filling <- function (input_matrix) {
+# Load the required libraries
+install_and_load_required_packages("parallel")
+#
 cl <- makeCluster(cpu_core_number)
 ######################################################## NA REPLACEMENT FUNCTION
 na_replacement_function <- function (x) {
@@ -3229,7 +3289,10 @@ return (signal_matrix)
 
 
 ############################## PEAK STATISTICS (on processed Spectra)
-peak_statistics <- function (spectra, snr=3, class_list=list(), tof_mode="linear", file_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, remove_outliers=TRUE) {
+peak_statistics <- function (spectra, SNR=3, class_list=list(), tof_mode="linear", file_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, remove_outliers=TRUE) {
+# Load the required libraries
+install_and_load_required_packages(c("MALDIquant", "stats"))
+#
 # Determine the number of classes
 if (length(class_list) == 0 | length(class_list) == 1) {
 number_of_classes <- 1
@@ -3239,14 +3302,14 @@ if (length(class_list) > 1) {
 }
 # Detect and Align Peaks
 if (tof_mode == "linear") {
-	peaks <- detectPeaks (spectra, method="MAD", snr=snr, halfWindowSize=20)
+	peaks <- detectPeaks (spectra, method="MAD", SNR=SNR, halfWindowSize=20)
 }
 if (tof_mode == "reflector" | tof_mode == "reflectron") {
-	peaks <- detectPeaks (spectra, method="MAD", snr=snr, halfWindowSize=20)
+	peaks <- detectPeaks (spectra, method="MAD", SNR=SNR, halfWindowSize=5)
 }
-peaks <- align_and_filter_peaks (peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold=frequency_threshold)
+peaks <- align_and_filter_peaks(peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold=frequency_threshold)
 # Generate the matrix (and convert it into a data frame)
-signal_matrix <- intensityMatrix (peaks, spectra)
+signal_matrix <- intensityMatrix(peaks, spectra)
 # Peak vector
 #peak_vector <- as.numeric(names(signal_matrix))
 ############################################################## ONE CLASS
@@ -3489,6 +3552,9 @@ return (peak_stat_matrix)
 
 ########################## REMOVE LOW INTENSITY PEAKS
 remove_low_intensity_peaks <- function (peaks, intensity_threshold_percent=0.1) {
+# Load the required libraries
+install_and_load_required_packages("parallel")
+#
 cl <- makeCluster(cpu_core_number)
 ########################################### INTENSITY FILTERING FUNCTION
 intensity_filtering_function <- function (peaks, intensity_threshold_percent) {
@@ -3572,13 +3638,16 @@ return (spectra)
 
 ################################# REMOVE UNDIGESTED SPECTRA
 remove_undigested_spectra <- function (spectra, mass_range_of_interest=c(0,2500), percentage_of_spectrum_in_the_range=75) {
+# Load the required libraries
+install_and_load_required_packages("parallel")
+#
 # Make the cluster (one for each core/thread)
 cl <- makeCluster(cpu_core_number)
 clusterEvalQ (cl, {library(MALDIquant)})
 ################################################# UNDIGESTED FILTERING FUNCTION
 undigested_filtering_function <- function (spectra, mass_range_of_interest, percentage_of_spectrum_in_the_range) {
 	## Peak picking
-	peaks <- detectPeaks (spectra, method="MAD", snr=3, halfWindowSize=20)
+	peaks <- detectPeaks (spectra, method="MAD", SNR=3, halfWindowSize=20)
 	# Define the peaks of interest based on the given interval
 	peaks_of_interest <- peaks@mass [peaks@mass > mass_range_of_interest[1] & peaks@mass < mass_range_of_interest[2]]
 	# Calculate the percentage of the spectrum that is within the given range
@@ -3611,13 +3680,16 @@ return (spectra_digested)
 
 ################# GENERATE REPRESENTATIVE SPECTRA, BASED UPON SPECTRA SIMILARITY (ONE IMZML)
 generate_representative_spectra_hca <- function (spectra, spectra_per_patient=10, tof_mode="linear", algorithm="hierarchicalClustering") {
+# Load the required libraries
+install_and_load_required_packages(c("MALDIquant", "stats"))
+#
 # Detect and align peaks
 if (tof_mode=="linear") {
-	peaks <- detectPeaks (spectra, method="MAD", snr=3, halfWindowSize=20)
+	peaks <- detectPeaks (spectra, method="MAD", SNR=3, halfWindowSize=20)
 	peaks <- align_and_filter_peaks (peaks, tolerance_ppm=2000, peaks_filtering=FALSE, frequency_threshold=0.25)
 }
 if (tof_mode=="reflectron" | tof_mode=="reflector") {
-	peaks <- detectPeaks (spectra, method="MAD", snr=3, halfWindowSize=20)
+	peaks <- detectPeaks (spectra, method="MAD", SNR=3, halfWindowSize=20)
 	peaks <- align_and_filter_peaks (peaks, tolerance_ppm=200, peaks_filtering=FALSE, frequency_threshold=0.25)
 }
 # Generate the peaklist matrix
@@ -3680,6 +3752,9 @@ return (spectra_grouped)
 
 ############################################## DEISOTOPING
 de_isotope_peaks <- function (peaks) {
+# Load the required libraries
+install_and_load_required_packages("parallel")
+#
 ##################################################### Deisotoping Function
 deisotoping_function <- function (peaks) {
 	# Deisotoped Ions
