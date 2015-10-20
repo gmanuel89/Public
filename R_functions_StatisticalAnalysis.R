@@ -1,46 +1,4 @@
 ################## FEATURE SELECTION FUNCTIONS
-
-###INSTALL THE REQUIRED PACKAGES
-required_packages <- c ("parallel", "caret", "tcltk", "e1071", "doMC", "kernlab", "pROC")
-installed_packages <- installed.packages()[,1]
-missing_packages <- character()
-for (p in 1:length(required_packages)) {
-	if ((required_packages[p] %in% installed_packages) == FALSE) {
-		missing_packages <- append(missing_packages, required_packages[p])
-	}
-}
-if (length(missing_packages) > 0) {
-	install.packages(missing_packages)
-}
-
-
-
-
-############ LOAD THE REQUIRED PACKAGES
-library (parallel)
-library (caret)
-library (tcltk)
-library (doMC)
-library (e1071)
-library (kernlab)
-library (pROC)
-
-
-
-
-############################## MULTICORE
-# Detect the number of cores
-cpu_thread_Number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
-# Register the foreach backend
-registerDoMC(cores = cpu_core_number)
-##############################
-
-
-
-
-
-################################################################################
 ################################################ INSTALL REQUIRED PACKAGES
 install_and_load_required_packages <- function (required_packages) {
 installed_packages <- installed.packages()[,1]
@@ -54,7 +12,7 @@ if (length(missing_packages) > 0) {
 	install.packages(missing_packages)
 }
 for (p in required_packages) {
-	library(p)
+	library(p, character.only=TRUE)
 }
 }
 
@@ -68,7 +26,7 @@ source_github <- function(url, ...) {
   if ("RCurl" %in% installed.packages()[,1] == FALSE) {
 	  install.packages("RCurl")
   }
-  require(RCurl)
+  library(RCurl)
   # Parse and evaluate each R script (in the global environement)
   sapply(c(url, ...), function(u) {
     eval(parse(text = getURL(u, followlocation = TRUE, cainfo = system.file("CurlSSL", "cacert.pem", package = "RCurl"))), envir = .GlobalEnv)
@@ -114,12 +72,10 @@ return (peaklist_features_low_correlation)
 
 ################################ DEFINED SPECTRA GROUPING (PEAKLIST MATRIX)
 # Generate a peaklist dataframe with a certain number of rows per patient
-group_peaklist <- function (peaklist, rows_per_patient=100, seed=0, balanced=TRUE, discard_poor_samples=FALSE, discard_if_lower_than=100, non_features=c("Sample","Class"), algorithm="random") {
-# Plant the seed only if a specified value is entered
-if (seed != 0) {
-	# Make the randomness reproducible
-	set.seed(seed)
-}
+group_peaklist <- function (peaklist, rows_per_patient=100, seed=NULL, balanced=TRUE, discard_poor_samples=FALSE, discard_if_lower_than=100, non_features=c("Sample","Class"), algorithm="random") {
+# Load the required libraries
+install_and_load_required_packages(c("caret", "stats"))
+#
 result_data_frame <- data.frame()
 # Create the file vector and the patient vector
 file_vector <- peaklist$Sample
@@ -178,6 +134,11 @@ if (rows_per_patient > 1) {
 		if (discard_poor_samples == FALSE || (discard_poor_samples == TRUE && patient_data_frame_rows >= discard_if_lower_than)) {
 			########################### RANDOMNESS
 			if (algorithm == "random") {
+				# Plant the seed only if a specified value is entered
+				if !is.null(seed) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
 				# Generate random folds (one for each representative Spectrum)
 				# Index of the spectra to be allocated in the fold, randomly selected
 				index <- createFolds(patient_data_frame$Sample, k = rows_per_patient)
@@ -205,6 +166,11 @@ if (rows_per_patient > 1) {
 			if (algorithm == "hierarchicalClustering" | algorithm == "hca" | algorithm == "HCA") {
 				# Compute the distance matrix
 				distance_matrix <- dist(patient_data_frame[,!(names(patient_data_frame) %in% non_features)], method="euclidean")
+				# Plant the seed only if a specified value is entered
+				if !is.null(seed) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
 				hca <- hclust(distance_matrix)
 				# Associate to each row/spectrum the subgroup of the tree to which it belongs
 				# k must be between 1 and 56
@@ -235,6 +201,11 @@ if (rows_per_patient > 1) {
 			}
 			######################### K-MEANS
 			if (algorithm == "kMeans" | algorithm == "kmeans" | algorithm == "k-Means") {
+				# Plant the seed only if a specified value is entered
+				if !is.null(seed) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
 				# Compute the k-Means clustering
 				k_means <- kmeans(patient_data_frame[,!(names(patient_data_frame) %in% non_features)], centers=rows_per_patient)
 				# Associate to each row/spectrum the subgroup/cluster to which it belongs
@@ -312,15 +283,15 @@ return (peaklist_no_hemoglobin)
 
 ##################### MATRIX/DATAFRAME SPLITTING FUNCTION (TRAINING AND TESTING)
 # Output which patient (for each class) should be taken for training and for testing
-matrix_splitting_training_test <- function (peaklist, class_list=list(), seed=0, percentage_of_observation_for_training=50) {
-# Plant the seed only if a specified value is entered
-if (seed != 0) {
-	# Make the randomness reproducible
-	set.seed(seed)
-}
+matrix_splitting_training_test <- function (peaklist, class_list=list(), seed=NULL, percentage_of_observation_for_training=50) {
 ############################# If there are no classes or one class, just randomly select rows on the entire dataset
 if (length(class_list) <= 1) {
-index_training <- sample(nrow(peaklist), size=round(nrow(peaklist)*percentage_of_observation_for_training/100))
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
+		set.seed(seed)
+	}
+	index_training <- sample(nrow(peaklist), size=round(nrow(peaklist)*percentage_of_observation_for_training/100))
 }
 ############################# If there are more classes, randomly select the rows for each class
 if (length(class_list) > 1) {
@@ -350,6 +321,11 @@ for (j in 1:length(class_list)) {
 ############ Create a list containing the training and testing indexes of the class dataframes
 index_training <- list()
 for (i in 1:length(class_data_frame_list)) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
+		set.seed(seed)
+	}
 	index_training[[i]] <- createDataPartition(y = class_data_frame_list[[i]]$Class, p = (percentage_of_observation_for_training/100), list = FALSE)
 }
 names(index_training) <- class_list
@@ -408,37 +384,71 @@ return (list(training_dataset = training_dataset, testDataset = test_dataset))
 
 
 ############################## RECURSIVE FEATURE ELIMINATION - FEATURE SELECTION
-recursive_feature_elimination <- function (peaklist, features_to_select=20, selection_method="pls", discriminant="Class", non_features=c("Sample", "Class", "THY"), seed=0) {
-if (seed != 0) {
-	set.seed(seed)
-}
+recursive_feature_elimination <- function (peaklist, features_to_select=20, selection_method="pls", cv_repeats_control=3, k_fold_cv_control=10, discriminant="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE) {
+# Load the required libraries
+install_and_load_required_packages(c("caret", "pls"))
+#
 ########################################################### RFE MODEL (with PLS)
 rfe_ctrl <- rfeControl (functions = caretFuncs,
-	method = "cv",
-	repeats = 3,
-	number = 10
+	method = "repeatedcv",
+	repeats = cv_repeats_control,
+	number = k_fold_cv_control
 	)
 # The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
-if (selection_method != "") {
-	if (seed != 0) {
-		set.seed(seed)
+if (automatically_select_features == TRUE) {
+	if (selection_method != "") {
+		# Plant the seed only if a specified value is entered
+		if !is.null(seed) {
+			# Make the randomness reproducible
+			set.seed(seed)
+		}
+		rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
+			sizes = seq(2, features_to_select, by=1),
+			rfeControl = rfe_ctrl,
+			method = selection_method,
+			)
+	} else {
+		# Plant the seed only if a specified value is entered
+		if !is.null(seed) {
+			# Make the randomness reproducible
+			set.seed(seed)
+		}
+		rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
+			sizes = seq(2, features_to_select, by=1),
+			rfeControl = rfe_ctrl,
+			)
 	}
-	rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
-		sizes = features_to_select,
-		rfeControl = rfe_ctrl,
-		method = selection_method,
-		)
+	# Output the best predictors after the RFE
+	predictors_rfe <- predictors (rfe_model)
 } else {
-	if (seed != 0) {
-		set.seed(seed)
+	if (selection_method != "") {
+		# Plant the seed only if a specified value is entered
+		if !is.null(seed) {
+			# Make the randomness reproducible
+			set.seed(seed)
+		}
+		rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
+			sizes = features_to_select,
+			rfeControl = rfe_ctrl,
+			method = selection_method,
+			)
+	} else {
+		# Plant the seed only if a specified value is entered
+		if !is.null(seed) {
+			# Make the randomness reproducible
+			set.seed(seed)
+		}
+		rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
+			sizes = features_to_select,
+			rfeControl = rfe_ctrl,
+			)
 	}
-	rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
-		sizes = features_to_select,
-		rfeControl = rfe_ctrl,
-		)
+	# Output the best predictors after the RFE
+	predictors_rfe <- predictors (rfe_model) [1:features_to_select]
 }
-# Output the best predictors after the RFE
-predictors_rfe <- predictors (rfe_model) [1:features_to_select]
+# Plot
+#plot(rfe_model, type=c("g","o"))
+#rfe_graphics <- recordPlot()
 # Take the selected features
 peaklist_rfe <- peaklist [,predictors_rfe]
 # Add the non features back
@@ -446,8 +456,8 @@ for (i in 1:length(non_features)) {
 	peaklist_rfe <- cbind(peaklist_rfe , peaklist[,non_features[i]])
 }
 names(peaklist_rfe) <- c(as.character(predictors_rfe), non_features)
-#
-return (peaklist_rfe)
+return (list(peaklist_rfe=peaklist_rfe, predictors_rfe=predictors_rfe))
+#return (list(peaklist_rfe=peaklist_rfe, predictors_rfe, rfe_graphics=rfe_graphics))
 }
 
 
@@ -489,14 +499,14 @@ if (range[1] != 0 & range[2] != 0) {
 	}
 }
 # Keep only the features of interest
-peaklistTruncated <- data.frame (peaklist [,as.character(features_to_keep)])
+peaklist_truncated <- data.frame (peaklist [,as.character(features_to_keep)])
 # Add the non features back
 for (i in 1:length(non_features)) {
-	peaklistTruncated <- data.frame (peaklistTruncated, peaklist[,non_features[i]])
+	peaklist_truncated <- data.frame (peaklist_truncated, peaklist[,non_features[i]])
 }
-names(peaklistTruncated) <- c(features_to_keep, non_features)
+names(peaklist_truncated) <- c(features_to_keep, non_features)
 #
-return (peaklistTruncated)
+return (peaklist_truncated)
 }
 
 
@@ -511,8 +521,10 @@ return (peaklistTruncated)
 
 ##################### CROSS-VALIDATION FOR A SUPPORT VECTOR MACHINE MODEL
 ################ One row per patient (average)
-cross_validation_svm <- function (training_dataset, seed=0, k_fold=10, repeats=5, svm_model, non_features=c("Sample","Class","THY"), positive_class=levels(training_dataset$Class)[1]) {
-if (seed != 0) {
+cross_validation_svm <- function (training_dataset, seed=NULL, k_fold=10, repeats=5, svm_model, non_features=c("Sample","Class","THY"), positive_class=levels(training_dataset$Class)[1]) {
+# Plant the seed only if a specified value is entered
+if !is.null(seed) {
+	# Make the randomness reproducible
 	set.seed(seed)
 }
 ### Extract the svm model parameters
@@ -539,7 +551,9 @@ result_matrix <- matrix (NA, ncol=14, nrow=0)
 colnames(result_matrix) <- c("Accuracy", "Kappa", "No information rate", "Accuracy p-value", "McNiemar p-value", "Sensitivity", "Specificity", "PPV", "NPV", "Prevalence", "Detection Rate", "Detection Prevalence", "Balanced Accuracy", "ROC AUC")
 #### For each repetition...
 for (i in 1:repeats) {
-	if (seed != 0) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
 		set.seed(seed*i)
 	}
 	# Index of the spectra to be allocated in the folds, randomly selected
@@ -557,12 +571,16 @@ for (i in 1:repeats) {
 		training_predictors <- training_subset [,!(names(training_subset) %in% non_features)]
 		training_outcomes <- training_subset$Class
 		# Now the model has to be built using the training and tested onto the testing dataset
-		if (seed != 0) {
+		# Plant the seed only if a specified value is entered
+		if !is.null(seed) {
+			# Make the randomness reproducible
 			set.seed(seed)
 		}
 		model <- svm (x=training_predictors, y=training_outcomes, scale=TRUE, kernel=svm_kernel, degree=svm_degree, gamma=svm_gamma, cost=svm_cost)
 		# Use the model to predict the testing subset
-		if (seed != 0) {
+		# Plant the seed only if a specified value is entered
+		if !is.null(seed) {
+			# Make the randomness reproducible
 			set.seed(seed)
 		}
 		predicted_classes <- predict(model, newdata=test_predictors)
@@ -684,17 +702,19 @@ return (peaklist_no_trypsin)
 
 
 ############################# SVM TUNING AND VALIDATION
-svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial", k_fold_cv=2, repeats_cv=5, positive_class_cv="HP", seed=0, pca=FALSE, numer_of_components=3) {
-if (seed != 0) {
-	set.seed(seed)
-}
+svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial", k_fold_cv=2, repeats_cv=5, positive_class_cv="HP", seed=NULL, pca=FALSE, numer_of_components=3) {
+# Load the required libraries
+install_and_load_required_packages(c("caret", "kernlab", "e1071"))
+#
 ############################################################################ PCA
 if (pca == TRUE) {
 # Compute the PCs
 pca_training <- prcomp (as.matrix(peaklist_training [,!(names(peaklist_training) %in% non_features)]))
 pca_test <- prcomp (as.matrix(peaklist_test [,!(names(peaklist_test) %in% non_features)]))
 #################### SVM tuning
-if (seed != 0) {
+# Plant the seed only if a specified value is entered
+if !is.null(seed) {
+	# Make the randomness reproducible
 	set.seed(seed)
 }
 svm_tuning <- tune.svm (as.data.frame(pca_training$x[,1:number_of_components]), factor(peaklist_training$Class), gamma=gamma, cost=cost, kernel=kernel, epsilon=epsilon)
@@ -718,7 +738,9 @@ parameters_output <- list (kernel=svm_kernel, cost=svm_tuning$best.model$cost, d
 #################### EXTERNAL VALIDATION (If a dataset is provided)
 if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	#### Use the model to predictthe outcome of the testing set (the new data must have only the predictors)
-	if (seed != 0) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
 		set.seed(seed)
 	}
 	predicted_classes_svm <- predict(svm_model, newdata = as.data.frame(pca_test$x[,1:number_of_components]))
@@ -742,25 +764,33 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 ################### Optimise according to the kernel
 # Find the best tuning parameters for the SVM
 if (kernel == "radial") {
-	if (seed != 0) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
 		set.seed(seed)
 	}
 	svm_tuning <- tune.svm(peaklist_training [,!(names(peaklist_training) %in% non_features)], factor(peaklist_training$Class), gamma=gamma, cost=cost, kernel=kernel, epsilon=epsilon)
 }
 if (kernel == "polynomial") {
-	if (seed != 0) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
 		set.seed(seed)
 	}
 	svm_tuning <- tune.svm(peaklist_training [,!(names(peaklist_training) %in% non_features)], factor(peaklist_training$Class), gamma=gamma, cost=cost, kernel=kernel, epsilon=epsilon, degree=degree)
 }
 if (kernel == "linear") {
-	if (seed != 0) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
 		set.seed(seed)
 	}
 	svm_tuning <- tune.svm(peaklist_training [,!(names(peaklist_training) %in% non_features)], factor(peaklist_training$Class), gamma=gamma, cost=cost, kernel=kernel)
 }
 if (kernel == "sigmoid") {
-	if (seed != 0) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
 		set.seed(seed)
 	}
 	svm_tuning <- tune.svm(peaklist_training [,!(names(peaklist_training) %in% non_features)], factor(peaklist_training$Class), gamma=gamma, cost=cost, kernel=kernel, epsilon=epsilon)
@@ -783,11 +813,13 @@ if (svm_kernel == 3) {
 }
 parameters_output <- list (kernel=svm_kernel, cost=svm_tuning$best.model$cost, degree=svm_tuning$best.model$degree, epsilon=svm_tuning$best.model$epsilon, gamma=svm_tuning$best.model$gamma)
 #################### CROSS-VALIDATION
-cv_svm_model <- cross_validation_svm (peaklist_training, k_fold=k_fold_cv, repeats=repeats_cv, svm_model=svm_model, non_features=non_features, positive_class=positive_class_cv, seed=seed)
+cv_svm_model <- cross_validation_svm(peaklist_training, k_fold=k_fold_cv, repeats=repeats_cv, svm_model=svm_model, non_features=non_features, positive_class=positive_class_cv, seed=seed)
 #################### EXTERNAL VALIDATION (If a dataset is provided)
 if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	#### Use the model to predict the outcome of the testing set (the new data must have only the predictors)
-	if (seed != 0) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
 		set.seed(seed)
 	}
 	predicted_classes_svm <- predict(svm_model, newdata = peaklist_test [,!(names(peaklist_test) %in% non_features)])
@@ -803,8 +835,21 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	roc_legend <- paste("ROC area under the curve:", roc_curve$auc)
 	legend("bottomright", legend=roc_legend, xjust=0.5, yjust=0.5)
 	svm_roc[[2]] <- recordPlot()
+	###################### Pie chart classification
+	correctly_classified <- 0
+	misclassified <- 0
+	for (i in 1:nrow(classification_results_svm)) {
+		if (classification_results_svm$predicted[i] == classification_results_svm$true[i]) {
+			correctly_classified <- correctly_classified + 1
+		} else {
+			misclassified <- misclassified + 1
+		}
+	}
+	classification_pie <- c(correctly_classified, misclassified)
+	pie (x=classification_pie, labels=c("Correctly classified", "Misclassified"), col=c("green","blue"))
+	pie_chart_classification <- recordPlot()
 	# Output the results
-	return (list(model=svm_model, cross_validation=cv_svm_model, classification_results=classification_results_svm, parameters=parameters_output, performances=test_performances_svm, roc=svm_roc))
+	return (list(model=svm_model, cross_validation=cv_svm_model, classification_results=classification_results_svm, parameters=parameters_output, performances=test_performances_svm, roc=svm_roc, pie_chart_classification=pie_chart_classification))
 }	else {return (list(model=svm_model, parameters=parameters_output, cross_validation=cv_svm_model))}
 	}
 }
@@ -820,17 +865,19 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 
 
 ############################# SVM VALIDATION
-svm_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial", k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=0, pca=FALSE, numer_of_components=3) {
-if (seed != 0) {
-	set.seed(seed)
-}
+svm_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial", k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, pca=FALSE, numer_of_components=3) {
+# Load the required libraries
+install_and_load_required_packages(c("caret", "e1071", "kernlab"))
+#
 ############################################################################ PCA
 if (pca == TRUE) {
 # Compute the PCs
 pca_training <- prcomp(as.matrix(peaklist_training [,!(names(peaklist_training) %in% non_features)]))
 pca_test <- prcomp(as.matrix(peaklist_test [,!(names(peaklist_test) %in% non_features)]))
 # SVM tuning
-if (seed != 0) {
+# Plant the seed only if a specified value is entered
+if !is.null(seed) {
+	# Make the randomness reproducible
 	set.seed(seed)
 }
 # SVM with defined parameters
@@ -839,7 +886,9 @@ parameters_output <- list (kernel=kernel, cost=cost, degree=degree, epsilon=epsi
 #################### EXTERNAL VALIDATION (If a dataset is provided)
 if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	#### Use the model to predict the outcome of the testing set (the new data must have only the predictors)
-	if (seed != 0) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
 		set.seed(seed)
 	}
 	predicted_classes_svm <- predict(svm_model, newdata = as.data.frame(pca_test$x[,1:number_of_components]))
@@ -861,15 +910,16 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 } else {
 ####################################################################### FEATURES
 # SVM with defined parameters
-svm_model <- svm (peaklist_training [,!(names(peaklist_training) %in% non_features)], factor(peaklist_training$Class),
-		kernel=kernel, cost=cost, epsilon=epsilon, gamma=gamma)
-parameters_output <- list (Kernel=kernel, Cost=cost, Degree=degree, Epsilon=epsilon, Gamma=gamma)
+svm_model <- svm(peaklist_training [,!(names(peaklist_training) %in% non_features)], factor(peaklist_training$Class), kernel=kernel, cost=cost, epsilon=epsilon, gamma=gamma)
+parameters_output <- list (kernel=kernel, cost=cost, degree=degree, epsilon=epsilon, gamma=gamma)
 #################### CROSS-VALIDATION
-cvsvm_model <- cross_validation_svm (peaklist_training, k_fold=k_fold_cv, repeats=repeats_cv, svm_model=svm_model, non_features=non_features, positive_class=positive_class_cv, seed=seed)
+cvsvm_model <- cross_validation_svm(peaklist_training, k_fold=k_fold_cv, repeats=repeats_cv, svm_model=svm_model, non_features=non_features, positive_class=positive_class_cv, seed=seed)
 #################### EXTERNAL VALIDATION (If a dataset is provided)
 if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	#### Use the model to predict the outcome of the testing set (the new data must have only the predictors)
-	if (seed != 0) {
+	# Plant the seed only if a specified value is entered
+	if !is.null(seed) {
+		# Make the randomness reproducible
 		set.seed(seed)
 	}
 	predicted_classes_svm <- predict(svm_model, newdata = peaklist_test [,!(names(peaklist_test) %in% non_features)])
@@ -879,15 +929,28 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	test_performances_svm <- confusionMatrix(data = predicted_classes_svm, peaklist_test$Class, positive=positive_class_cv)
 	#### ROC analysis
 	svm_roc <- list()
-	roc_curve <- roc (response=classification_results_svm$true, predictor=as.numeric(classification_results_svm$predicted))
+	roc_curve <- roc(response=classification_results_svm$true, predictor=as.numeric(classification_results_svm$predicted))
 	svm_roc[[1]] <- roc_curve$auc
 	plot (roc_curve)
 	roc_legend <- paste("ROC area under the curve:", roc_curve$auc)
 	legend("bottomright", legend=roc_legend, xjust=0.5, yjust=0.5)
 	svm_roc[[2]] <- recordPlot()
+	###################### Pie chart classification
+	correctly_classified <- 0
+	misclassified <- 0
+	for (i in 1:nrow(classification_results_svm)) {
+		if (classification_results_svm$predicted[i] == classification_results_svm$true[i]) {
+			correctly_classified <- correctly_classified + 1
+		} else {
+			misclassified <- misclassified + 1
+		}
+	}
+	classification_pie <- c(correctly_classified, misclassified)
+	pie (x=classification_pie, labels=c("Correctly classified", "Misclassified"), col=c("green","blue"))
+	pie_chart_classification <- recordPlot()
 	# Output the results
-	return (list (model=svm_model, cross_validation=cvsvm_model, classification_results=classification_results_svm, parameters=parameters_output, performances=test_performances_svm, roc=svm_roc))
-}	else {return (list (model=svm_model, parameters=parameters_output, cross_validation=cvsvm_model))}
+	return (list (model=svm_model, cross_validation=cvsvm_model, classification_results=classification_results_svm, parameters=parameters_output, performances=test_performances_svm, roc=svm_roc, pie_chart_classification=pie_chart_classification))
+} else {return (list (model=svm_model, parameters=parameters_output, cross_validation=cvsvm_model))}
 	}
 }
 
