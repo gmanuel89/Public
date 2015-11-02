@@ -37,34 +37,7 @@ source_github <- function(url, ...) {
 
 
 
-####################################### FEATURE SELECTION BASED UPON CORRELATION
-correlation_feature_selection <- function (peaklist, correlation_method="pearson", non_features=c("Sample", "Class", "THY")) {
-# Take only the part of the matrix without Class and Sample
-peaklist_features <- peaklist [,!(names(peaklist) %in% non_features)]
-# Compute the correlation
-feature_correlation <- cor(peaklist_features, method=correlation_method)
-# Output the highly correlated features
-highly_correlated <- find_correlation(feature_correlation, correlation_threshold)
-# Keep only the part of the matrix that is not highly correlated
-peaklist_features_low_correlation <- peaklist_features [,-highly_correlated]
-# Sort the dataframe column by a non decreasing order
-peaklist_features_low_correlation <- peaklist_features_low_correlation [,order(as.numeric(names(peaklist_features_low_correlation)))]
-low_correlated_features <- names(peaklist_features_low_correlation)
-# Add back the non Features (Sample and Class)
-for (i in 1:length(non_features)) {
-	peaklist_features_low_correlation <- data.frame (peaklist_features_low_correlation, peaklist[,non_features[i]])
-}
-names(peaklist_features_low_correlation) <- c(low_correlated_features, non_features)
-# Return the dataframe
-cat (paste("The number of selected features is:", length(low_correlated_features)))
-return (peaklist_features_low_correlation)
-}
-
-
-
-
-
-################################################################################
+###############################################################################
 
 
 
@@ -135,7 +108,7 @@ if (rows_per_patient > 1) {
 			########################### RANDOMNESS
 			if (algorithm == "random") {
 				# Plant the seed only if a specified value is entered
-				if !is.null(seed) {
+				if (!is.null(seed)) {
 					# Make the randomness reproducible
 					set.seed(seed)
 				}
@@ -167,7 +140,7 @@ if (rows_per_patient > 1) {
 				# Compute the distance matrix
 				distance_matrix <- dist(patient_data_frame[,!(names(patient_data_frame) %in% non_features)], method="euclidean")
 				# Plant the seed only if a specified value is entered
-				if !is.null(seed) {
+				if (!is.null(seed)) {
 					# Make the randomness reproducible
 					set.seed(seed)
 				}
@@ -202,7 +175,7 @@ if (rows_per_patient > 1) {
 			######################### K-MEANS
 			if (algorithm == "kMeans" | algorithm == "kmeans" | algorithm == "k-Means") {
 				# Plant the seed only if a specified value is entered
-				if !is.null(seed) {
+				if (!is.null(seed)) {
 					# Make the randomness reproducible
 					set.seed(seed)
 				}
@@ -287,7 +260,7 @@ matrix_splitting_training_test <- function (peaklist, class_list=list(), seed=NU
 ############################# If there are no classes or one class, just randomly select rows on the entire dataset
 if (length(class_list) <= 1) {
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
@@ -322,7 +295,7 @@ for (j in 1:length(class_list)) {
 index_training <- list()
 for (i in 1:length(class_data_frame_list)) {
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
@@ -383,81 +356,151 @@ return (list(training_dataset = training_dataset, testDataset = test_dataset))
 
 
 
-############################## RECURSIVE FEATURE ELIMINATION - FEATURE SELECTION
-recursive_feature_elimination <- function (peaklist, features_to_select=20, selection_method="pls", cv_repeats_control=3, k_fold_cv_control=10, discriminant="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE) {
+############################################################# FEATURE SELECTION
+feature_selection <- function (peaklist, feature_selection_method="rfe", features_to_select=20, selection_method="pls", correlation_method="pearson", correlation_threshold=0.75, cv_repeats_control=3, k_fold_cv_control=10, discriminant_attribute="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE, generate_plots=TRUE) {
 # Load the required libraries
-install_and_load_required_packages(c("caret", "pls"))
-#
+install_and_load_required_packages(c("caret", "pls", "stats"))
 ########################################################### RFE MODEL (with PLS)
-rfe_ctrl <- rfeControl (functions = caretFuncs,
-	method = "repeatedcv",
-	repeats = cv_repeats_control,
-	number = k_fold_cv_control
-	)
-# The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
-if (automatically_select_features == TRUE) {
-	if (selection_method != "") {
-		# Plant the seed only if a specified value is entered
-		if !is.null(seed) {
-			# Make the randomness reproducible
-			set.seed(seed)
+if (feature_selection_method == "rfe" || feature_selection_method == "recursive feature elimination") {
+	rfe_ctrl <- rfeControl (functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control)
+	# The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
+	if (automatically_select_features == TRUE) {
+		if (selection_method != "") {
+			# Plant the seed only if a specified value is entered
+			if (!is.null(seed)) {
+				# Make the randomness reproducible
+				set.seed(seed)
+			}
+			rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = seq(2, features_to_select, by=1), rfeControl = rfe_ctrl, method = selection_method)
+		} else {
+			# Plant the seed only if a specified value is entered
+			if (!is.null(seed)) {
+				# Make the randomness reproducible
+				set.seed(seed)
+			}
+			rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = seq(2, features_to_select, by=1), rfeControl = rfe_ctrl)
 		}
-		rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
-			sizes = seq(2, features_to_select, by=1),
-			rfeControl = rfe_ctrl,
-			method = selection_method,
-			)
+		# Output the best predictors after the RFE
+		predictors_rfe <- predictors (rfe_model)
 	} else {
-		# Plant the seed only if a specified value is entered
-		if !is.null(seed) {
-			# Make the randomness reproducible
-			set.seed(seed)
+		if (selection_method != "") {
+			# Plant the seed only if a specified value is entered
+			if (!is.null(seed)) {
+				# Make the randomness reproducible
+				set.seed(seed)
+			}
+			rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = features_to_select, rfeControl = rfe_ctrl, method = selection_method)
+		} else {
+			# Plant the seed only if a specified value is entered
+			if (!is.null(seed)) {
+				# Make the randomness reproducible
+				set.seed(seed)
+			}
+			rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = features_to_select, rfeControl = rfe_ctrl)
 		}
-		rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
-			sizes = seq(2, features_to_select, by=1),
-			rfeControl = rfe_ctrl,
-			)
+		# Output the best predictors after the RFE
+		predictors_rfe <- predictors (rfe_model) [1:features_to_select]
 	}
-	# Output the best predictors after the RFE
-	predictors_rfe <- predictors (rfe_model)
-} else {
-	if (selection_method != "") {
-		# Plant the seed only if a specified value is entered
-		if !is.null(seed) {
-			# Make the randomness reproducible
-			set.seed(seed)
-		}
-		rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
-			sizes = features_to_select,
-			rfeControl = rfe_ctrl,
-			method = selection_method,
-			)
-	} else {
-		# Plant the seed only if a specified value is entered
-		if !is.null(seed) {
-			# Make the randomness reproducible
-			set.seed(seed)
-		}
-		rfe_model <- rfe (x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant],
-			sizes = features_to_select,
-			rfeControl = rfe_ctrl,
-			)
-	}
-	# Output the best predictors after the RFE
-	predictors_rfe <- predictors (rfe_model) [1:features_to_select]
+	# Predictors
+	predictors_feature_selection <- predictors_rfe
 }
-# Plot
-#plot(rfe_model, type=c("g","o"))
-#rfe_graphics <- recordPlot()
-# Take the selected features
-peaklist_rfe <- peaklist [,predictors_rfe]
+######################################################################### ANOVA
+if (feature_selection_method == "ANOVA") {
+	feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
+	features_ANOVA <- character()
+	# For each feature, calculate the impact on the classification capability by fitting an ANOVA
+	for (feature in feature_list){
+		# Isolate the peak intensities
+		intensity_vector <- peaklist [,feature]
+		# Compute an ANOVA based upon the discriminant attribute
+		feature_ANOVA <- aov(intensity_vector ~ peaklist[,discriminant_attribute])
+		# Extract the p-value
+		feature_ANOVA_pvalue = summary(feature_ANOVA)[[1]]$"Pr(>F)"[1]
+		# Keep the feature if with a great impact
+		if (feature_ANOVA_pvalue <= 0.05) {
+			features_ANOVA <- append(features_ANOVA, feature)
+		}
+	}
+	# Predictors
+	predictors_feature_selection <- features_ANOVA
+}
+################################################################ KRUSKAL-WALLIS
+if (feature_selection_method == "kruskal" || feature_selection_method == "kruskal-wallis" || feature_selection_method == "Kruskal-Wallis") {
+	feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
+	features_kruskal <- character()
+	# For each feature, calculate the impact on the classification capability by fitting an ANOVA
+	for (feature in feature_list){
+		# Isolate the peak intensities
+		intensity_vector <- peaklist [,feature]
+		# Compute an ANOVA based upon the discriminant attribute
+		feature_kruskal <- kruskal.test(intensity_vector ~ peaklist[,discriminant_attribute])
+		# Extract the p-value
+		feature_kruskal_pvalue = feature_kruskal$p.value
+		# Keep the feature if with a great impact
+		if (feature_kruskal_pvalue <= 0.05) {
+			features_kruskal <- append(features_kruskal, feature)
+		}
+	}
+	# Predictors
+	predictors_feature_selection <- features_kruskal
+}
+################################################# CORRELATION FEATURE SELECTION
+if (feature_selection_method == "correlation") {
+	# Take only the part of the matrix without Class and Sample
+	peaklist_features <- peaklist [,!(names(peaklist) %in% non_features)]
+	# Compute the correlation
+	feature_correlation <- cor(peaklist_features, method=correlation_method)
+	# Output the highly correlated features
+	highly_correlated <- findCorrelation(feature_correlation, correlation_threshold)
+	# List the highly correlated features
+	highly_correlated_features <- names (peaklist_features [,highly_correlated])
+	# Features to keep
+	low_correlation_features <- names (peaklist_features [,-highly_correlated])
+	print(paste("The number of selected features is", length(low_correlation_features), "out of", length(peaklist_features)))
+	# Predictors
+	predictors_feature_selection <- low_correlation_features
+}
+#################################################################### IMPORTANCE
+if (feature_selection_method == "importance") {
+	feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
+	# For each feature, calculate the impact on the classification capability
+	model_control <- trainControl(method="repeatedcv", number=k_fold_cv_control, repeats=cv_repeats_control)
+	# Compute a model based upon the discriminant attribute
+	feature_model <- train(x=peaklist [,!(names(peaklist) %in% non_features)], y=peaklist[,discriminant_attribute], method="pls", preProcess="scale", trControl=model_control)
+	# Estimate variable importance
+	feature_importance <- varImp(feature_model, scale=FALSE)
+	# Isolate the most important features (rank them according to their importance first!)
+	feature_importance_df <- feature_importance$importance
+	feature_importance_df$Features <- rownames(feature_importance_df)
+	feature_importance_df <- feature_importance_df [order(-feature_importance_df$Overall),]
+	# Predictors
+	predictors_feature_selection <- feature_importance_df$Features [1:features_to_select]
+}
+########################################################################## Plot
+if (generate_plots == TRUE) {
+	if (feature_selection_method == "rfe" || feature_selection_method == "recursive feature elimination") {
+		plot(rfe_model, type=c("g","o"))
+		feature_selection_graphics <- recordPlot()
+	}
+	if (feature_selection_method == "correlation") {
+	}
+	if (feature_selection_method == "importance") {
+		plot(feature_importance)
+		feature_selection_graphics <- recordPlot()
+	}
+} else {feature_selection_graphics <- NULL}
+#################################################### Take the selected features
+peaklist_feature_selection <- peaklist [,predictors_feature_selection]
 # Add the non features back
 for (i in 1:length(non_features)) {
-	peaklist_rfe <- cbind(peaklist_rfe , peaklist[,non_features[i]])
+	peaklist_feature_selection <- cbind(peaklist_feature_selection, peaklist[,non_features[i]])
 }
-names(peaklist_rfe) <- c(as.character(predictors_rfe), non_features)
-return (list(peaklist_rfe=peaklist_rfe, predictors_rfe=predictors_rfe))
-#return (list(peaklist_rfe=peaklist_rfe, predictors_rfe, rfe_graphics=rfe_graphics))
+names(peaklist_feature_selection) <- c(as.character(predictors_feature_selection), non_features)
+if (!is.null(feature_selection_graphics)) {
+	return (list(peaklist_feature_selection=peaklist_feature_selection, predictors_feature_selection=predictors_feature_selection, feature_selection_graphics=feature_selection_graphics))
+} else {
+	return (list(peaklist_feature_selection=peaklist_feature_selection, predictors_feature_selection=predictors_feature_selection))
+}
 }
 
 
@@ -523,7 +566,7 @@ return (peaklist_truncated)
 ################ One row per patient (average)
 cross_validation_svm <- function (training_dataset, seed=NULL, k_fold=10, repeats=5, svm_model, non_features=c("Sample","Class","THY"), positive_class=levels(training_dataset$Class)[1]) {
 # Plant the seed only if a specified value is entered
-if !is.null(seed) {
+if (!is.null(seed)) {
 	# Make the randomness reproducible
 	set.seed(seed)
 }
@@ -552,7 +595,7 @@ colnames(result_matrix) <- c("Accuracy", "Kappa", "No information rate", "Accura
 #### For each repetition...
 for (i in 1:repeats) {
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed*i)
 	}
@@ -572,14 +615,14 @@ for (i in 1:repeats) {
 		training_outcomes <- training_subset$Class
 		# Now the model has to be built using the training and tested onto the testing dataset
 		# Plant the seed only if a specified value is entered
-		if !is.null(seed) {
+		if (!is.null(seed)) {
 			# Make the randomness reproducible
 			set.seed(seed)
 		}
 		model <- svm (x=training_predictors, y=training_outcomes, scale=TRUE, kernel=svm_kernel, degree=svm_degree, gamma=svm_gamma, cost=svm_cost)
 		# Use the model to predict the testing subset
 		# Plant the seed only if a specified value is entered
-		if !is.null(seed) {
+		if (!is.null(seed)) {
 			# Make the randomness reproducible
 			set.seed(seed)
 		}
@@ -705,7 +748,6 @@ return (peaklist_no_trypsin)
 svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial", k_fold_cv=2, repeats_cv=5, positive_class_cv="HP", seed=NULL, pca=FALSE, numer_of_components=3) {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "kernlab", "e1071"))
-#
 ############################################################################ PCA
 if (pca == TRUE) {
 # Compute the PCs
@@ -713,7 +755,7 @@ pca_training <- prcomp (as.matrix(peaklist_training [,!(names(peaklist_training)
 pca_test <- prcomp (as.matrix(peaklist_test [,!(names(peaklist_test) %in% non_features)]))
 #################### SVM tuning
 # Plant the seed only if a specified value is entered
-if !is.null(seed) {
+if (!is.null(seed)) {
 	# Make the randomness reproducible
 	set.seed(seed)
 }
@@ -739,7 +781,7 @@ parameters_output <- list (kernel=svm_kernel, cost=svm_tuning$best.model$cost, d
 if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	#### Use the model to predictthe outcome of the testing set (the new data must have only the predictors)
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
@@ -765,7 +807,7 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 # Find the best tuning parameters for the SVM
 if (kernel == "radial") {
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
@@ -773,7 +815,7 @@ if (kernel == "radial") {
 }
 if (kernel == "polynomial") {
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
@@ -781,7 +823,7 @@ if (kernel == "polynomial") {
 }
 if (kernel == "linear") {
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
@@ -789,7 +831,7 @@ if (kernel == "linear") {
 }
 if (kernel == "sigmoid") {
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
@@ -818,7 +860,7 @@ cv_svm_model <- cross_validation_svm(peaklist_training, k_fold=k_fold_cv, repeat
 if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	#### Use the model to predict the outcome of the testing set (the new data must have only the predictors)
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
@@ -876,7 +918,7 @@ pca_training <- prcomp(as.matrix(peaklist_training [,!(names(peaklist_training) 
 pca_test <- prcomp(as.matrix(peaklist_test [,!(names(peaklist_test) %in% non_features)]))
 # SVM tuning
 # Plant the seed only if a specified value is entered
-if !is.null(seed) {
+if (!is.null(seed)) {
 	# Make the randomness reproducible
 	set.seed(seed)
 }
@@ -887,7 +929,7 @@ parameters_output <- list (kernel=kernel, cost=cost, degree=degree, epsilon=epsi
 if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	#### Use the model to predict the outcome of the testing set (the new data must have only the predictors)
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
@@ -918,7 +960,7 @@ cvsvm_model <- cross_validation_svm(peaklist_training, k_fold=k_fold_cv, repeats
 if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	#### Use the model to predict the outcome of the testing set (the new data must have only the predictors)
 	# Plant the seed only if a specified value is entered
-	if !is.null(seed) {
+	if (!is.null(seed)) {
 		# Make the randomness reproducible
 		set.seed(seed)
 	}
