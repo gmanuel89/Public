@@ -1513,7 +1513,7 @@ if (spectra_alignment==TRUE) {
 		}
 	}
 }
-return (list(spectra=spectra_dataset, spectra_dataset_grouped=spectra_grouped, spectra_average=spectra_dataset_average, spectra_skyline=spectra_dataset_skyline, spectra_dataset_representative=spectra_dataset_representative))
+return (list(spectra=spectra_dataset, spectra_dataset_grouped=spectra_dataset_grouped, spectra_average=spectra_dataset_average, spectra_skyline=spectra_dataset_skyline, spectra_dataset_representative=spectra_dataset_representative))
 }
 
 
