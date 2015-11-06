@@ -1407,6 +1407,7 @@ spectra_dataset <- list ()
 spectra_dataset_grouped <- list()
 spectra_dataset_average <- list()
 spectra_dataset_skyline <- list()
+spectra_dataset_representative <- list()
 # For each imzML file (patient)...
 for (i in 1:length(folder_files)) {
 	### Load the spectra
@@ -1455,7 +1456,8 @@ for (i in 1:length(folder_files)) {
     ### Generate representative spectra
     if (generate_representative_spectra == TRUE && "representative" %in% output_list) {
     	spectra_grouped <- group_spectra(spectra, spectra_per_patient=spectra_per_patient, file_format=file_format, tof_mode=tof_mode, seed=ifelse(is.null(seed), 0, seed), algorithm=algorithm_for_representative_spectra, discarded_nodes=discarded_nodes)
-        spectra_dataset_grouped <- append(spectra_dataset_grouped, spectra_grouped)
+        spectra_dataset_representative[[i]] <- spectra_grouped
+        spectra_dataset_grouped <- append(spectra_dataset_grouped,spectra_grouped$spectra)
     }
 	### Free the memory
 	rm(spectra)
@@ -1511,7 +1513,7 @@ if (spectra_alignment==TRUE) {
 		}
 	}
 }
-return (list(spectra=spectra_dataset, spectra_dataset_grouped=spectra_grouped, spectra_average=spectra_dataset_average, spectra_skyline=spectra_dataset_skyline))
+return (list(spectra=spectra_dataset, spectra_dataset_grouped=spectra_grouped, spectra_average=spectra_dataset_average, spectra_skyline=spectra_dataset_skyline, spectra_dataset_representative=spectra_dataset_representative))
 }
 
 
