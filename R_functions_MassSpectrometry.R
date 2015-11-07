@@ -354,6 +354,7 @@ spectra_filtering_function <- function (spectra) {
 
 ########################################## SPECTRA GROUPING (PATIENTS) (one imzML file per patient)
 # Obtain a certain number of spectra per patient -> Representative spectra
+# Input: preprocessed spectra, how many spectra to obtain and using which algorithm
 group_spectra <- function (spectra, spectra_per_patient=1, file_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", discarded_nodes=1, balanced=TRUE, method="mean") {
 # Load the required libraries
 install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
@@ -1421,16 +1422,18 @@ for (i in 1:length(folder_files)) {
 	if (tic_purification == TRUE) {
 		spectra <- spectra_tic_purification(spectra, tof_mode=tof_mode, absolute_tic_threshold=absolute_tic_threshold)
 	}
-    ### Preprocessing (only if they are not averaged)
-	if (!("average" %in% output_list) && !("skyline" %in% output_list)) {
+    ### Preprocessing (only if the spectra dataset has to be returned not averaged and there is still some spectra left)
+	if ("spectra" %in% output_list) {
 		if (preprocess_spectra == TRUE) {
-			spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength, process_in_packages_of=process_in_packages_of)
+			try(spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength, process_in_packages_of=process_in_packages_of), silent=TRUE)
 		}
 	}
     ### Add this purified spectra list to a global list (if there is still something after the TIC purification)
-	try(spectra_dataset <- append(spectra_dataset, spectra), silent=TRUE)
+    if ("spectra" %in% output_list) {
+	       try(spectra_dataset <- append(spectra_dataset, spectra), silent=TRUE)
+    }
 	### Average the spectra (preprocessing not needed)
-	if (spectra_per_patient == 1 && "average" %in% output_list) {
+	if (spectra_per_patient == 1 || "average" %in% output_list) {
 		# At least two spectra for the averaging (the averaging will fail if there is only one spectrum)
     	if (tof_mode == "linear") {
     		try(spectra_avg <- averageMassSpectra(spectra, method="mean"), silent=TRUE)
@@ -3909,7 +3912,7 @@ classification_via_hca <- function (spectra_to_be_classified, spectra_database, 
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
 # Outputs
 classification_hca_results <- NULL
-### Create the file Vector
+##################### Create the file Vector
 # Create the empty vector
 file_vector <- character()
 # Add the file names recursively, scrolling the whole spectral dataset
@@ -3926,12 +3929,14 @@ if (pixel_by_pixel_classification == FALSE) {
 # For each patient...
 for (p in 1:length(patient_vector)) {
     patient_spectra <- list()
+    patient_spectra_number <- 0
     # Isolate the patient spectra
     for (s in 1:length(spectra_to_be_classified)) {
         # If the spectrum filename corresponds to the patient
         if (spectra_to_be_classified[[s]]@metaData$file == patient_vector[p]) {
             # Add the selected spectra to the list of the patient spectra
             patient_spectra <- append(patient_spectra, spectra_to_be_classified[[s]])
+            patient_spectra_number <- patient_spectra_number + 1
         }
     }
     # Put the database and the spectra together
@@ -3955,7 +3960,7 @@ for (p in 1:length(patient_vector)) {
     # Remove the first rows (database spectra) and keep only the first columns (database spectra)
     distance_matrix <- distance_matrix [(length(spectra_database)+1):nrow(distance_matrix),(1:length(spectra_database))]
     # Classification output
-    classification_hca <- matrix(nrow=length(spectra_to_be_classified), ncol=1)
+    classification_hca <- matrix(nrow=patient_spectra_number, ncol=1)
     rownames(classification_hca) <- rownames(distance_matrix)
     colnames(classification_hca) <- "Classification"
     ## Function for matrix apply
@@ -3990,6 +3995,30 @@ return (list(classification_hca_results=classification_hca_results, hca_graph=hc
 ################## PIXEL-BY-PIXEL CLASSIFICATION
 }
 
+
+
+
+
+################################################################################
+
+
+
+
+
+############ PEARSON CORRELATION p-value
+correlation_pvalue <- function (correlation_coefficient, number_of_samples, correlation_type="pearson", tails=2) {
+    degrees_of_freedom <- number_of_samples - 2
+    if (correlation_type == "pearson") {
+        t_value = correlation_coefficient * sqrt((number_of_samples-2)/(1-(correlation_coefficient)^2))
+        p_value <- pt(t_value, df=degrees_of_freedom, lower.tail = FALSE, log.p = FALSE)
+    }
+    if (tails == 1) {
+        return (p_value)
+    }
+    if (tails == 2) {
+        return (p_value*2)
+    }
+}
 
 
 
