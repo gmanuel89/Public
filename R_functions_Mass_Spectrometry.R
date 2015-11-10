@@ -758,47 +758,65 @@ for (i in 1:length(folder_files)) {
 	if (tic_purification == TRUE) {
 		spectra <- spectra_tic_purification(spectra, tof_mode=tof_mode, absolute_tic_threshold=absolute_tic_threshold)
 	}
-    ############################################ Preprocessing (only if the spectra dataset has to be returned not averaged and there is still some spectra left)
+	# Check if it is not a single spectrum (it returns an error when trying to access the second element of the list)
+	error <- try(spectra[[2]], silent=TRUE)
+    ############################################ Preprocessing (only if there is still some spectra left)
 	if ("spectra" %in% output_list) {
 		if (preprocess_spectra == TRUE) {
-			try(spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength, process_in_packages_of=process_in_packages_of), silent=TRUE)
+			if (length(spectra) > 0) {
+				spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength, process_in_packages_of=process_in_packages_of)
+			}
 		}
 	}
     ##################################### Add this purified spectra list to a global list (if there is still something after the TIC purification)
     if ("spectra" %in% output_list) {
-	       try(spectra_dataset <- append(spectra_dataset, spectra), silent=TRUE)
+		if (length(spectra) > 0) {
+	       spectra_dataset <- append(spectra_dataset, spectra)
+	   }
     }
 	###################################### Average the spectra (preprocessing not needed)
 	if (generate_representative_spectra == TRUE && spectra_per_patient == 1 && "average" %in% output_list) {
-		# At least two spectra for the averaging (the averaging will fail if there is only one spectrum, so use it if there is only one)
+		# At least two spectra for the averaging (the averaging will fail if there is only one spectrum, so use it if there is only one; after TIC purification no spectra can be left!) Check if there is any spectra and if there are one or many spectra.
     	if (tof_mode == "linear") {
             spectra_avg <- spectra
-    		try(spectra_avg <- averageMassSpectra(spectra, method="mean"), silent=TRUE)
-    		try(spectra_avg <- smoothIntensity(spectra_avg, method="SavitzkyGolay", halfWindowSize=10), silent=TRUE)
-    		try(spectra_avg <- removeBaseline(spectra_avg, method="TopHat"), silent=TRUE)
-    		spectra_avg <- calibrateIntensity(spectra_avg, method="TIC")
+			if (length(spectra_avg) > 0 && class(error) != "try-error") {
+	    		spectra_avg <- averageMassSpectra(spectra, method="mean")
+	    		spectra_avg <- smoothIntensity(spectra_avg, method="SavitzkyGolay", halfWindowSize=10)
+	    		spectra_avg <- removeBaseline(spectra_avg, method="TopHat")
+	    		spectra_avg <- calibrateIntensity(spectra_avg, method="TIC")
+			}
     	}
     	if (tof_mode == "reflector" || tof_mode == "reflectron") {
             spectra_avg <- spectra
-    		try(spectra_avg <- averageMassSpectra(spectra, method="mean"), silent=TRUE)
-    		try(spectra_avg <- smoothIntensity(spectra_avg, method="SavitzkyGolay", halfWindowSize=2.5), silent=TRUE)
-    		try(spectra_avg <- removeBaseline(spectra_avg, method="TopHat"), silent=TRUE)
-    		spectra_avg <- calibrateIntensity(spectra_avg, method="TIC")
+			if (length(spectra_avg) > 0 && class(error) != "try-error") {
+	    		spectra_avg <- averageMassSpectra(spectra, method="mean")
+	    		spectra_avg <- smoothIntensity(spectra_avg, method="SavitzkyGolay", halfWindowSize=2.5)
+	    		spectra_avg <- removeBaseline(spectra_avg, method="TopHat")
+	    		spectra_avg <- calibrateIntensity(spectra_avg, method="TIC")
+			}
     	}
-        spectra_dataset_average <- append(spectra_dataset_average, spectra_avg)
+		if (length(spectra_avg) > 0) {
+        	spectra_dataset_average <- append(spectra_dataset_average, spectra_avg)
+		}
 	}
 	if (generate_representative_spectra == TRUE && skyline == TRUE && "skyline" %in% output_list) {
-		# At least two spectra for the skyline (the process will fail if there is only one spectrum, so use it if there is only one)
+		# At least two spectra for the skyline (the process will fail if there is only one spectrum, so use it if there is only one; after TIC purification no spectra can be left!)
         spectra_skyline <- spectra
-		try(spectra_skyline <- generate_skyline_spectrum(spectra), silent=TRUE)
-		try(spectra_skyline <- removeBaseline(spectra_skyline, method="TopHat"), silent=TRUE)
-		spectra_skyline <- calibrateIntensity(spectra_skyline, method="TIC")
-        spectra_dataset_syline <- append(spectra_dataset_skyline, spectra_skyline)
+		if (length(spectra_avg) > 0 && class(error) != "try-error") {
+			spectra_skyline <- generate_skyline_spectrum(spectra)
+			spectra_skyline <- removeBaseline(spectra_skyline, method="TopHat")
+			spectra_skyline <- calibrateIntensity(spectra_skyline, method="TIC")
+		}
+		if (length(spectra_syline) > 0) {
+			spectra_dataset_syline <- append(spectra_dataset_skyline, spectra_skyline)
+		}
 	}
-    ### Generate representative spectra
+    ### Generate representative spectra (after TIC purification no spectra can be left!)
     if (generate_representative_spectra == TRUE && "representative" %in% output_list) {
-    	spectra_dataset_representative[[i]] <- group_spectra(spectra, spectra_per_patient=spectra_per_patient, file_format=file_format, tof_mode=tof_mode, seed=ifelse(is.null(seed), 0, seed), algorithm=algorithm_for_representative_spectra, discarded_nodes=discarded_nodes)
-        spectra_dataset_grouped <- append(spectra_dataset_grouped,spectra_dataset_representative[[i]]$spectra)
+		if (length(spectra) > 0 && class(error) != "try-error") {
+	    	spectra_dataset_representative[[i]] <- group_spectra(spectra, spectra_per_patient=spectra_per_patient, file_format=file_format, tof_mode=tof_mode, seed=ifelse(is.null(seed), 0, seed), algorithm=algorithm_for_representative_spectra, discarded_nodes=discarded_nodes)
+	        spectra_dataset_grouped <- append(spectra_dataset_grouped,spectra_dataset_representative[[i]]$spectra)
+		}
     }
 	### Free the memory
 	rm(spectra)
@@ -807,84 +825,94 @@ for (i in 1:length(folder_files)) {
 ################################## TRIMMING/CROPPING
 ### Trimming the entire dataset (dataset)
 if ("spectra" %in% output_list) {
-    if (mass_range[1] == 0 && mass_range[2] == 0) {
-    	spectra_dataset <- trim(spectra_dataset)
-    }
-    if (mass_range[1] == 0 && mass_range[2] != 0) {
-    	spectra_dataset <- trim(spectra_dataset, range=mass_range)
-    }
-    if (mass_range[1] != 0 && mass_range[2] == 0) {
-    	mass_range[2] <- Inf
-    	spectra_dataset <- trim(spectra_dataset, range=mass_range)
-    }
-    if (mass_range[1] != 0 && mass_range[2] != 0) {
-    	spectra_dataset <- trim(spectra_dataset, range=mass_range)
-    }
-    spectra_dataset <- calibrateIntensity(spectra_dataset, method="TIC")
+	if (length(spectra_dataset) > 0) {
+	    if (mass_range[1] == 0 && mass_range[2] == 0) {
+	    	spectra_dataset <- trim(spectra_dataset)
+	    }
+	    if (mass_range[1] == 0 && mass_range[2] != 0) {
+	    	spectra_dataset <- trim(spectra_dataset, range=mass_range)
+	    }
+	    if (mass_range[1] != 0 && mass_range[2] == 0) {
+	    	mass_range[2] <- Inf
+	    	spectra_dataset <- trim(spectra_dataset, range=mass_range)
+	    }
+	    if (mass_range[1] != 0 && mass_range[2] != 0) {
+	    	spectra_dataset <- trim(spectra_dataset, range=mass_range)
+	    }
+	    spectra_dataset <- calibrateIntensity(spectra_dataset, method="TIC")
+	}
 }
 ### Trimming the entire dataset (spectra grouped)
 if (generate_representative_spectra == TRUE && spectra_per_patient != 1 && "representative" %in% output_list) {
-    if (mass_range[1] == 0 && mass_range[2] == 0) {
-    	spectra_dataset_grouped <- trim(spectra_dataset_grouped)
-    }
-    if (mass_range[1] == 0 && mass_range[2] != 0) {
-    	spectra_dataset_grouped <- trim(spectra_dataset_grouped, range=mass_range)
-    }
-    if (mass_range[1] != 0 && mass_range[2] == 0) {
-    	mass_range[2] <- Inf
-    	spectra_dataset_grouped <- trim(spectra_dataset_grouped, range=mass_range)
-    }
-    if (mass_range[1] != 0 && mass_range[2] != 0) {
-    	spectra_dataset_grouped <- trim(spectra_dataset_grouped, range=mass_range)
-    }
-    spectra_dataset_grouped <- calibrateIntensity(spectra_dataset_grouped, method="TIC")
+	if (length(spectra_dataset_grouped) > 0) {
+	    if (mass_range[1] == 0 && mass_range[2] == 0) {
+	    	spectra_dataset_grouped <- trim(spectra_dataset_grouped)
+	    }
+	    if (mass_range[1] == 0 && mass_range[2] != 0) {
+	    	spectra_dataset_grouped <- trim(spectra_dataset_grouped, range=mass_range)
+	    }
+	    if (mass_range[1] != 0 && mass_range[2] == 0) {
+	    	mass_range[2] <- Inf
+	    	spectra_dataset_grouped <- trim(spectra_dataset_grouped, range=mass_range)
+	    }
+	    if (mass_range[1] != 0 && mass_range[2] != 0) {
+	    	spectra_dataset_grouped <- trim(spectra_dataset_grouped, range=mass_range)
+	    }
+	    spectra_dataset_grouped <- calibrateIntensity(spectra_dataset_grouped, method="TIC")
+	}
 }
 ### Trimming the entire dataset (spectra average)
 if (generate_representative_spectra == TRUE && spectra_per_patient == 1 && "average" %in% output_list) {
-    if (mass_range[1] == 0 && mass_range[2] == 0) {
-    	spectra_dataset_average <- trim(spectra_dataset_average)
-    }
-    if (mass_range[1] == 0 && mass_range[2] != 0) {
-    	spectra_dataset_average <- trim(spectra_dataset_average, range=mass_range)
-    }
-    if (mass_range[1] != 0 && mass_range[2] == 0) {
-    	mass_range[2] <- Inf
-    	spectra_dataset_average <- trim(spectra_dataset_average, range=mass_range)
-    }
-    if (mass_range[1] != 0 && mass_range[2] != 0) {
-    	spectra_dataset_average <- trim(spectra_dataset_average, range=mass_range)
-    }
-    spectra_dataset_average <- calibrateIntensity(spectra_dataset_average, method="TIC")
+	if (length(spectra_dataset_average) > 0) {
+	    if (mass_range[1] == 0 && mass_range[2] == 0) {
+	    	spectra_dataset_average <- trim(spectra_dataset_average)
+	    }
+	    if (mass_range[1] == 0 && mass_range[2] != 0) {
+	    	spectra_dataset_average <- trim(spectra_dataset_average, range=mass_range)
+	    }
+	    if (mass_range[1] != 0 && mass_range[2] == 0) {
+	    	mass_range[2] <- Inf
+	    	spectra_dataset_average <- trim(spectra_dataset_average, range=mass_range)
+	    }
+	    if (mass_range[1] != 0 && mass_range[2] != 0) {
+	    	spectra_dataset_average <- trim(spectra_dataset_average, range=mass_range)
+	    }
+	    spectra_dataset_average <- calibrateIntensity(spectra_dataset_average, method="TIC")
+	}
 }
 ### Trimming the entire dataset (spectra skyline)
 if (generate_representative_spectra == TRUE && spectra_per_patient == 1 && "skyline" %in% output_list) {
-    if (mass_range[1] == 0 && mass_range[2] == 0) {
-    	spectra_dataset_skyline <- trim(spectra_dataset_skyline)
-    }
-    if (mass_range[1] == 0 && mass_range[2] != 0) {
-    	spectra_dataset_skyline <- trim(spectra_dataset_skyline, range=mass_range)
-    }
-    if (mass_range[1] != 0 && mass_range[2] == 0) {
-    	mass_range[2] <- Inf
-    	spectra_dataset_skyline <- trim(spectra_dataset_skyline, range=mass_range)
-    }
-    if (mass_range[1] != 0 && mass_range[2] != 0) {
-    	spectra_dataset_skyline <- trim(spectra_dataset_skyline, range=mass_range)
-    }
-    spectra_dataset_skyline <- calibrateIntensity(spectra_dataset_skyline, method="TIC")
+	if (length(spectra_dataset_skyline) > 0) {
+	    if (mass_range[1] == 0 && mass_range[2] == 0) {
+	    	spectra_dataset_skyline <- trim(spectra_dataset_skyline)
+	    }
+	    if (mass_range[1] == 0 && mass_range[2] != 0) {
+	    	spectra_dataset_skyline <- trim(spectra_dataset_skyline, range=mass_range)
+	    }
+	    if (mass_range[1] != 0 && mass_range[2] == 0) {
+	    	mass_range[2] <- Inf
+	    	spectra_dataset_skyline <- trim(spectra_dataset_skyline, range=mass_range)
+	    }
+	    if (mass_range[1] != 0 && mass_range[2] != 0) {
+	    	spectra_dataset_skyline <- trim(spectra_dataset_skyline, range=mass_range)
+	    }
+	    spectra_dataset_skyline <- calibrateIntensity(spectra_dataset_skyline, method="TIC")
+	}
 }
 ############################################################# SPECTRA ALIGNMENT
 if (spectra_alignment==TRUE) {
-	# Average the spectra: the avg spectrum peaks will be used as reference
-    spectra_avg_ref <- averageMassSpectra(spectra_dataset, method="mean")
-	peaks_avg_ref <- detectPeaks(spectra_avg_ref, SNR=5)
-	reference_for_alignment <- peaks_avg_ref@mass
-	if (length(reference_for_alignment@mass) > 0) {
-		if (tof_mode == "linear") {
-			spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=20, noiseMethod="MAD", SNR=3, reference=reference_for_alignment, tolerance=(alignment_tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
-		}
-		if (tof_mode == "reflector" | tof_mode == "reflectron") {
-			spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=5, noiseMethod="MAD", SNR=3, reference=reference_for_alignment, tolerance=(alignment_tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
+	if (length(spectra) > 0 && class(error) != "try-error") {
+		# Average the spectra: the avg spectrum peaks will be used as reference
+	    spectra_avg_ref <- averageMassSpectra(spectra_dataset, method="mean")
+		peaks_avg_ref <- detectPeaks(spectra_avg_ref, SNR=5)
+		reference_for_alignment <- peaks_avg_ref@mass
+		if (length(reference_for_alignment@mass) > 0) {
+			if (tof_mode == "linear") {
+				spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=20, noiseMethod="MAD", SNR=3, reference=reference_for_alignment, tolerance=(alignment_tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
+			}
+			if (tof_mode == "reflector" | tof_mode == "reflectron") {
+				spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=5, noiseMethod="MAD", SNR=3, reference=reference_for_alignment, tolerance=(alignment_tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
+			}
 		}
 	}
 }
@@ -1079,9 +1107,14 @@ return (spectra)
 
 ######################################################## SPECTRA PRE-PROCESSING
 # The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalisation)
-preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra)) {
+preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra), sampling_method="sequential") {
 # Load the required libraries
-install_and_load_required_packages(c("MALDIquant", "caret", "parallel"))
+install_and_load_required_packages(c("MALDIquant", "parallel"))
+# Check if it is not a single spectrum (it returns an error when trying to access the second element of the list)
+error <- try(spectra[[2]], silent=TRUE)
+# If error is an actual error, its R class is "try-error"
+######################################### Multiple spectra
+if (class(error) != "try-error") {
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
 cpu_core_number <- cpu_thread_number/2
@@ -1091,68 +1124,194 @@ if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
 }
 # Create the list containing the processed spectra
 preprocessed_spectra <- list()
-# Calculate the k_fold
-k_fold <- floor(length(spectra) / process_in_packages_of)
-# Determine the spectra to be randomly allocated into processing folds
-index <- createFolds(y=seq(1:length(spectra)), k=k_fold)
-for (i in 1:length(index)) {
-	# Make the cluster (one for each core/thread)
-	cl <- makeCluster(cpu_core_number)
-	clusterEvalQ(cl, {library(MALDIquant)})
-	# Allocate the spectra (in the package) to be processed temporarily
-	spectra_temp <- spectra [index[[i]]]
+if (sampling_method == "sequential") {
+	index1 <- 1
+	index2 <- process_in_packages_of
+	spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
+	for (p in 1:spectra_packages) {
+		# Make the cluster (one for each core/thread)
+		cl <- makeCluster(cpu_core_number)
+		clusterEvalQ(cl, {library(MALDIquant)})
+		# If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
+		if (index2 < length(spectra)) {
+			spectra_temp <- spectra [index1:index2]
+		} else {spectra_temp <- spectra [index1:length(spectra)]}
+		# Fix the indexes at every cycle
+		index1 <- index2 + 1
+		index2 <- index2 + process_in_packages_of
+		# Process the selected spectra
+		if (tof_mode == "linear") {
+			## Remove flat spectra
+			#spectra <- removeEmptyMassObjects (spectra)
+			if (smoothing_strength == "small") {
+				## Smoothing (Savitzky-Golay filter, with window size 5, 11 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5))
+			}
+			if (smoothing_strength == "medium") {
+				## Smoothing (Savitzky-Golay filter, with window size 10, 21 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10))
+			}
+			if (smoothing_strength == "strong") {
+				## Smoothing (Savitzky-Golay filter, with window size 20, 41 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20))
+			}
+			if (smoothing_strength == "veryStrong") {
+				## Smoothing (Savitzky-Golay filter, with window size 30, 61 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30))
+			}
+			## Baseline correction
+			spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline(spectra, method="TopHat"))
+			## Normalisation (TIC)
+			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity(spectra, method="TIC"))
+		}
+		if (tof_mode == "reflectron" || tof_mode == "reflector") {
+			## Remove flat spectra
+			#spectra <- removeEmptyMassObjects (spectra)
+			if (smoothing_strength == "small") {
+				## Smoothing (Savitzky-Golay filter, with window size 2, 5 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1))
+			}
+			if (smoothing_strength == "medium") {
+				## Smoothing (Savitzky-Golay filter, with window size 6, 13 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3))
+			}
+			if (smoothing_strength == "strong") {
+				## Smoothing (Savitzky-Golay filter, with window size 12, 25 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6))
+			}
+			if (smoothing_strength == "veryStrong") {
+				## Smoothing (Savitzky-Golay filter, with window size 18, 37 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9))
+			}
+			## Baseline correction
+			spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline (spectra, method="TopHat"))
+			## Normalisation (TIC)
+			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity (spectra, method="TIC"))
+		}
+		# Close the processes
+		stopCluster(cl)
+		# Append these preprocessed spectra to the final list
+		preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
+	}
+}
+if (sampling_method == "kfold") {
+	install_and_load_required_packages("caret")
+	# Calculate the k_fold
+	k_fold <- floor(length(spectra) / process_in_packages_of)
+	# Determine the spectra to be randomly allocated into processing folds
+	index <- createFolds(y=seq(1:length(spectra)), k=k_fold)
+	for (i in 1:length(index)) {
+		# Make the cluster (one for each core/thread)
+		cl <- makeCluster(cpu_core_number)
+		clusterEvalQ(cl, {library(MALDIquant)})
+		# Allocate the spectra (in the package) to be processed temporarily
+		spectra_temp <- spectra [index[[i]]]
+		if (tof_mode == "linear") {
+			## Remove flat spectra
+			#spectra <- removeEmptyMassObjects (spectra)
+			if (smoothing_strength == "small") {
+				## Smoothing (Savitzky-Golay filter, with window size 5, 11 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5))
+			}
+			if (smoothing_strength == "medium") {
+				## Smoothing (Savitzky-Golay filter, with window size 10, 21 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10))
+			}
+			if (smoothing_strength == "strong") {
+				## Smoothing (Savitzky-Golay filter, with window size 20, 41 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20))
+			}
+			if (smoothing_strength == "veryStrong") {
+				## Smoothing (Savitzky-Golay filter, with window size 30, 61 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30))
+			}
+			## Baseline correction
+			spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline(spectra, method="TopHat"))
+			## Normalisation (TIC)
+			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity(spectra, method="TIC"))
+		}
+		if (tof_mode == "reflectron" || tof_mode == "reflector") {
+			## Remove flat spectra
+			#spectra <- removeEmptyMassObjects (spectra)
+			if (smoothing_strength == "small") {
+				## Smoothing (Savitzky-Golay filter, with window size 2, 5 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1))
+			}
+			if (smoothing_strength == "medium") {
+				## Smoothing (Savitzky-Golay filter, with window size 6, 13 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3))
+			}
+			if (smoothing_strength == "strong") {
+				## Smoothing (Savitzky-Golay filter, with window size 12, 25 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6))
+			}
+			if (smoothing_strength == "veryStrong") {
+				## Smoothing (Savitzky-Golay filter, with window size 18, 37 points)
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9))
+			}
+			## Baseline correction
+			spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline (spectra, method="TopHat"))
+			## Normalisation (TIC)
+			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity (spectra, method="TIC"))
+		}
+		# Close the processes
+		stopCluster(cl)
+		# Append the processed spectra package to the global list
+		preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
+	}
+}
+}
+######################################### Single spectra
+if (class(error) == "try-error") {
 	if (tof_mode == "linear") {
 		## Remove flat spectra
 		#spectra <- removeEmptyMassObjects (spectra)
 		if (smoothing_strength == "small") {
 			## Smoothing (Savitzky-Golay filter, with window size 5, 11 points)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5))
+			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5)
 		}
 		if (smoothing_strength == "medium") {
 			## Smoothing (Savitzky-Golay filter, with window size 10, 21 points)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10))
+			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10)
 		}
 		if (smoothing_strength == "strong") {
 			## Smoothing (Savitzky-Golay filter, with window size 20, 41 points)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20))
+			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20)
 		}
 		if (smoothing_strength == "veryStrong") {
 			## Smoothing (Savitzky-Golay filter, with window size 30, 61 points)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30))
+			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30)
 		}
 		## Baseline correction
-		spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline(spectra, method="TopHat"))
+		spectra_temp <- removeBaseline(spectra, method="TopHat")
 		## Normalisation (TIC)
-		spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity(spectra, method="TIC"))
+		spectra_temp <- calibrateIntensity(spectra, method="TIC")
 	}
 	if (tof_mode == "reflectron" || tof_mode == "reflector") {
 		## Remove flat spectra
 		#spectra <- removeEmptyMassObjects (spectra)
 		if (smoothing_strength == "small") {
 			## Smoothing (Savitzky-Golay filter, with window size 2, 5 points)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1))
+			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1)
 		}
 		if (smoothing_strength == "medium") {
 			## Smoothing (Savitzky-Golay filter, with window size 6, 13 points)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3))
+			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3)
 		}
 		if (smoothing_strength == "strong") {
 			## Smoothing (Savitzky-Golay filter, with window size 12, 25 points)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6))
+			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6)
 		}
 		if (smoothing_strength == "veryStrong") {
 			## Smoothing (Savitzky-Golay filter, with window size 18, 37 points)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9))
+			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9)
 		}
 		## Baseline correction
-		spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline (spectra, method="TopHat"))
+		spectra_temp <- removeBaseline(spectra, method="TopHat")
 		## Normalisation (TIC)
-		spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity (spectra, method="TIC"))
+		spectra_temp <- calibrateIntensity(spectra, method="TIC")
 	}
-	# Close the processes
-	stopCluster(cl)
-	# Append the processed spectra package to the global list
-	preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
+	preprocessed_spectra <- spectra_temp
 }
 return (preprocessed_spectra)
 }
@@ -1175,7 +1334,8 @@ return (preprocessed_spectra)
 group_spectra <- function (spectra, spectra_per_patient=1, file_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", discarded_nodes=1, balanced=TRUE, method="mean") {
 # Load the required libraries
 install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
-#
+# Check if it is not a single spectrum (it returns an error when trying to access the second element of the list)
+error <- try(spectra[[2]], silent=TRUE)
 ### Create the file Vector
 if (file_format == "imzml" | file_format == "imzML") {
 	# Put the filenames in a vector
@@ -1234,11 +1394,11 @@ if (spectra_per_patient == 0 || spectra_per_patient == 1) {
 # Run this script if there has to be two or more representative spectra per patient
 if (spectra_per_patient > 1) {
 	# If there is only one spectrum, use it
-	if (length(spectra) == 1) {
+	if (length(spectra) > 0 && class(error) == "try-error") {
 		patient_spectra_final <- spectra
 	}
 	# If there are more spectra...
-	if (length(spectra) > 1) {
+	if (length(spectra) > 0 && class(error) != "try-error") {
 		# Make the randomness reproducible
 		if (!is.null(seed)) {
 			set.seed (seed)
