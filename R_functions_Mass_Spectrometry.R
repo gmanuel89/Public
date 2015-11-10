@@ -463,46 +463,68 @@ return (spectra)
 
 
 ######################### REPLACE THE SNR WITH THE STDEV IN THE PEAKS
-# This function computes the standard deviation of each peak of an average spectrum peaklist, by replacing the existing SNR slot with the SD (each peak of the average peaklist is searched across the dataset)
-replace_SNR_with_st_dev_in_peaklist <- function (peaks_average, peaks, tolerance_ppm=2000, file_format="imzml") {
-	# Scroll the peaks of the average peaklist
-	for (p in 1:length(peaks_average@mass)) {
-		# Create an empty vector where to allocate the intensity of this peak into the dataset
-		intensity_vector <- numeric()
-		# Pass every peaklist of the dataset (one for each spectrum)
-		for (s in 1:length(peaks)) {
-			# Do the operation only for the peaklists that matches the AVG
-			if (file_format == "brukerflex") {
-				if (length(grep(peaks_average@metaData$sampleName, peaks[[s]]@metaData$sampleName, ignore.case=TRUE)) == 1) {
-					# Scroll the peaklist
-					for (m in 1:length(peaks[[s]]@mass)) {
-						# Identify the peak
-						if ((abs(peaks[[s]]@mass[m] - peaks_average@mass[p])*10^6/peaks_average@mass[p]) <= tolerance_ppm) {
-							# Record its intensity into a vector
-							intensity_vector <- append(intensity_vector, peaks[[s]]@intensity[m])
-						}
-					}
-				}
-			}
-			if (file_format == "imzml" | file_format == "imzML") {
-				if (length(grep(peaks_average@metaData$file, peaks[[s]]@metaData$file, ignore.case=TRUE)) == 1) {
-					# Scroll the peaklist
-					for (m in 1:length(peaks[[s]]@mass)) {
-						# Identify the peak
-						if ((abs(peaks[[s]]@mass[m] - peaks_average@mass[p])*10^6/peaks_average@mass[p]) <= tolerance_ppm) {
-							# Record its intensity into a vector
-							intensity_vector <- append(intensity_vector, peaks[[s]]@intensity[m])
-						}
-					}
-				}
-			}
-		}
-		# Calculate the standard deviation of the peak (whose intensities are in the vector)
-		st_dev <- sd(intensity_vector)
-		# Replace the SNR slot with the st_dev (for the peak)
-		peaks_average@SNR[p] <- st_dev
+# This function computes the standard deviation of each peak of an average spectrum peaklist, by replacing the existing SNR slot with the SD or CV: all the peaks (average and dataset) are aligned and each peak of the average peaklist is searched across the dataset thanks to the intensity matrix.
+replace_SNR_in_avg_peaklist <- function (spectra, SNR=5, tof_mode="linear", tolerance_ppm=2000, file_format="imzml", replace_snr_with="std") {
+install_and_load_required_packages(c("MALDIquant", "stats"))
+# Check if it is not a single spectrum (it returns an error when trying to access the second element of the list)
+error <- try(spectra[[2]], silent=TRUE)
+# If the spectra are many...
+if (length(spectra) > 0 && class(error) != "try-error") {
+	# Average the spectra
+	avg_spectrum <- averageMassSpectra(spectra, method="mean")
+	avg_spectrum <- removeBaseline(avg_spectrum, method="TopHat")
+	avg_spectrum <- calibrateIntensity(avg_spectrum, method="TIC")
+	# Peak picking
+	if (tof_mode == "linear") {
+		peaks <- detectPeaks(spectra, SNR=SNR, method="MAD", halfWindowSize=20)
+		peaks_avg <- detectPeaks(avg_spectrum, SNR=SNR, method="MAD", halfWindowSize=20)
+		# Merge for the alignment
+		global_peaks <- append(peaks_avg, peaks)
+		global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25)
+		peaks_avg <- global_peaks[[1]]
+		peaks <- global_peaks [2:length(global_peaks)]
 	}
-return (peaks_average)
+	if (tof_mode == "reflectron" || tof_mode =="reflector") {
+		peaks <- detectPeaks(spectra, SNR=SNR, method="MAD", halfWindowSize=5)
+		peaks_avg <- detectPeaks(avg_spectrum, SNR=SNR, method="MAD", halfWindowSize=5)
+		# Merge for the alignment
+		global_peaks <- append(peaks_avg, peaks)
+		global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25)
+		peaks_avg <- global_peaks[[1]]
+		peaks <- global_peaks [2:length(global_peaks)]
+	}
+	# Compute the intensity matrix
+	intensity_matrix <- intensityMatrix(peaks, spectra)
+	# Scroll the peaks of the average peaklist...
+	for (p in 1:length(peaks_avg@mass)) {
+		# Search for the column in the intensity_matrix
+		for (z in 1:ncol(intensity_matrix)) {
+			# Match...
+			if (peaks_avg@mass[p] == colnames(intensity_matrix)[z]) {
+				# Create an empty vector where to allocate the intensity of this peak into the dataset
+				intensity_vector <- intensity_matrix[,z]
+				# Compute the standard deviation
+				if (replace_snr_with == "std" || replace_snr_with == "sd") {
+					std_int <- sd(intensity_vector)
+					# Replacement
+					peaks_avg@snr[p] <- std_int
+				}
+				if (replace_snr_with == "cv" || replace_snr_with == "CV") {
+					std_int <- sd(intensity_vector)
+					mean_int <- mean(intensity_vector)
+					cv_int <- std_int / mean_int
+					# Replacement
+					peaks_avg@snr[p] <- cv_int
+				}
+				# Save time avoiding to scroll to the end when found
+				break
+			} else {peaks_avg@snr[p] <- NaN}
+		}
+	}
+	return (peaks_avg)
+} else {
+	return(print("The spectra list is empty or the spectra list contains only one spectrum"))
+}
 }
 
 
@@ -515,57 +537,7 @@ return (peaks_average)
 
 
 
-######################### REPLACE THE SNR WITH THE CV IN THE PEAKS
-# This function computes the coefficient of variation of each peak of an average spectrum peaklist, by replacing the existing SNR slot with the CV (each peak of the average peaklist is searched across the dataset.
-replace_SNR_with_cv_in_peaklist <- function (peaks_average, peaks, tolerance_ppm=2000, file_format="imzml") {
-	# Scroll the peaks of the average peaklist
-	for (p in 1:length(peaks_average@mass)) {
-		# Create an empty vector where to allocate the intensity of this peak into the dataset
-		intensity_vector <- numeric()
-		# Pass every peaklist of the dataset (one for each spectrum)
-		for (s in 1:length(peaks)) {
-			# Do the operation only for the peaklists that matches the AVG
-			if (file_format == "brukerflex") {
-				if (length(grep(peaks_average@metaData$sampleName, peaks[[s]]@metaData$sampleName, ignore.case=TRUE)) == 1) {
-					# Scroll the peaklist
-					for (m in 1:length(peaks[[s]]@mass)) {
-						# Identify the peak
-						if ((abs(peaks[[s]]@mass[m] - peaks_average@mass[p])*10^6/peaks_average@mass[p]) <= tolerance_ppm) {
-							# Record its intensity into a vector
-							intensity_vector <- append(intensity_vector, peaks[[s]]@intensity[m])
-						}
-					}
-				}
-			}
-			if (file_format == "imzml" | file_format == "imzML") {
-				if (length(grep(peaks_average@metaData$file, peaks[[s]]@metaData$file, ignore.case=TRUE)) == 1) {
-					# Scroll the peaklist
-					for (m in 1:length(peaks[[s]]@mass)) {
-						# Identify the peak
-						if ((abs(peaks[[s]]@mass[m] - peaks_average@mass[p])*10^6/peaks_average@mass[p]) <= tolerance_ppm) {
-							# Record its intensity into a vector
-							intensity_vector <- append(intensity_vector, peaks[[s]]@intensity[m])
-						}
-					}
-				}
-			}
-		}
-		# Calculate the standard deviation and the mean of the peak (whose intensities are in the vector)
-		st_dev <- sd(intensity_vector)
-		mean_intensity <- mean(intensity_vector)
-		# Calculate the coefficient of variation
-		coeff_var_intensity <- (st_dev / mean_intensity) * 100
-		# Replace the SNR slot with the CV (for the peak)
-		peaks_average@SNR[p] <- coeff_var_intensity
-	}
-return (peaks_average)
-}
 
-
-
-
-
-################################################################################
 
 
 
@@ -1926,19 +1898,19 @@ if (most_intense_peaks == TRUE) {
 if (standard_deviation == TRUE && coeff_of_var == FALSE) {
 	# For each peaklist in the library, compute the SD
 	for (j in 1:length(peaks_library)) {
-		peaks_library[[j]] <- replace_SNR_with_st_dev_in_peaklist(peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format)
+		peaks_library[[j]] <- replace_SNR_in_avg_peaklist(peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format, replace_snr_with="std")
 	}
 }
 if (standard_deviation == FALSE && coeff_of_var == TRUE) {
 	# For each peaklist in the library, compute the CV
 	for (j in 1:length(peaks_library)) {
-		peaks_library[[j]] <- replace_SNR_with_cv_in_peaklist(peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format)
+		peaks_library[[j]] <- replace_SNR_in_avg_peaklist(peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format, replace_snr_with="cv")
 	}
 }
 if (standard_deviation == TRUE && coeff_of_var == TRUE) {
 	# For each peaklist in the library, compute the SD
 	for (j in 1:length(peaks_library)) {
-		peaks_library[[j]] <- replace_SNR_with_st_dev_in_peaklist (peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format)
+		peaks_library[[j]] <- replace_SNR_in_avg_peaklist(peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format, replace_snr_with="std")
 	}
 }
 # Remove low intensity peaks
