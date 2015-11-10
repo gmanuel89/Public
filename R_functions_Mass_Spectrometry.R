@@ -334,29 +334,39 @@ return (result_matrix)
 remove_low_intensity_peaks <- function (peaks, intensity_threshold_percent=0.1) {
 # Load the required libraries
 install_and_load_required_packages("parallel")
-# Detect the number of cores
-cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
-cl <- makeCluster(cpu_core_number)
+# Check if it is not a single peaks element (it returns an error when trying to access the second element of the list)
+error <- try(peaks[[2]], silent=TRUE)
+# If error is an actual error, its R class is "try-error"
 ########################################### INTENSITY FILTERING FUNCTION
 intensity_filtering_function <- function (peaks, intensity_threshold_percent) {
 	# Filter out the peaks whose intensity is below a certain threshold
-	for (p in 1:length(peaks@mass)) {
-		if ((abs(peaks@intensity[p] - max(peaks@intensity,na.rm=TRUE))*100/max(peaks@intensity,na.rm=TRUE)) < intensity_threshold_percent) {
-			peaks@intensity[p] <- NA
-			peaks@mass[p] <- NA
-		}
-	}
-	# Discard the NA values
-	peaks@mass <- peaks@mass [!is.na (peaks@mass)]
-	peaks@intensity <- peaks@intensity [!is.na (peaks@intensity)]
-	#
+	# Store mass and intensity into vectors
+	intensity_values <- peaks@intensity
+	mass_values <- peaks@mass
+	# Identify the positions of the values to be discarded
+	values_to_be_discarded <- intensity_values[((abs(intensity_values - max(intensity_values,na.rm=TRUE))*100/max(intensity_values,na.rm=TRUE)) < intensity_threshold_percent)]
+	positions_to_be_discarded <- which(intensity_values == values_to_be_discarded)
+	# Discard the values from the vectors
+	intensity_values <- intensity_values [-positions_to_be_discarded]
+	mass_values <- mass_values [-positions_to_be_discarded]
+	# Put the values back into the MALDIquant list
+	peaks@mass <- mass_values
+	peaks@intensity <- intensity_values
 	return (peaks)
 }
-########################################################################
-peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_function (peaks, intensity_threshold_percent=intensity_threshold_percent))
+######################################### Multiple peaks elements
+if (class(error) != "try-error") {
+	# Detect the number of cores
+	cpu_thread_number <- detectCores(logical=TRUE)
+	cpu_core_number <- cpu_thread_number/2
+	cl <- makeCluster(cpu_core_number)
+	peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_function (peaks, intensity_threshold_percent=intensity_threshold_percent))
+	stopCluster(cl)
+} else {
+	######################################### Single peaks element
+	peaks_filtered <- intensity_filtering_function(peaks, intensity_threshold_percent)
+}
 return (peaks_filtered)
-stopCluster(cl)
 }
 
 
