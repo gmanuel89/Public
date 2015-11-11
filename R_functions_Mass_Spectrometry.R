@@ -2569,7 +2569,7 @@ return (list(classification_hca_results=classification_hca_results, hca_graph=hc
 
 
 
-######################################################## CLASSIFICATION VIA SVM
+######################################################### CLASSIFICATION VIA SVM
 # The function takes a folder in which there are imzML files (one for each patient), the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel and the patient's average spectrum), MS images with the pixel-by-pixel classification, the SVM model itself and the average spectrum of the patients with red bars on the signals used by the SVM to classify it.
 classify_patients_svm <- function (spectra_folder, filepath_R, svm_model_name="SVMModel", smoothing_strength_preprocessing="medium", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
@@ -3327,10 +3327,16 @@ return (list(training_dataset = training_dataset, testDataset = test_dataset))
 # The function allows for the use of several feature selection algorithms
 feature_selection <- function (peaklist, feature_selection_method="rfe", features_to_select=20, selection_method="pls", correlation_method="pearson", correlation_threshold=0.75, cv_repeats_control=3, k_fold_cv_control=10, discriminant_attribute="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE, generate_plots=TRUE) {
 # Load the required libraries
-install_and_load_required_packages(c("caret", "pls", "stats"))
+install_and_load_required_packages(c("caret", "pls", "stats", "doMC"))
+##### MULTICORE
+# Detect the number of cores
+cpu_thread_number <- detectCores(logical=TRUE)
+cpu_core_number <- cpu_thread_number/2
+# Register the foreach backend
+registerDoMC(cores = cpu_core_number)
 ########################################################### RFE MODEL (with PLS)
 if (feature_selection_method == "rfe" || feature_selection_method == "recursive feature elimination") {
-	rfe_ctrl <- rfeControl (functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control)
+	rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control)
 	# The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
 	if (automatically_select_features == TRUE) {
 		if (selection_method != "") {
@@ -3532,7 +3538,7 @@ return (peaklist_truncated)
 
 
 ############################ CROSS-VALIDATION FOR A SUPPORT VECTOR MACHINE MODEL
-# This function operates a cross-validation to evaluate the performances of the SVM model.
+# This function operates a cross-validation to evaluate the performances of the SVM model, trained (and tuned) onto the dataset. The cross-validation is made by training the SVM model (with the same parameters) onto the training subset and evaluating its performances onto the testing subset.
 # It returns a matrix with the cross-validation results (the average performance of all the validations performed) along with the results from each validation (for each k of the k-fold). It returns also the seed used for making the randomness reproducible and the list of features.
 # It is advisable to have one row per patient in the peaklist matrix.
 cross_validation_svm <- function (training_dataset, seed=NULL, k_fold=10, repeats=5, svm_model, non_features=c("Sample","Class","THY"), positive_class=levels(training_dataset$Class)[1]) {
@@ -3641,9 +3647,15 @@ return (list(confusion_matrix=confusion_matrix_list, result_matrix=result_matrix
 ###################################################### SVM TUNING AND VALIDATION
 # This function operates the tuning of the Support Vector Machine (SVM), by testing all the parameters of the SVM (choosing them from a list provided by the user) and selecting the best.
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
-svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial", k_fold_cv=2, repeats_cv=5, positive_class_cv="HP", seed=NULL, pca=FALSE, numer_of_components=3) {
+svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial", k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, pca=FALSE, numer_of_components=3) {
 # Load the required libraries
-install_and_load_required_packages(c("caret", "kernlab", "e1071"))
+install_and_load_required_packages(c("caret", "kernlab", "e1071", "doMC"))
+##### MULTICORE
+# Detect the number of cores
+cpu_thread_number <- detectCores(logical=TRUE)
+cpu_core_number <- cpu_thread_number/2
+# Register the foreach backend
+registerDoMC(cores = cpu_core_number)
 ############################################################################ PCA
 if (pca == TRUE) {
 # Compute the PCs
@@ -3672,7 +3684,7 @@ if (svm_kernel == 2) {
 if (svm_kernel == 3) {
 	svm_kernel <- "sigmoid"
 }
-parameters_output <- list (kernel=svm_kernel, cost=svm_tuning$best.model$cost, degree=svm_tuning$best.model$degree, epsilon=svm_tuning$best.model$epsilon, gamma=svm_tuning$best.model$gamma)
+parameters_output <- data.frame (kernel=svm_kernel, cost=svm_tuning$best.model$cost, degree=svm_tuning$best.model$degree, epsilon=svm_tuning$best.model$epsilon, gamma=svm_tuning$best.model$gamma)
 #################### EXTERNAL VALIDATION (If a dataset is provided)
 if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	#### Use the model to predictthe outcome of the testing set (the new data must have only the predictors)
@@ -3749,7 +3761,7 @@ if (svm_kernel == 2) {
 if (svm_kernel == 3) {
 	svm_kernel <- "sigmoid"
 }
-parameters_output <- list (kernel=svm_kernel, cost=svm_tuning$best.model$cost, degree=svm_tuning$best.model$degree, epsilon=svm_tuning$best.model$epsilon, gamma=svm_tuning$best.model$gamma)
+parameters_output <- data.frame (kernel=svm_kernel, cost=svm_tuning$best.model$cost, degree=svm_tuning$best.model$degree, epsilon=svm_tuning$best.model$epsilon, gamma=svm_tuning$best.model$gamma)
 #################### CROSS-VALIDATION
 cv_svm_model <- cross_validation_svm(peaklist_training, k_fold=k_fold_cv, repeats=repeats_cv, svm_model=svm_model, non_features=non_features, positive_class=positive_class_cv, seed=seed)
 #################### EXTERNAL VALIDATION (If a dataset is provided)
@@ -3850,7 +3862,7 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 ####################################################################### FEATURES
 # SVM with defined parameters
 svm_model <- svm(peaklist_training [,!(names(peaklist_training) %in% non_features)], factor(peaklist_training$Class), kernel=kernel, cost=cost, epsilon=epsilon, gamma=gamma)
-parameters_output <- list (kernel=kernel, cost=cost, degree=degree, epsilon=epsilon, gamma=gamma)
+parameters_output <- data.frame (kernel=kernel, cost=cost, degree=degree, epsilon=epsilon, gamma=gamma)
 #################### CROSS-VALIDATION
 cvsvm_model <- cross_validation_svm(peaklist_training, k_fold=k_fold_cv, repeats=repeats_cv, svm_model=svm_model, non_features=non_features, positive_class=positive_class_cv, seed=seed)
 #################### EXTERNAL VALIDATION (If a dataset is provided)
@@ -3891,6 +3903,174 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	return (list (model=svm_model, cross_validation=cvsvm_model, classification_results=classification_results_svm, parameters=parameters_output, performances=test_performances_svm, roc=svm_roc, pie_chart_classification=pie_chart_classification))
 } else {return (list (model=svm_model, parameters=parameters_output, cross_validation=cvsvm_model))}
 	}
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+###################################################### PLS TUNING AND VALIDATION
+# This function operates the training of a Partial Least Squares (PLS) model, by testing all the parameters of the PLS and selecting the best (in terms of accuracy). The tuning is performed via cross-validation onto the training dataset.
+# It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
+pls_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(ncomp=1:5), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximise_selection_criteria_values=TRUE) {
+# Load the required libraries
+install_and_load_required_packages(c("caret", "e1071", "doMC"))
+##### MULTICORE
+# Detect the number of cores
+cpu_thread_number <- detectCores(logical=TRUE)
+cpu_core_number <- cpu_thread_number/2
+# Register the foreach backend
+registerDoMC(cores = cpu_core_number)
+################ Tuning
+# A tune grid has to be generated and passed to the tuning algorithm
+if (is.null(tuning_parameters) || is.null(tuning_parameters$ncomp)) {
+	tune_grid <- NULL
+} else {
+	tune_grid <- expand.grid(tuning_parameters)
+}
+############ Fit the model (and tune it)
+# Fit the model with the features and tune it with cross-validation
+train_control_pls <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv)
+if (!is.null(seed)) {
+	# Make the randomness reproducible
+	set.seed(seed)
+}
+pls_model <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="pls", trControl=train_control_pls, preProcess=preprocessing, metric=selection_criteria, maximize=maximise_selection_criteria_values, tuneGrid=tune_grid)
+# Output the parameters
+pls_performances <- pls_model$results
+# Plots
+plots <- list()
+plot(pls_model)
+#plot_pls_accuracy <- recordPlot()
+#plots <- append(plots, plot_pls_accuracy)
+#################### EXTERNAL VALIDATION (If a dataset is provided)
+if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
+	#### Use the model to predict the outcome of the testing set (the new data must have only the predictors)
+	# Plant the seed only if a specified value is entered
+	if (!is.null(seed)) {
+		# Make the randomness reproducible
+		set.seed(seed)
+	}
+	predicted_classes_pls <- predict(pls_model, newdata = peaklist_test [,!(names(peaklist_test) %in% non_features)])
+	# Create the outcomes dataframe
+	classification_results_pls <- data.frame (sample=peaklist_test$Sample, predicted=predicted_classes_pls, true=peaklist_test$Class)
+	### Generate the confusion matrix to evaluate the performances
+	test_performances_pls <- confusionMatrix(data = predicted_classes_pls, peaklist_test$Class, positive=positive_class_cv)
+	#### ROC analysis
+	pls_roc <- list()
+	roc_curve <- roc(response=classification_results_pls$true, predictor=as.numeric(classification_results_pls$predicted))
+	pls_roc[[1]] <- roc_curve$auc
+	plot (roc_curve)
+	roc_legend <- paste("ROC area under the curve:", roc_curve$auc)
+	legend("bottomright", legend=roc_legend, xjust=0.5, yjust=0.5)
+	pls_roc[[2]] <- recordPlot()
+	###################### Pie chart classification
+	correctly_classified <- 0
+	misclassified <- 0
+	for (i in 1:nrow(classification_results_pls)) {
+		if (classification_results_pls$predicted[i] == classification_results_pls$true[i]) {
+			correctly_classified <- correctly_classified + 1
+		} else {
+			misclassified <- misclassified + 1
+		}
+	}
+	classification_pie <- c(correctly_classified, misclassified)
+	pie(x=classification_pie, labels=c("Correctly classified", "Misclassified"), col=c("green","blue"))
+	pie_chart_classification <- recordPlot()
+	plots <- append(plots, pie_chart_classification)
+}
+# Output the results
+return (list(model=pls_model, classification_results=classification_results_pls, performances_pls_cv=pls_performances, pls_performances=test_performances_pls, roc=pls_roc, plots=plots))
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+################################### NAIVE BAYES CLASSIFIER TUNING AND VALIDATION
+# This function operates the training of a Naive Bayes Classifier (NBC) model, by testing all the parameters of the NBC and selecting the best (in terms of accuracy). The tuning is performed via cross-validation onto the training dataset.
+# It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
+nbc_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(fL=NULL,usekernel=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximise_selection_criteria_values=TRUE) {
+# Load the required libraries
+install_and_load_required_packages(c("caret", "e1071", "doMC", "klaR", "MASS"))
+##### MULTICORE
+# Detect the number of cores
+cpu_thread_number <- detectCores(logical=TRUE)
+cpu_core_number <- cpu_thread_number/2
+# Register the foreach backend
+registerDoMC(cores = cpu_core_number)
+# Fit the model with the features and tune it with cross-validation
+train_control_nbc <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv)
+################ Tuning
+# A tune grid has to be generated and passed to the tuning algorithm
+if (is.null(tuning_parameters) || is.null(tuning_parameters$fL) && is.null(tuning_parameters$usekernel)) {
+	tune_grid <- NULL
+} else {
+	tune_grid <- expand.grid(tuning_parameters)
+}
+############ Fit the model (and tune it)
+# Make the randomness reproducible
+if (!is.null(seed)) {
+	set.seed(seed)
+}
+nbc_model <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="nb", trControl=train_control_nbc, preProcess=preprocessing, metric=selection_criteria, maximize=maximise_selection_criteria_values, tuneGrid=tune_grid)
+# Output the parameters
+nbc_performances <- nbc_model$results
+# Plots
+plots <- list()
+#plot(nbc_model)
+#plot_nbc_accuracy <- recordPlot()
+#plots <- append(plots, plot_nbc_accuracy)
+#################### EXTERNAL VALIDATION (If a dataset is provided)
+if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
+	#### Use the model to predict the outcome of the testing set (the new data must have only the predictors)
+	# Plant the seed only if a specified value is entered
+	if (!is.null(seed)) {
+		# Make the randomness reproducible
+		set.seed(seed)
+	}
+	predicted_classes_nbc <- predict(nbc_model, newdata = peaklist_test [,!(names(peaklist_test) %in% non_features)])
+	# Create the outcomes dataframe
+	classification_results_nbc <- data.frame (sample=peaklist_test$Sample, predicted=predicted_classes_nbc, true=peaklist_test$Class)
+	### Generate the confusion matrix to evaluate the performances
+	test_performances_nbc <- confusionMatrix(data = predicted_classes_nbc, peaklist_test$Class, positive=positive_class_cv)
+	#### ROC analysis
+	nbc_roc <- list()
+	roc_curve <- roc(response=classification_results_nbc$true, predictor=as.numeric(classification_results_nbc$predicted))
+	nbc_roc[[1]] <- roc_curve$auc
+	plot(roc_curve)
+	roc_legend <- paste("ROC area under the curve:", roc_curve$auc)
+	legend("bottomright", legend=roc_legend, xjust=0.5, yjust=0.5)
+	pls_roc[[2]] <- recordPlot()
+	###################### Pie chart classification
+	correctly_classified <- 0
+	misclassified <- 0
+	for (i in 1:nrow(classification_results_nbc)) {
+		if (classification_results_nbc$predicted[i] == classification_results_nbc$true[i]) {
+			correctly_classified <- correctly_classified + 1
+		} else {
+			misclassified <- misclassified + 1
+		}
+	}
+	classification_pie <- c(correctly_classified, misclassified)
+	pie(x=classification_pie, labels=c("Correctly classified", "Misclassified"), col=c("green","blue"))
+	pie_chart_classification <- recordPlot()
+	plots <- append(plots, pie_chart_classification)
+}
+# Output the results
+return (list(model=nbc_model, classification_results=classification_results_nbc, performances_nbc_cv=nbc_performances, nbc_performances=test_performances_nbc, roc=nbc_roc, plots=plots))
 }
 
 
