@@ -3491,7 +3491,7 @@ return (list(pixel_by_pixel_classification=final_result_matrix, patient_classifi
 
 
 
-####################################################### ENSEMBLE CLASSIFICATION
+######################################################## ENSEMBLE CLASSIFICATION
 # This function takes as input the folder containing the spectra to be classified (one imzML for each patient) or an imzML file or a list of MALDIquant spectra, and the folder where the R workspaces containing the models are stored (with a name resembling the model), and the model names in each workspace, along with the folder containing the spectra to be used as database for clustering classification (one representative imzML per class in the order of the class_list input, or with imzML files named according to the class). Moreover, additonal preprocessing details can be specified. Many classifiers at the same time can be chosen, and the function relies on other functions (specific for each classifier).
 # The function outputs a list containing the classification results for each classifier (see the specific functions for details) and the ensemble classificaton result.
 ensemble_classification <- function (spectra_path, folder_R_models, classifiers=c("svm", "pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering, smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000, decision_method="majority", vote_weights="equal") {
@@ -3755,13 +3755,13 @@ correlation_pvalue <- function (correlation_coefficient, number_of_samples, corr
 
 ##################################### DEFINED SPECTRA GROUPING (PEAKLIST MATRIX)
 # This function takes a peaklist matrix as input and generates a peaklist dataframe with a certain number of rows per patient, by averaging spectra randomly or according to a clustering algorithm.
-group_peaklist <- function (peaklist, rows_per_patient=100, seed=NULL, balanced=TRUE, discard_poor_samples=FALSE, discard_if_lower_than=100, non_features=c("Sample","Class"), algorithm="random") {
+group_peaklist <- function (peaklist, rows_per_patient=100, seed=NULL, balanced=TRUE, discard_poor_samples=FALSE, discard_if_lower_than=100, non_features=c("Sample","Class"), algorithm="random", grouping_variable="Sample") {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "stats"))
-#
+# Results
 result_data_frame <- data.frame()
 # Create the file vector and the patient vector
-file_vector <- peaklist$Sample
+file_vector <- peaklist[,grouping_variable]
 patient_vector <- levels(file_vector)
 #### If the dataset has to be balanced...
 if (balanced == TRUE) {
@@ -3771,7 +3771,7 @@ if (balanced == TRUE) {
 	# Scroll the other patients
 	for (p in 1:length(patient_vector)) {
 		# Determine the number of observations for this patient
-		observation_number <- nrow(peaklist [peaklist$Sample==patient_vector[p],])
+		observation_number <- nrow(peaklist [peaklist[,grouping_variable] == patient_vector[p],])
 		# Set the lowest as the row number of the first patient and then check
 		if (lowest_observation_number == NULL || observation_number < lowest_observation_number) {
 			lowest_observation_number <- observation_number
@@ -3787,7 +3787,7 @@ if (rows_per_patient == 0 | rows_per_patient == 1) {
 	# For each patient
 	for (p in 1:length(patient_vector)) {
 		# Subset the entire dataframe, isolating only the part corresponding to that patient
-		patient_data_frame <- peaklist [peaklist$Sample==patient_vector[p],]
+		patient_data_frame <- peaklist [peaklist[,grouping_variable] == patient_vector[p],]
 		patient_data_frame_rows <- nrow(patient_data_frame)
 		# Continue only if nothing has to be discarded or the dimension of the patient dataset is higher than the threshold
 		if (discard_poor_samples == FALSE || (discard_poor_samples == TRUE && patient_data_frame_rows >= discard_if_lower_than)) {
@@ -3811,7 +3811,7 @@ if (rows_per_patient > 1) {
 	# For each patient
 	for (p in 1:length(patient_vector)) {
 		# Subset the entire dataframe, isolating only the part corresponding to that patient
-		patient_data_frame <- peaklist [peaklist$Sample==patient_vector[p],]
+		patient_data_frame <- peaklist [peaklist[,grouping_variable] == patient_vector[p],]
 		patient_data_frame_rows <- nrow(patient_data_frame)
 		# Continue only if nothing has to be discarded or the dimension of the patient dataset is higher than the threshold
 		if (discard_poor_samples == FALSE || (discard_poor_samples == TRUE && patient_data_frame_rows >= discard_if_lower_than)) {
@@ -3824,7 +3824,7 @@ if (rows_per_patient > 1) {
 				}
 				# Generate random folds (one for each representative Spectrum)
 				# Index of the spectra to be allocated in the fold, randomly selected
-				index <- createFolds(patient_data_frame$Sample, k = rows_per_patient)
+				index <- createFolds(patient_data_frame[,grouping_variable], k = rows_per_patient)
 				# For each fold
 				for (k in 1:length(index)) {
 					# Take the corresponding spectra subset (of the selected fold)
@@ -3931,9 +3931,9 @@ return (result_data_frame)
 
 
 ##################### MATRIX/DATAFRAME SPLITTING FUNCTION (TRAINING AND TESTING)
-# This function takes a peaklist matrix as input and outputs a list containing the part of the dataset used for the training and the part to be used as testing dataset.
-# The split is made according to the user desire and according to a selected column (usually the class column)
-matrix_splitting_training_test <- function (peaklist, class_list=list(), seed=NULL, percentage_of_observation_for_training=50, splitting_feature="Class") {
+# This function takes a peaklist matrix as input and outputs a list containing the part of the dataset used for the training and the part to be used as testing dataset. If a class list is provided, an additional column containing the class is automatically created according to the sample name (the class name must be in the sample name too). The splitting happens onto the class variable, taking into account also the sample (so that the spectra from the same sample are not splitted).
+# The split is made according to the user desire and according to a selected column (usually the class column).
+matrix_splitting_training_test <- function (peaklist, class_list=list(), seed=NULL, percentage_of_observation_for_training=50) {
 ############################# If there are no classes or one class, just randomly select rows on the entire dataset
 if (length(class_list) <= 1) {
 	# Plant the seed only if a specified value is entered
@@ -4368,7 +4368,7 @@ cpu_thread_number <- detectCores(logical=TRUE)
 cpu_core_number <- cpu_thread_number/2
 # Register the foreach backend
 registerDoMC(cores = cpu_core_number)
-############################################################################ PCA
+################################################## PCA
 if (pca == TRUE) {
 # Compute the PCs
 pca_training <- prcomp (as.matrix(peaklist_training [,!(names(peaklist_training) %in% non_features)]))
@@ -4429,7 +4429,7 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 	return (list (model=svm_model, svm_features=colnames(svm_model$SV), svm_parameters=parameters_output, classification_results=classification_results_svm, performances=test_performances_svm, roc=svm_roc))
 }	else {return (list (model=svm_model, svm_features=colnames(svm_model$SV), svm_parameters=parameters_output, cross_validation=cv_svm_model))}
 } else {
-####################################################################### FEATURES
+######################################## FEATURES
 if (autotuning == TRUE) {
 	# Find the best tuning parameters for the SVM
 	# Plant the seed only if a specified value is entered
@@ -4676,6 +4676,15 @@ return (list(model=nbc_model, classification_results=classification_results_nbc,
 
 
 ################################################################################
+
+
+
+
+
+################################################# ENSEMBLE TUNING AND VALIDATION
+# This function operates the tuning of the ensemble classifier, by relying upon other functions to train, tune and validate the individual classifiers.
+# It returns the best models in terms of classification performances, along with their parameters and performances (cross-validation or external validation, according to if an external dataset is provided).
+ensemble_tuning_and_validation <- function()
 
 
 
