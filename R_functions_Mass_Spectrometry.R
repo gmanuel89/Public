@@ -3494,7 +3494,7 @@ return (list(pixel_by_pixel_classification=final_result_matrix, patient_classifi
 ######################################################## ENSEMBLE CLASSIFICATION
 # This function takes as input the folder containing the spectra to be classified (one imzML for each patient) or an imzML file or a list of MALDIquant spectra, and the folder where the R workspaces containing the models are stored (with a name resembling the model), and the model names in each workspace, along with the folder containing the spectra to be used as database for clustering classification (one representative imzML per class in the order of the class_list input, or with imzML files named according to the class). Moreover, additonal preprocessing details can be specified. Many classifiers at the same time can be chosen, and the function relies on other functions (specific for each classifier).
 # The function outputs a list containing the classification results for each classifier (see the specific functions for details) and the ensemble classificaton result.
-ensemble_classification <- function (spectra_path, folder_R_models, classifiers=c("svm", "pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering, smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000, decision_method="majority", vote_weights="equal") {
+ensemble_classification <- function (spectra_path, folder_R_models, classifiers=c("svm","pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering=NULL, nodes_in_hca=3, discarded_nodes_in_hca=1, smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000, decision_method="majority", vote_weights="equal") {
 ########################## Outputs (all)
 classification_svm_final <- list()
 classification_hca_final <- list()
@@ -3598,25 +3598,15 @@ for (f in 1:length(filepath_test_imzml)) {
 	    }
 	}
 	########################################## HCA
-	if ("hca" %in% classifiers) {
-	    # Database: import, trim and preprocess
-	    spectra_database_for_hca <- importImzMl(spectra_database_folder)
-	    if (mass_range[1] == 0 && mass_range[2] == 0) {
-	        spectra_database_for_hca <- trim(spectra_database_for_hca)
-	    }
-	    if (mass_range[1] == 0 && mass_range[2] != 0) {
-	        spectra_database_for_hca <- trim(spectra_database_for_hca, range=mass_range)
-	    }
-	    if (mass_range[1] != 0 && mass_range[2] == 0) {
-	        mass_range[2] <- Inf
-	        spectra_database_for_hca <- trim(spectra_database_for_hca, range=mass_range)
-	    }
-	    if (mass_range[1] != 0 && mass_range[2] != 0) {
-	        spectra_database_for_hca <- trim(spectra_database_for_hca, range=mass_range)
-	    }
-	    spectra_database_for_hca <- preprocess_spectra(spectra_database_for_hca, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
+	if ("hca" %in% classifiers && (!is.null(spectra_database_folder_for_clustering) || length(spectra_database_folder_for_clustering) == 0)) {
+	    # Database: import, trim and preprocess (memory efficient import of imzML files)
+		# Generate one spectrum (average) per patient (imzML file)
+		spectra_database_for_hca <- memory_efficient_import(spectra_database_folder, tof_mode=tof_mode, tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength=smoothing_strength_preprocessing, mass_range=mass_range, preprocess_spectra=preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of, generate_representative_spectra=TRUE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", discarded_nodes=0, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=tolerance_ppm, file_format="imzml", seed=seed, output_list="average")
+	    spectra_database_for_hca <- spectra_database_for_hca$spectra_average
+		# Generate one representative spectrum per class
+		spectra_database_for_hca <- group_spectra_class(spectra_database_for_hca, class_list=class_list_for_hca, file_format="imzml")
 	    # HCA classification
-	    classification_hca <- hierarchical_clustering_classification(sample_spectra, spectra_database=spectra_database_for_hca, class_list=c("Ben","PTC"), class_in_file_name=TRUE, tof_mode="reflectron", pixel_by_pixel_classification=FALSE, clustering_algorithm="hca", nodes=4, discarded_nodes=0, seed=12345)
+	    classification_hca <- hierarchical_clustering_classification(sample_spectra, spectra_database=spectra_database_for_hca, class_list=c("Ben","PTC"), class_in_file_name=TRUE, tof_mode="reflectron", pixel_by_pixel_classification=FALSE, clustering_algorithm="hca", nodes=nodes_in_hca, discarded_nodes=discarded_nodes_in_hca, seed=seed)
 	    classification_hca_final <- append(classification_hca_final, classification_hca)
 	}
 	######################################## ENSEMBLE
@@ -3635,6 +3625,9 @@ for (f in 1:length(filepath_test_imzml)) {
 				votes [which(class_list==class)] <- length(which(x == class))
 			}
 			final_vote <- names(votes)[which(votes==max(votes))]
+			if (length(final_vote) != 1) {
+				final_vote <- 0
+			}
 			return(final_vote)
 		}
 		# For each spectrum (matrix row), establish the final majority vote
@@ -4684,7 +4677,18 @@ return (list(model=nbc_model, classification_results=classification_results_nbc,
 ################################################# ENSEMBLE TUNING AND VALIDATION
 # This function operates the tuning of the ensemble classifier, by relying upon other functions to train, tune and validate the individual classifiers.
 # It returns the best models in terms of classification performances, along with their parameters and performances (cross-validation or external validation, according to if an external dataset is provided).
-ensemble_tuning_and_validation <- function()
+ensemble_tuning_and_validation <- function(peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), classifiers=c("svm","pls","hca","bayes"), autotuning=TRUE,  classifier_parameters=list(svm=list(gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial"), pls=data.frame(ncomp=1:5), bayes=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria=data.frame(pls="Accuracy",bayes="Accuracy"), maximise_selection_criteria_values=data.frame(pls=TRUE,bayes=TRUE)) {
+	if ("svm" %in% classifiers || "SVM" %in% classifiers) {
+		svm_classifier <- svm_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, autotuning=autotuning, tuning_parameters=classifier_parameters$svm, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, parameters=classifier_parameters$svm, positive_class_cv=positive_class_cv, seed=seed, pca=FALSE, numer_of_components=3)
+	}
+	if ("pls" %in% classifiers || "PLS" %in% classifiers) {
+		pls_classifier <- pls_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, tuning_parameters=classifier_parameters$pls, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, positive_class_cv="HP", seed=seed, preprocessing=preprocessing, selection_criteria=as.character(selection_criteria$pls), maximise_selection_criteria_values=maximise_selection_criteria_values$pls)
+	}
+	if ("bayes" %in% classifiers || "Bayes" %in% classifiers) {
+		bayes_classifier <- nbc_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, tuning_parameters=classifier_parameters$bayes, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, positive_class_cv=positive_class_cv, seed=seed, preprocessing=preprocessing, selection_criteria=as.character(selection_criteria$bayes), maximise_selection_criteria_values=maximise_selection_criteria_values$bayes)
+	}
+	return(list(svm_classifier=svm_classifier, pls_classifier=pls_classifier, bayes_classifier=bayes_classifier))
+}
 
 
 
