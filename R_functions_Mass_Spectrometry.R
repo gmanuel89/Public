@@ -5229,7 +5229,7 @@ distance_matrix <- distance_matrix[(library_size+1):nrow(distance_matrix),]
 distance_matrix <- distance_matrix[,1:library_size]
 ### Normalise the euclidean distances
 if (normalise_distances == TRUE) {
-	# TIC
+	# TIC (SUM)
 	if (normalisation_method == "sum") {
 		# Compute the sum of the rows
 		row_sums <- apply(distance_matrix, MARGIN=1, FUN=sum)
@@ -5247,6 +5247,28 @@ if (normalise_distances == TRUE) {
 			} else if (x >= 1 && x < 1.2) {
 				x <- paste("NI (", round(as.numeric(x),3), ")", sep="")
 			} else if (x >= 1.2) {
+		        x <- paste("NO (", round(as.numeric(x),3), ")", sep="")
+		    }
+		    return (x)
+		}
+		result_matrix <- apply(distance_matrix, MARGIN=c(1,2), FUN=function(x) scoring_function(x))
+	}
+	# MAX
+	if (normalisation_method == "max") {
+		# Divide each element of the matrix by the maximum of the row
+		for (r in 1:nrow(distance_matrix)) {
+			distance_matrix [r,] <- distance_matrix[r,] / max(distance_matrix[r,])
+		}
+		# Multiply everything by 100, to have more readable results (percentage of the max)
+		distance_matrix <- distance_matrix * 100
+		# The classification is made by comparing the single sample spectrum with the spectrum of the database class (the distance is displayed in the distance matrix): the closer the better
+		# Scroll the rows, assign the class based upon the distance, create the output matrix for results (create a function to apply to each matrix row)
+		scoring_function <- function (x) {
+			if (x < 50) {
+		    	x <- paste("YES (", round(as.numeric(x),3), ")", sep="")
+			} else if (x >= 50 && x < 75) {
+				x <- paste("NI (", round(as.numeric(x),3), ")", sep="")
+			} else if (x >= 75) {
 		        x <- paste("NO (", round(as.numeric(x),3), ")", sep="")
 		    }
 		    return (x)
