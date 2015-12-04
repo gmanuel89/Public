@@ -42,14 +42,14 @@ file_vector <- character()
 for (i in 1:length(peaks)) {
     # Check the length(if averaged, it contains the name of all the single spectra)
     if (file_format == "imzml" | file_format == "imzML") {
-        if (length(peaks[[i]]@metaData$file) == 1) {
-            file_vector <- append(file_vector, peaks[[i]]@metaData$file)
+        if (length(peaks[[i]]@metaData$file[1]) == 1) {
+            file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
         }
-        if (length(peaks[[i]]@metaData$file) > 1) {
+        if (length(peaks[[i]]@metaData$file[1]) > 1) {
             file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
         }
     }
-    if (file_format == "brukerflex") {
+    if (file_format == "brukerflex" || file_format == "xmass") {
         if (length(peaks[[i]]@metaData$sampleName) == 1) {
             file_vector <- append(file_vector, peaks[[i]]@metaData$sampleName)
         }
@@ -148,9 +148,9 @@ file_vector <- character()
 # Add the file names recursively, scrolling the whole spectral dataset
 for (i in 1:length(peaks)) {
 	if (file_format == "imzml" | file_format == "imzML") {
-		file_vector <- append(file_vector, peaks[[i]]@metaData$file)
+		file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
 	}
-	if (file_format == "brukerflex") {
+	if (file_format == "brukerflex" || file_format == "xmass") {
 		file_vector <- append(file_vector, peaks[[i]]@metaData$sampleName)
 	}
 }
@@ -283,13 +283,13 @@ for (lib in 1:length(filepath)) {
 	#### Create the partial result matrices
 	st_dev_matrix <- matrix (ncol=length(signal_list), nrow=1)
 	colnames(st_dev_matrix) <- column_names_st_dev
-	rownames(st_dev_matrix) <- spectra[[1]]@metaData$file
+	rownames(st_dev_matrix) <- spectra[[1]]@metaData$file[1]
 	coeff_var_matrix <- matrix (0, ncol=length(signal_list), nrow=1)
 	colnames(coeff_var_matrix) <- column_names_coeff_var
-	rownames(coeff_var_matrix) <- spectra[[1]]@metaData$file
+	rownames(coeff_var_matrix) <- spectra[[1]]@metaData$file[1]
 	mean_abs_dev_matrix <- matrix (0, ncol=length(signal_list), nrow=1)
 	colnames(mean_abs_dev_matrix) <- column_names_mean_abs_dev
-	rownames(mean_abs_dev_matrix) <- spectra[[1]]@metaData$file
+	rownames(mean_abs_dev_matrix) <- spectra[[1]]@metaData$file[1]
 	# For each signal in the signal_list
 	for (s in 1:length(signal_list)) {
 		# Identify the column of interest
@@ -352,11 +352,13 @@ intensity_filtering_function <- function (peaks, intensity_threshold_percent) {
 	return (peaks)
 }
 ######################################### Multiple peaks elements
-if (is.list(peaks)) {
+if (isMassPeaksList(peaks)) {
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
 	cpu_core_number <- cpu_thread_number/2
+	# Make the CPU cluster for parallelisation
 	cl <- makeCluster(cpu_core_number)
+	# Apply the multicore function
 	peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_function (peaks, intensity_threshold_percent=intensity_threshold_percent))
 	stopCluster(cl)
 } else {
@@ -477,7 +479,7 @@ replace_SNR_in_avg_peaklist <- function (spectra, SNR=5, tof_mode="linear", tole
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Check if it is not a single spectrum
 # If the spectra are many...
-if (length(spectra) > 0 && is.list(spectra)) {
+if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
 	# Average the spectra
 	avg_spectrum <- averageMassSpectra(spectra, method="mean")
 	avg_spectrum <- removeBaseline(avg_spectrum, method="TopHat")
@@ -613,7 +615,7 @@ return (list (vector=v, outliers_position=outliers_position))
 
 ######################################### PEAK STATISTICS (on processed Spectra)
 # This function computes the peak statistics onto a selected spectra dataset, both when the spectra belong to no (or one) class and more classes.
-peak_statistics <- function (spectra, SNR=3, class_list=list(), class_in_filename=TRUE, tof_mode="linear", file_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, remove_outliers=TRUE) {
+peak_statistics <- function (spectra, SNR=3, class_list=list(), class_in_file_name=TRUE, tof_mode="linear", file_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, remove_outliers=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Determine the number of classes
@@ -1048,7 +1050,7 @@ return (spectrum_images)
 # This function imports the spectra in a memory efficient way: it reads spectra from one imzML file at a time, it can discard spectra according to their TIC, it runs the preprocessing of the spectra from the imzML file into packages of spectra, it can generate a set of representative average spectra (by grouping spectra randomly or according to a clustering algorithm). After this, it stores all the spectra from all the imzML files into a variable and from here it can align the spectra with the peaklist of the average spectrum of the dataset and it can crop all the spectra to a selected mass range.
 # It relies upon other functions.
 # The functions returns (the user can select what to compute) a list of elements: all the spectra, the representative spectra, the MS images after clustering.
-memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", mass_range=c(0,0), preprocess_spectra=TRUE, process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=2000, file_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
+memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", mass_range=c(0,0), preprocess_spectra=TRUE, process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", clustering_method_for_hca="agglomerative", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=2000, file_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
 ################################################### Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
 #
@@ -1066,7 +1068,7 @@ for (i in 1:length(folder_files)) {
 	if (file_format == "imzml" | file_format == "imzML") {
 		spectra <- importImzMl(folder_files[i])
 	}
-	if (file_format == "brukerflex") {
+	if (file_format == "brukerflex" || file_format == "xmass") {
 		spectra <- importBrukerFlex(folder_files[i])
 	}
     ######################################## TIC purification
@@ -1093,7 +1095,7 @@ for (i in 1:length(folder_files)) {
 		# At least two spectra for the averaging (the averaging will fail if there is only one spectrum, so use it if there is only one; after TIC purification no spectra can be left!) Check if there is any spectra and if there are one or many spectra.
     	if (tof_mode == "linear") {
             spectra_avg <- spectra
-			if (length(spectra_avg) > 0 && is.list(spectra)) {
+			if (length(spectra_avg) > 0 && isMassSpectrumList(spectra)) {
 	    		spectra_avg <- averageMassSpectra(spectra, method="mean")
 	    		spectra_avg <- smoothIntensity(spectra_avg, method="SavitzkyGolay", halfWindowSize=10)
 	    		spectra_avg <- removeBaseline(spectra_avg, method="TopHat")
@@ -1102,7 +1104,7 @@ for (i in 1:length(folder_files)) {
     	}
     	if (tof_mode == "reflector" || tof_mode == "reflectron") {
             spectra_avg <- spectra
-			if (length(spectra_avg) > 0 && is.list(spectra)) {
+			if (length(spectra_avg) > 0 && isMassSpectrumList(spectra)) {
 	    		spectra_avg <- averageMassSpectra(spectra, method="mean")
 	    		spectra_avg <- smoothIntensity(spectra_avg, method="SavitzkyGolay", halfWindowSize=2.5)
 	    		spectra_avg <- removeBaseline(spectra_avg, method="TopHat")
@@ -1116,7 +1118,7 @@ for (i in 1:length(folder_files)) {
 	if (generate_representative_spectra == TRUE && skyline == TRUE && "skyline" %in% output_list) {
 		# At least two spectra for the skyline (the process will fail if there is only one spectrum, so use it if there is only one; after TIC purification no spectra can be left!)
         spectra_skyline <- spectra
-		if (length(spectra_avg) > 0 && is.list(spectra)) {
+		if (length(spectra_avg) > 0 && isMassSpectrumList(spectra)) {
 			spectra_skyline <- generate_skyline_spectrum(spectra)
 			spectra_skyline <- removeBaseline(spectra_skyline, method="TopHat")
 			spectra_skyline <- calibrateIntensity(spectra_skyline, method="TIC")
@@ -1127,8 +1129,8 @@ for (i in 1:length(folder_files)) {
 	}
     ### Generate representative spectra (after TIC purification no spectra can be left!)
     if (generate_representative_spectra == TRUE && "representative" %in% output_list) {
-		if (length(spectra) > 0 && is.list(spectra)) {
-	    	spectra_dataset_representative[[i]] <- group_spectra(spectra, spectra_per_patient=spectra_per_patient, file_format=file_format, tof_mode=tof_mode, seed=ifelse(is.null(seed), 0, seed), algorithm=algorithm_for_representative_spectra, discarded_nodes=discarded_nodes)
+		if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
+	    	spectra_dataset_representative[[i]] <- group_spectra(spectra, spectra_per_patient=spectra_per_patient, file_format=file_format, tof_mode=tof_mode, seed=ifelse(is.null(seed), 0, seed), algorithm=algorithm_for_representative_spectra, clustering_method=clustering_method_for_hca, discarded_nodes=discarded_nodes)
 	        spectra_dataset_grouped <- append(spectra_dataset_grouped,spectra_dataset_representative[[i]]$spectra)
 		}
     }
@@ -1215,7 +1217,7 @@ if (generate_representative_spectra == TRUE && spectra_per_patient == 1 && "skyl
 }
 ############################################################# SPECTRA ALIGNMENT
 if (spectra_alignment==TRUE) {
-	if (length(spectra_dataset) > 0 && is.list(spectra_dataset)) {
+	if (length(spectra_dataset) > 0 && isMassSpectrumList(spectra_dataset)) {
 		# Average the spectra: the avg spectrum peaks will be used as reference
 	    spectra_avg_ref <- averageMassSpectra(spectra_dataset, method="mean")
 		peaks_avg_ref <- detectPeaks(spectra_avg_ref, SNR=5)
@@ -1359,7 +1361,7 @@ if (file_format == "imzml" || file_format=="imzML") {
     # Scroll the spectra...
     for (i in 1:length(spectra)) {
         # Split the filepath at / (universal for different OSs)
-        sample_name <- unlist(strsplit(spectra[[i]]@metaData$file,"/"))
+        sample_name <- unlist(strsplit(spectra[[i]]@metaData$file[1],"/"))
         # The sample name is the last part of the path
         sample_name <- sample_name[length(sample_name)]
         # Detach the file extension
@@ -1369,11 +1371,11 @@ if (file_format == "imzml" || file_format=="imzML") {
         spectra[[i]]@metaData$file <- sample_name
     }
 }
-if (file_format == "brukerflex") {
+if (file_format == "brukerflex" || file_format == "xmass") {
     # Scroll the spectra...
     for (i in 1:length(spectra)) {
         # Split the filepath at / (universal for different OSs)
-        sample_name <- unlist(strsplit(spectra[[i]]@metaData$file,"/"))
+        sample_name <- unlist(strsplit(spectra[[i]]@metaData$file[1],"/"))
         # The sample name is the last part of the path
         sample_name <- sample_name[length(sample_name)-4]
         # Put the name back into the spectra
@@ -1396,14 +1398,17 @@ return (spectra)
 ########################################################## CLASS NAME REPLACING
 # This function replaces the sample name field in the spectrum with the class the spectrum belongs to (the file name must contain the class)
 # The input can be both spectra or peaks (MALDIquant)
-replace_class_name <- function (spectra, class_list) {
+replace_class_name <- function (spectra, class_list, class_in_file_name=TRUE, file_format="imzml") {
 class_list <- sort(class_list)
+if (class_in_file_name == TRUE) {
+	spectra <- replace_sample_name(spectra, file_format=file_format)
+}
 # Scroll the class list...
 for (w in 1:length(class_list)) {
     # Scroll the spectra...
 	for (i in 1:length(spectra)) {
         # If there is a match between the file name and the class
-		if (length(grep(class_list[w],spectra[[i]]@metaData$file, fixed=TRUE)) == 1) {
+		if (length(grep(class_list[w],spectra[[i]]@metaData$file[1], fixed=TRUE)) == 1) {
             # Replace the file name with the class name
 			spectra[[i]]@metaData$file <- class_list [w]
 		}
@@ -1429,7 +1434,7 @@ preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="
 install_and_load_required_packages(c("MALDIquant", "parallel"))
 # Check if it is not a single spectrum
 ######################################### Multiple spectra
-if (is.list(spectra)) {
+if (isMassSpectrumList(spectra)) {
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
 cpu_core_number <- cpu_thread_number/2
@@ -1577,7 +1582,7 @@ if (sampling_method == "kfold") {
 }
 }
 ######################################### Single spectra
-if (!is.list(spectra)) {
+if (!isMassSpectrumList(spectra)) {
 	if (tof_mode == "linear") {
 		## Remove flat spectra
 		#spectra <- removeEmptyMassObjects (spectra)
@@ -1646,7 +1651,7 @@ return (preprocessed_spectra)
 # It is advisable to use a list of spectra coming from one patient (one imzML)
 # Spectra_per_patient = 1 returns the average spectrum of the spectra dataset.
 # The function returns a list of elements: representative spectra, MS images of pixels under the same nodes coloured the same way, list of spectra under the discarded nodes (with their average spectrum), list of spectra grouped according to the node they belong to.
-group_spectra <- function (spectra, spectra_per_patient=1, file_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", discarded_nodes=1, balanced=TRUE, method="mean") {
+group_spectra <- function (spectra, spectra_per_patient=1, file_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", clustering_method="agglomerative", discarded_nodes=1, balanced=TRUE, method="mean") {
 # Load the required libraries
 install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
 # Check if it is not a single spectrum
@@ -1657,11 +1662,11 @@ if (file_format == "imzml" | file_format == "imzML") {
 	file_vector <- character()
 	# Add the file names recursively, scrolling the whole spectral dataset
 	for (i in 1:length(spectra)) {
-		file_vector <- append(file_vector, spectra[[i]]@metaData$file)
+		file_vector <- append(file_vector, spectra[[i]]@metaData$file[1])
 	}
 	patient_vector <- unique(file_vector)
 }
-if (file_format == "brukerflex") {
+if (file_format == "brukerflex" || file_format == "xmass") {
 	# Put the filenames in a vector
 	# Create the empty vector
 	file_vector <- character()
@@ -1682,7 +1687,7 @@ if (balanced == TRUE) {
 		# Isolate the spectra of that patient
 		spectra_patient <- list()
 		for (s in 1:length(spectra)) {
-			if (spectra[[s]]@metaData$file == patient_vector[[p]]) {
+			if (spectra[[s]]@metaData$file[1] == patient_vector[[p]]) {
 				spectra_patient <- append(spectra_patient, spectra[[s]])
 			}
 		}
@@ -1708,11 +1713,11 @@ if (spectra_per_patient == 0 || spectra_per_patient == 1) {
 # Run this script if there has to be two or more representative spectra per patient
 if (spectra_per_patient > 1) {
 	# If there is only one spectrum, use it
-	if (length(spectra) > 0 && !is.list(spectra)) {
+	if (length(spectra) > 0 && !isMassSpectrumList(spectra)) {
 		patient_spectra_final <- spectra
 	}
 	# If there are more spectra...
-	if (length(spectra) > 0 && is.list(spectra)) {
+	if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
 		# Make the randomness reproducible
 		if (!is.null(seed)) {
 			set.seed (seed)
@@ -1735,7 +1740,7 @@ if (spectra_per_patient > 1) {
 			# Add the single patient spectra to a list
 			patient_spectra <- list()
 			for (s in 1:length(spectra)) {
-				if (spectra[[s]]@metaData$file == patient_vector[p]) {
+				if (spectra[[s]]@metaData$file[1] == patient_vector[p]) {
 					patient_spectra <- append(patient_spectra, spectra[[s]])
 				}
 			}
@@ -1783,7 +1788,8 @@ if (spectra_per_patient > 1) {
 			}
 			######################################### SIMILARITY
 			############################ HCA
-			if ("hierarchicalClustering" %in% algorithm | "hca" %in% algorithm | "HCA" %in% algorithm) {
+			# Agglomerative
+			if ((algorithm == "hierarchicalClustering" | algorithm == "hca" | algorithm == "HCA") && (clustering_method == "agglomerative" || is.null(clustering_method))) {
                 spectra_hca_grouped_patient <- list()
 				# Adjust the spectra per patient value accordingo to how many nodes should be discarded
 				spectra_per_patient <- spectra_per_patient + discarded_nodes
@@ -1793,7 +1799,7 @@ if (spectra_per_patient > 1) {
 					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
 				}
 				if (tof_mode=="reflectron" | tof_mode=="reflector") {
-					peaks <- detectPeaks (patient_spectra, method="MAD", SNR=3, halfWindowSize=5)
+					peaks <- detectPeaks(patient_spectra, method="MAD", SNR=3, halfWindowSize=5)
 					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
 				}
 				# Generate the peaklist matrix
@@ -1821,7 +1827,7 @@ if (spectra_per_patient > 1) {
 						spectra_hca_for_plotting <- patient_spectra[index]
 						# Replace the intensities with the S number for plotting purposes
 						for (n in 1:length(spectra_hca_for_plotting)) {
-							spectra_hca_for_plotting[[n]]@intensity <- rep (0, length(spectra_hca_for_plotting[[n]]@intensity))
+							spectra_hca_for_plotting[[n]]@intensity <- rep(0, length(spectra_hca_for_plotting[[n]]@intensity))
 						}
 						spectra_for_plotting <- append(spectra_for_plotting, spectra_hca_for_plotting)
 						# They do not get added to the final list of patient spectra
@@ -1829,10 +1835,10 @@ if (spectra_per_patient > 1) {
 						discarded_spectra <- append(discarded_spectra, spectra_hca)
 						# Average the spectra
 						if (method == "mean") {
-							spectra_average <- averageMassSpectra (spectra_hca, method="mean")
+							spectra_average <- averageMassSpectra(spectra_hca, method="mean")
 						}
 						if (method == "skyline") {
-							spectra_average <- generate_skyline_spectrum (spectra_hca)
+							spectra_average <- generate_skyline_spectrum(spectra_hca)
 						}
 						# Add the average to the final list of discarded spectra AVG
 						discarded_spectra_average <- append(discarded_spectra_average, spectra_average)
@@ -1846,16 +1852,16 @@ if (spectra_per_patient > 1) {
 						spectra_hca_for_plotting <- patient_spectra[index]
 						# Replace the intensities with the D number for plotting purposes
 						for (n in 1:length(spectra_hca_for_plotting)) {
-							spectra_hca_for_plotting[[n]]@intensity <- rep (d, length(spectra_hca_for_plotting[[n]]@intensity))
+							spectra_hca_for_plotting[[n]]@intensity <- rep(d, length(spectra_hca_for_plotting[[n]]@intensity))
 						}
 						# Add these modified spectra to the final list of spectra for plotting purposes
 						spectra_for_plotting <- append(spectra_for_plotting, spectra_hca_for_plotting)
 						# Average the spectra in this HCA subgroup
 						if (method == "mean") {
-							spectra_average <- averageMassSpectra (spectra_hca, method="mean")
+							spectra_average <- averageMassSpectra(spectra_hca, method="mean")
 						}
 						if (method == "skyline") {
-							spectra_average <- generate_skyline_spectrum (spectra_hca)
+							spectra_average <- generate_skyline_spectrum(spectra_hca)
 						}
 						# Add the average to the final list
 						patient_spectra_final <- append(patient_spectra_final, spectra_average)
@@ -1880,7 +1886,7 @@ if (spectra_per_patient > 1) {
 						spectra_average <- averageMassSpectra(spectra_hca, method="mean")
 					}
 					if (method == "skyline") {
-						spectra_average <- generate_skyline_spectrum (spectra_hca)
+						spectra_average <- generate_skyline_spectrum(spectra_hca)
 					}
 					# Add the average to the final list
 					patient_spectra_final <- append(patient_spectra_final, spectra_average)
@@ -1888,52 +1894,52 @@ if (spectra_per_patient > 1) {
 				}
 				# Store the plot into the list
 				plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[1], tolerance=1, legend=FALSE)
-				msi_plots [[p]] <- recordPlot ()
+				msi_plots [[p]] <- recordPlot()
                 # Spectra clustered
                 spectra_hca_grouped[[p]] <- spectra_hca_grouped_patient
 			}
-			######################### K-MEANS
-			if ("k_means" %in% algorithm | "kmeans" %in% algorithm | "k-Means" %in% algorithm) {
-                spectra_kmeans_grouped_patient <- list()
+			# K-MEANS
+			if ((algorithm == "hierarchicalClustering" | algorithm == "hca" | algorithm == "HCA") && (clustering_method == "k_means" | clustering_method == "kmeans"| clustering_method == "k-Means")) {
+                spectra_hca_grouped_patient <- list()
 				# Adjust the spectra per patient value accordingo to how many nodes should be discarded
 				spectra_per_patient <- spectra_per_patient + discarded_nodes
 				# Detect and align peaks
 				if (tof_mode=="linear") {
-					peaks <- detectPeaks (patient_spectra, method="MAD", SNR=3, halfWindowSize=20)
-					peaks <- align_and_filter_peaks (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
+					peaks <- detectPeaks(patient_spectra, method="MAD", SNR=3, halfWindowSize=20)
+					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
 				}
 				if (tof_mode=="reflectron" | tof_mode=="reflector") {
-					peaks <- detectPeaks (patient_spectra, method="MAD", SNR=3, halfWindowSize=5)
-					peaks <- align_and_filter_peaks (peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
+					peaks <- detectPeaks(patient_spectra, method="MAD", SNR=3, halfWindowSize=5)
+					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
 				}
 				# Generate the peaklist matrix
-				peaklist <- intensityMatrix (peaks, patient_spectra)
+				peaklist <- intensityMatrix(peaks, patient_spectra)
 				# Compute the k-Means clustering
-				k_means <- kmeans(peaklist, centers=spectra_per_patient)
+				hca <- kmeans(peaklist, centers=spectra_per_patient)
 				# Associate to each row/spectrum the subgroup/cluster to which it belongs
-				k_means_groups <- k_means$cluster
+				hca_groups <- hca$cluster
 				if (discarded_nodes != 0) {
 				# For each subgroup to be isolated (to discard)...
 					for (d in 1:discarded_nodes) {
 						# Index the spectra under in the selected subgroup
-						index <- which(k_means_groups == d)
-						spectra_k_means <- patient_spectra[index]
-						spectra_k_means_for_plotting <- patient_spectra[index]
+						index <- which(hca_groups == d)
+						spectra_hca <- patient_spectra[index]
+						spectra_hca_for_plotting <- patient_spectra[index]
 						# Replace the intensities with the S number for plotting purposes
-						for (n in 1:length(spectra_k_means_for_plotting)) {
-							spectra_k_means_for_plotting[[n]]@intensity <- rep (0, length(spectra_k_means_for_plotting[[n]]@intensity))
+						for (n in 1:length(spectra_hca_for_plotting)) {
+							spectra_hca_for_plotting[[n]]@intensity <- rep(0, length(spectra_hca_for_plotting[[n]]@intensity))
 						}
 						# Add these modified spectra to the final list of spectra for plotting
-						spectra_for_plotting <- append(spectra_for_plotting, spectra_k_means_for_plotting)
+						spectra_for_plotting <- append(spectra_for_plotting, spectra_hca_for_plotting)
 						# They do not get averaged and added to the final list of patient spectra
 						# Add them to the discarded spectra
-						discarded_spectra <- append(discarded_spectra, spectra_k_means)
+						discarded_spectra <- append(discarded_spectra, spectra_hca)
 						# Average the spectra
 						if (method == "mean") {
-							spectra_average <- averageMassSpectra (spectra_k_means, method="mean")
+							spectra_average <- averageMassSpectra(spectra_hca, method="mean")
 						}
 						if (method == "skyline") {
-							spectra_average <- generate_skyline_spectrum (spectra_k_means)
+							spectra_average <- generate_skyline_spectrum(spectra_hca)
 						}
 						# Add the average to the final list of discarded spectra AVG
 						discarded_spectra_average <- append(discarded_spectra_average, spectra_average)
@@ -1941,22 +1947,22 @@ if (spectra_per_patient > 1) {
 					# For each subgroup to be isolated (to keep)...
 					for (d in (discarded_nodes+1):spectra_per_patient) {
 						# Index the spectra under in the selected subgroup
-						index <- which(k_means_groups == d)
-						spectra_k_means <- patient_spectra[index]
-                        spectra_kmeans_grouped_patient[[d]] <- spectra_k_means
-						spectra_k_means_for_plotting <- patient_spectra[index]
+						index <- which(hca_groups == d)
+						spectra_hca <- patient_spectra[index]
+                        spectra_hca_grouped_patient[[d]] <- spectra_hca
+						spectra_hca_for_plotting <- patient_spectra[index]
 						# Replace the intensities with the D number for plotting purposes
-						for (n in 1:length(spectra_k_means_for_plotting)) {
-							spectra_k_means_for_plotting[[n]]@intensity <- rep (d, length(spectra_k_means_for_plotting[[n]]@intensity))
+						for (n in 1:length(spectra_hca_for_plotting)) {
+							spectra_hca_for_plotting[[n]]@intensity <- rep(d, length(spectra_hca_for_plotting[[n]]@intensity))
 						}
 						# Add these modified spectra to the final list of spectra for plotting
-						spectra_for_plotting <- append(spectra_for_plotting, spectra_k_means_for_plotting)
+						spectra_for_plotting <- append(spectra_for_plotting, spectra_hca_for_plotting)
 						# Average the spectra in this subgroup
 						if (method == "mean") {
-							spectra_average <- averageMassSpectra (spectra_k_means, method="mean")
+							spectra_average <- averageMassSpectra(spectra_hca, method="mean")
 						}
 						if (method == "skyline") {
-							spectra_average <- generate_skyline_spectrum (spectra_k_means, method="mean")
+							spectra_average <- generate_skyline_spectrum(spectra_hca, method="mean")
 						}
 						# Add the average to the final list
 						patient_spectra_final <- append(patient_spectra_final, spectra_average)
@@ -1965,22 +1971,22 @@ if (spectra_per_patient > 1) {
 					# For each subgroup to be isolated...
 					for (s in 1:spectra_per_patient) {
 						# Index the spectra under in the selected subgroup of the HCA
-						index <- which(k_means_groups == s)
-						spectra_k_means <- patient_spectra[index]
-                        spectra_kmeans_grouped_patient[[s]] <- spectra_k_means
-						spectra_k_means_for_plotting <- patient_spectra[index]
+						index <- which(hca_groups == s)
+						spectra_hca <- patient_spectra[index]
+                        spectra_hca_grouped_patient[[s]] <- spectra_hca
+						spectra_hca_for_plotting <- patient_spectra[index]
 						# Replace the intensities with the S number for plotting purposes
-						for (n in 1:length(spectra_k_means_for_plotting)) {
-							spectra_k_means_for_plotting[[n]]@intensity <- rep (s, length(spectra_k_means_for_plotting[[n]]@intensity))
+						for (n in 1:length(spectra_hca_for_plotting)) {
+							spectra_hca_for_plotting[[n]]@intensity <- rep(s, length(spectra_hca_for_plotting[[n]]@intensity))
 						}
 						# Add these modified spectra to the final list of spectra for plotting purposes
-						spectra_for_plotting <- append(spectra_for_plotting, spectra_k_means_for_plotting)
+						spectra_for_plotting <- append(spectra_for_plotting, spectra_hca_for_plotting)
 						# Average the spectra in this subgroup
 						if (method == "mean") {
-							spectra_average <- averageMassSpectra (spectra_k_means, method="mean")
+							spectra_average <- averageMassSpectra(spectra_hca, method="mean")
 						}
 						if (method == "skyline") {
-							spectra_average <- generate_skyline_spectrum (spectra_k_means, method="mean")
+							spectra_average <- generate_skyline_spectrum(spectra_hca, method="mean")
 						}
 						# Add the average to the final list
 						patient_spectra_final <- append(patient_spectra_final, spectra_average)
@@ -1988,9 +1994,9 @@ if (spectra_per_patient > 1) {
 					}
 				# Store the plot into the list
 				plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[1], tolerance=1, legend=FALSE)
-				msi_plots [[p]] <- recordPlot ()
+				msi_plots [[p]] <- recordPlot()
                 # Clustered spectra
-                spectra_kmeans_grouped <- spectra_kmeans_grouped_patient
+                spectra_hca_grouped <- spectra_hca_grouped_patient
 			}
 			#####################
 		}
@@ -2000,7 +2006,7 @@ if (spectra_per_patient > 1) {
 patient_spectra_final <- removeBaseline(patient_spectra_final, method="TopHat")
 patient_spectra_final <- calibrateIntensity(patient_spectra_final, method="TIC")
 #
-return (list(spectra=patient_spectra_final, ms_images=msi_plots, discarded_spectra=discarded_spectra, discarded_average_spectra=discarded_spectra_average, plots=plots, spectra_hca_grouped=spectra_hca_grouped, spectra_kmeans_grouped=spectra_kmeans_grouped))
+return (list(spectra=patient_spectra_final, ms_images=msi_plots, discarded_spectra=discarded_spectra, discarded_average_spectra=discarded_spectra_average, plots=plots, spectra_hca_grouped=spectra_hca_grouped))
 }
 
 
@@ -2015,18 +2021,58 @@ return (list(spectra=patient_spectra_final, ms_images=msi_plots, discarded_spect
 
 #################################################### SPECTRA GROUPING (CLASSES)
 # The functions takes a list of already preprocessed spectra (MALDIquant) and generates a list of representative spectra, averaging spectra according to the class they belong to, generating one average spectrum per class.
-group_spectra_class <- function (spectra, class_list, file_format="imzml") {
+group_spectra_class <- function (spectra, class_list, method="mean", file_format="imzml", class_in_file_name=TRUE) {
 class_list <- sort(class_list)
-## REPLACE THE filepath PARAMETER FOR EACH SPECTRUM WITH THE CLASS
-spectra <- replace_class_name(spectra, class_list=class_list)
-# Put the filenames/classes in a vector
-# Create the empty vector
-class_vector <- vector(length=0)
-# Add the file names recursively, scrolling the whole spectral dataset
-for (i in 1:length(spectra)) {
-	class_vector <- append(class_vector, spectra[[i]]@metaData$file)
+####### IMZML
+if (file_format == "imzml" || file_format == "imzML") {
+	## REPLACE THE filepath PARAMETER FOR EACH SPECTRUM WITH THE CLASS
+	spectra <- replace_class_name(spectra, class_list=class_list, file_format=file_format, class_in_file_name=class_in_file_name)
+	# Put the filenames/classes in a vector
+	# Create the empty vector
+	class_vector <- character()
+	# Add the file names recursively, scrolling the whole spectral dataset
+	for (i in 1:length(spectra)) {
+		class_vector <- append(class_vector, spectra[[i]]@metaData$file[1])
+	}
 }
-class_spectra_grouped <- averageMassSpectra(spectra, labels=class_vector, method="mean")
+####### XMASS
+if (file_format == "brukerflex" || file_format == "xmass") {
+	# Replace the names in the spectra with the class
+	for (class in class_list) {
+		for (s in 1:length(spectra)) {
+			if (length(grep(class, spectra[[s]]@metaData$file[1], fixed=TRUE)) > 0) {
+				spectra[[s]]@metaData$file <- class
+			}
+		}
+	}
+	# Create the empty vector
+	class_vector <- character()
+	# Add the file names recursively, scrolling the whole spectral dataset
+	for (i in 1:length(spectra)) {
+		class_vector <- append(class_vector, spectra[[i]]@metaData$file[1])
+	}
+}
+# Average
+if (method == "mean") {
+	class_spectra_grouped <- averageMassSpectra(spectra, labels=class_vector, method="mean")
+}
+# Skyline
+if (method == "skyline") {
+	class_spectra_grouped <- list()
+	# For each class
+	for (class in class_list) {
+		# Add the spectra for each class to a list
+		for (spectrum in spectra) {
+			if (spectrum@metaData$file[1] == class) {
+				class_spectra <- append(class_spectra, spetrum)
+			}
+		}
+		# Skyline spectrum
+		class_spectra_skyline <- generate_skyline_spectrum(class_spectra)
+		# Add this to the final list
+		class_spectra_grouped <- append(class_spectra_grouped, class_spectra_skyline)
+	}
+}
 return (class_spectra_grouped)
 }
 
@@ -2113,6 +2159,59 @@ return(avg_spectrum_with_bars)
 
 
 
+############################################# MOST INTENSE PEAKS IN PEAK PICKING
+# This function returns a peak list containing only the most intense peaks per spectrum. If the input is a list of spectra, the function computes the peak picking and keeps only the most intense ones, if it's a list of peaklists, it applies the filtering function directly on the peaks.
+most_intense_signals <- function (spectra, signals_to_take=20) {
+# Load the required libraries
+install_and_load_required_packages(c("parallel", "MALDIquant"))
+####################################################### PICKING FUNCTION
+picking_function <- function (peaks, signals_to_take) {
+	# Create a dataframe with mass and intensity
+	peaks_data_frame <- data.frame (mass = peaks@mass, intensity = peaks@intensity, SNR = peaks@snr)
+	# Sort the dataframe according to the SNR
+	peaks_data_frame <- peaks_data_frame [order(-peaks_data_frame$SNR),]
+	# Select only the first most intense signals
+	selected_signals <- peaks_data_frame [1:signals_to_take,]
+	# Sort the dataframe back according to mass
+	selected_signals <- selected_signals [order(selected_signals$mass),]
+	# Put these signals back into the peaklist
+	peaks@mass <- selected_signals$mass
+	peaks@intensity <- selected_signals$intensity
+	peaks@snr <- selected_signals$SNR
+	return (peaks)
+}
+########################################################################
+# Peak picking
+if (isMassSpectrumList(spectra)) {
+    peaks <- detectPeaks(spectra, method="MAD", SNR=3)
+} else if (isMassPeaksList(spectra)) {
+    peaks <- spectra
+}
+# Most intense signals
+if (isMassPeaksList(peaks)) {
+    # Detect the number of cores
+    cpu_thread_number <- detectCores(logical=TRUE)
+    cpu_core_number <- cpu_thread_number/2
+    # Make the CPU cluster for parallelisation
+    cl <- makeCluster(cpu_core_number)
+    most_intense_peaks <- parLapply(cl, peaks, fun = function(peaks) picking_function(peaks, signals_to_take=signals_to_take))
+	stopCluster(cl)
+} else if (isMassPeaks(peaks)) {
+    most_intense_peaks <- picking_function(peaks, signals_to_take)
+}
+return (most_intense_peaks)
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
 ############################################# AVERAGE THE REPLICATES (BY FOLDER)
 # This function averages the spectra contained in the same folder (more suitable for brukerflex format)
 average_replicates_by_folder <- function (spectra, folder, file_format="brukerflex") {
@@ -2130,7 +2229,8 @@ for (f in 1:length(folder_files)) {
 for (f in 1:(length(folder_files_splitted)-1)) {
 	# If the spectrum folder name is different between two samples but the folder above is the same, they are replicates (based on the brukerflex folder structure)
 	if ((folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 4] != folder_files_splitted[[f+1]] [length(folder_files_splitted[[f+1]]) - 4]) && (folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 5] == folder_files_splitted[[f+1]] [length(folder_files_splitted[[f+1]]) - 5])) {
-		folder_files_splitted[[f+1]] [length(folder_files_splitted[[f+1]]) - 4] <- folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 4]
+		folder_files_splitted[[f+1]] [length(folder_files_splitted[[f+1]]) - 4] <- folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 5]
+		folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 4] <- folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 5]
 	}
 }
 # Recreate the sample Vector
@@ -2154,24 +2254,57 @@ return (spectra_replicates_averaged)
 
 ################################################################# PEAK ALIGNMENT
 # This function takes a list of peaks (MALDIquant) and computes the peak alignment, along with the false positive removal and the removal of low-intensity peaks.
-align_and_filter_peaks <- function (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1) {
-# Load the required libraries
-install_and_load_required_packages("MALDIquant")
-# Peak alignment
-peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
-peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
-peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
-peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
-peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
-# False positive removal
-if (peaks_filtering == TRUE) {
-	peaks_aligned <- filterPeaks(peaks_aligned, minFrequency=frequency_threshold)
+align_and_filter_peaks <- function (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, reference_peaklist=NULL) {
+# Align only if there are many peaklists
+if (isMassPeaksList(peaks)) {
+	# Load the required libraries
+	install_and_load_required_packages(c("MALDIquant", "parallel"))
+	# Peak alignment
+	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
+	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
+	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
+	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
+	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
+	# False positive removal
+	if (peaks_filtering == TRUE) {
+		peaks_aligned <- filterPeaks(peaks_aligned, minFrequency=frequency_threshold)
+	}
+	# Low-intensity peaks removal
+	if (low_intensity_peaks_removal == TRUE) {
+		peaks_aligned <- remove_low_intensity_peaks(peaks_aligned, intensity_threshold_percent=intensity_threshold_percent)
+	}
+	# Align to a reference peaklist
+	if (!is.null(reference_peaklist)) {
+		############ Function for lapply
+		align_peaks <- function (peaks, reference_peaklist, tolerance_ppm) {
+			mass_vector <- peaks@mass
+			# For each reference peak
+			for (ref in reference_peaklist) {
+				# Replace the value in the vector with the reference value
+				mass_vector[which(abs(mass_vector - ref)*10^6/ref <= tolerance_ppm)] <- ref
+			}
+			# Put the fixed mass vector back into the MALDIquant peaklist
+			peaks@mass <- mass_vector
+			return (peaks)
+		}
+		############# If there are many peaklists or one peaklist (use multicore)
+		if (isMassPeaksList(peaks_aligned)) {
+			# Detect the number of cores
+			cpu_thread_number <- detectCores(logical=TRUE)
+			cpu_core_number <- cpu_thread_number/2
+			# Make the CPU cluster for parallelisation
+			cl <- makeCluster(cpu_core_number)
+			# Apply the multicore function
+			peaks_aligned <- parLapply(cl, peaks_aligned, fun=function(peaks_aligned) align_peaks(peaks_aligned, reference_peaklist, tolerance_ppm))
+			stopCluster(cl)
+		} else {
+			peaks_aligned <- align_peaks(peaks_aligned, reference_peaklist, tolerance_ppm)
+		}
+	}
+	return (peaks_aligned)
+} else {
+	return (peaks)
 }
-# Low-intensity peaks removal
-if (low_intensity_peaks_removal == TRUE) {
-	peaks_aligned <- remove_low_intensity_peaks(peaks_aligned, intensity_threshold_percent=intensity_threshold_percent)
-}
-return (peaks_aligned)
 }
 
 
@@ -2184,11 +2317,11 @@ return (peaks_aligned)
 
 
 
-################################################ LIBRARY CREATION (for Biotyper)
+################################################ LIBRARY CREATION
 # This function reads the files contained in a provided folder (no memory efficient importing), it can average them according to the class they belong to or according to the folder they are into (average replicate/patient). It also computes the peak picking and can replace the SNR field in the peaklist with the standard deviation of the peaks or the coefficient of variation.
 # It returns a list containing: the spectra and the peaks.
 # It is used to create the library/database.
-library_creation <- function (filepath_library, class_grouping=TRUE, mass_range=c(3000,15000), replicates_average=FALSE, patients_average=FALSE, SNR=5, most_intense_peaks=TRUE, signals_to_take=20, standard_deviation=FALSE, coeff_of_var=FALSE, low_intensity_peak_removal=FALSE, intensity_threshold_percent=0.1, tof_mode="linear", file_format="brukerflex") {
+library_creation <- function (filepath_library, class_grouping=TRUE, mass_range=c(3000,15000), spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=length(spectra)), average_replicates=FALSE, average_patients=FALSE, SNR=5, most_intense_peaks=TRUE, signals_to_take=20, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, tof_mode="linear", file_format="brukerflex") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 ### Define the classes (the classes are the folders in the library directory)
@@ -2199,7 +2332,7 @@ if (tof_mode == "linear") {
 if (tof_mode == "reflectron" || tof_mode == "reflector") {
 	tolerance_ppm <- 200
 }
-if (file_format == "brukerflex") {
+if (file_format == "brukerflex" || file_format == "xmass") {
 	### Load the spectra
 	spectra <- importBrukerFlex(filepath_library)
 }
@@ -2210,24 +2343,22 @@ if (file_format == "imzml" | file_format == "imzML") {
 ### Truncation
 spectra <- trim(spectra, range = mass_range)
 ### Preprocessing
-spectra <- preprocess_spectra(spectra, tof_mode=tof_mode)
+spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=spectra_preprocessing$smoothing_strength, process_in_packages_of=spectra_preprocessing$preprocess_in_packages_of, sampling_method="sequential")
 ### Average the replicates
-if (replicates_average == TRUE) {
+if (average_replicates == TRUE) {
 	spectra <- average_replicates_by_folder(spectra, filepath_library, file_format=file_format)
 	### Baseline correction
 	spectra <- removeBaseline(spectra, method="TopHat")
 }
-if (patients_average == TRUE) {
+if (average_patients == TRUE) {
 	spectra <- group_spectra(spectra, spectra_per_patient=1, file_format=file_format, tof_mode=tof_mode)
 	### Baseline correction
 	spectra <- removeBaseline(spectra, method="TopHat")
 }
 ### Peak picking on the individual spectra
 if (class_grouping == TRUE) {
-	### Replace the sample name with the class name
-	spectra <- replace_class_name(spectra, class_list=class_list)
 	### Spectra grouping (class)
-	spectra <- group_spectra_class(spectra, class_list, file_format=file_format)
+	spectra <- group_spectra_class(spectra, class_list, file_format=file_format, class_in_file_name=TRUE)
 	### Baseline correction
 	spectra <- removeBaseline(spectra, method="TopHat")
 } else {spectra <- spectra}
@@ -2235,28 +2366,12 @@ if (class_grouping == TRUE) {
 ### Peak picking
 if (most_intense_peaks == TRUE) {
 	peaks_library <- most_intense_signals(spectra, signals_to_take=signals_to_take)
-} else {peaks_library <- detectPeaks(spectra, method="MAD", SNR=SNR)}
-###########################
-if (standard_deviation == TRUE && coeff_of_var == FALSE) {
-	# For each peaklist in the library, compute the SD
-	for (j in 1:length(peaks_library)) {
-		peaks_library[[j]] <- replace_SNR_in_avg_peaklist(peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format, replace_snr_with="std")
-	}
-}
-if (standard_deviation == FALSE && coeff_of_var == TRUE) {
-	# For each peaklist in the library, compute the CV
-	for (j in 1:length(peaks_library)) {
-		peaks_library[[j]] <- replace_SNR_in_avg_peaklist(peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format, replace_snr_with="cv")
-	}
-}
-if (standard_deviation == TRUE && coeff_of_var == TRUE) {
-	# For each peaklist in the library, compute the SD
-	for (j in 1:length(peaks_library)) {
-		peaks_library[[j]] <- replace_SNR_in_avg_peaklist(peaks_library[[j]], peaks, tolerance_ppm=tolerance_ppm, file_format=file_format, replace_snr_with="std")
-	}
+} else {
+	peaks_library <- detectPeaks(spectra, method="MAD", SNR=SNR)
+	peaks_library <- align_and_filter_peaks(peaks_library, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25)
 }
 # Remove low intensity peaks
-if (low_intensity_peak_removal == TRUE) {
+if (low_intensity_peaks_removal == TRUE) {
 	peaks_library <- remove_low_intensity_peaks(peaks_library, intensity_threshold_percent=intensity_threshold_percent)
 }
 ####
@@ -2375,11 +2490,11 @@ return(library_list)
 #################################### CLASSIFICATION VIA HIERARCHICAL CLUSTERING
 # The input is a S4 list of spectra (MALDIquant), both for the classification and for the database, the class names (if in the spectrum file name, the filenames will be replaced with the class name and averaged to create representative spectra for the classes; if not in the files, one representative spectrum per class should be provided in the same order as the class list), the TOF-MS mode, the algorithm for the clustering and the nodes to discard.
 # The script returns a list containing: the hierarchical analysis dendrograms, a matrix with the classification (of pixels/spectra and samples) and the MS image with pixel or area classification, along with the classification of the patients.
-hierarchical_clustering_classification <- function (spectra_to_be_classified, spectra_database, class_list=c("HP","PTC"), class_in_file_name=TRUE, tof_mode="linear", clustering_algorithm="hca", nodes=4, discarded_nodes=0, seed=NULL, classification_of=c("average","subareas","pixels"), true_class_in_filename=FALSE, true_class_list=NULL) {
+hierarchical_clustering_classification <- function (spectra_to_be_classified, spectra_database, class_list=c("HP","PTC"), class_in_file_name=TRUE, tof_mode="linear", clustering_method="agglomerative", nodes=4, discarded_nodes=0, seed=NULL, classification_of=c("average","subareas","pixels"), true_class_in_file_name=FALSE, true_class_list=NULL) {
 # Do everything if the user wants some outputs
 if (!is.null(classification_of) && length(classification_of) > 0) {
 ################################################## Load the required libraries
-install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign", "stats", "caret"))
+install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign", "stats", "caret", "pROC"))
 ########################################################### Outputs
 classification_hca_results <- NULL
 classification_hca_results_pixel_by_pixel <- NULL
@@ -2405,7 +2520,7 @@ spectra_to_be_classified <- replace_sample_name(spectra_to_be_classified, file_f
 file_vector <- character()
 # Add the file names recursively, scrolling the whole spectral dataset
 for (i in 1:length(spectra_to_be_classified)) {
-	file_vector <- append(file_vector, spectra_to_be_classified[[i]]@metaData$file)
+	file_vector <- append(file_vector, spectra_to_be_classified[[i]]@metaData$file[1])
 }
 # Compute the patient (imzML file) vector
 patient_vector <- unique(file_vector)
@@ -2430,7 +2545,7 @@ for (p in 1:length(patient_vector)) {
     ################## CLASSIFICATION OF ENTIRE SUB-AREAS
 	if ("subareas" %in% classification_of) {
     #### Group spectra
-    patient_spectra_grouped <- group_spectra(patient_spectra, spectra_per_patient=nodes, file_format="imzml", tof_mode=tof_mode, seed=ifelse(is.null(seed), 0, seed), algorithm=clustering_algorithm, discarded_nodes=discarded_nodes, balanced=TRUE, method="mean")
+    patient_spectra_grouped <- group_spectra(patient_spectra, spectra_per_patient=nodes, file_format="imzml", tof_mode=tof_mode, seed=seed, algorithm="hca", clustering_method=clustering_method, discarded_nodes=discarded_nodes, balanced=TRUE, method="mean")
     patient_spectra_clustered_average <- patient_spectra_grouped$spectra
     patient_spectra_clustered <- patient_spectra_grouped$spectra_hca_grouped[[1]]
     # Put the database and the spectra together
@@ -2447,60 +2562,62 @@ for (p in 1:length(patient_vector)) {
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
     intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, file_format="imzml", sample_output=TRUE, class_output=FALSE)
     rownames(intensity_matrix) <- intensity_matrix[,"Sample"]
-    # Compute the hierarchical clustering
-    distance_matrix <- dist(intensity_matrix[,1:(ncol(intensity_matrix)-1)])
-    hierarchical_clustering <- hclust(distance_matrix)
-    plot(hierarchical_clustering)
-    hca_graph <- recordPlot()
-    distance_matrix <- as.matrix(distance_matrix)
-    # Remove the first rows (database spectra) and keep only the first columns (database spectra)
-    distance_matrix <- distance_matrix [(length(spectra_database)+1):nrow(distance_matrix),(1:length(spectra_database))]
-    ################### Classification output
-    ## Function for matrix apply
-    classification_hca_function <- function (dist_row) {
-        # Set the closest value to NULL
-        closest <- NULL
-        # Scroll the row...
-        for (l in 1:length(dist_row)) {
-            # If closest has not been set yet or the value in the cell is the closest...
-            if (is.null(closest) || dist_row[l] < closest){
-                # Set the closest value to be the one in the cell
-                closest <- dist_row[l]
-            }
-        }
-        # Find the position of the row where the closest is
-        closest_position <- which(dist_row == closest)
-        # The belonging class is corresponding to the element of the database which the spectrum is closer to
-        belonging_class <- names(dist_row)[closest_position]
-        return (belonging_class)
-    }
-    # Patient classification
-    classification_hca  <- cbind(apply(distance_matrix, MARGIN=1, FUN=function(x) classification_hca_function(x)))
-    ### Generate the final output results
-    if (is.null(classification_hca_results)) {
-        classification_hca_results <- classification_hca
-    } else {classification_hca_results <- rbind(classification_hca_results, classification_hca)}
-	colnames(classification_hca_results) <- "Classification"
-    ####################################### MS IMAGES
-    spectra_for_plotting <- list()
-    # Correspondence between the classificatio_hca matrix classification and the spectra under the hca nodes
-    for (n in 1:nrow(classification_hca)) {
-        # Isolate the spectra under the hca node...
-        spectra_hca_node <- patient_spectra_clustered[[n]]
-        # Replace the intensity with the classification
-        for (s in 1:length(spectra_hca_node)) {
-            for (z in 1:length(class_list)) {
-                if (classification_hca[n,1] == class_list[z]) {
-                    spectra_hca_node[[s]]@intensity <- rep(z, length(spectra_hca_node[[s]]@intensity))
-                }
-            }
-        }
-        spectra_for_plotting <- append(spectra_for_plotting, spectra_hca_node)
-    }
-    plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[1], tolerance=1, legend=FALSE)
-    legend(x="bottomright", legend=class_list, fill=c("green","red"))
-    legend(x="topright", legend=spectra_for_plotting[[1]]@metaData$file)
-    msi_plots [[p]] <- recordPlot()
+	# Compute the agglomerative hierarchical clustering
+	if (clustering_method == "agglomerative") {
+	    distance_matrix <- dist(intensity_matrix[,1:(ncol(intensity_matrix)-1)])
+	    hierarchical_clustering <- hclust(distance_matrix)
+	    plot(hierarchical_clustering)
+	    hca_graph <- recordPlot()
+	    distance_matrix <- as.matrix(distance_matrix)
+	    # Remove the first rows (database spectra) and keep only the first columns (database spectra)
+	    distance_matrix <- distance_matrix [(length(spectra_database)+1):nrow(distance_matrix),(1:length(spectra_database))]
+	    ################### Classification output
+	    ## Function for matrix apply
+	    classification_hca_function <- function (dist_row) {
+	        # Set the closest value to NULL
+	        closest <- NULL
+	        # Scroll the row...
+	        for (l in 1:length(dist_row)) {
+	            # If closest has not been set yet or the value in the cell is the closest...
+	            if (is.null(closest) || dist_row[l] < closest){
+	                # Set the closest value to be the one in the cell
+	                closest <- dist_row[l]
+	            }
+	        }
+	        # Find the position of the row where the closest is
+	        closest_position <- which(dist_row == closest)
+	        # The belonging class is corresponding to the element of the database which the spectrum is closer to
+	        belonging_class <- names(dist_row)[closest_position]
+	        return (belonging_class)
+	    }
+	    # Patient classification
+	    classification_hca  <- cbind(apply(distance_matrix, MARGIN=1, FUN=function(x) classification_hca_function(x)))
+	    ### Generate the final output results
+	    if (is.null(classification_hca_results)) {
+	        classification_hca_results <- classification_hca
+	    } else {classification_hca_results <- rbind(classification_hca_results, classification_hca)}
+		colnames(classification_hca_results) <- "Classification"
+	    ####################################### MS IMAGES
+	    spectra_for_plotting <- list()
+	    # Correspondence between the classificatio_hca matrix classification and the spectra under the hca nodes
+	    for (n in 1:nrow(classification_hca)) {
+	        # Isolate the spectra under the hca node...
+	        spectra_hca_node <- patient_spectra_clustered[[n]]
+	        # Replace the intensity with the classification
+	        for (s in 1:length(spectra_hca_node)) {
+	            for (z in 1:length(class_list)) {
+	                if (classification_hca[n,1] == class_list[z]) {
+	                    spectra_hca_node[[s]]@intensity <- rep(z, length(spectra_hca_node[[s]]@intensity))
+	                }
+	            }
+	        }
+	        spectra_for_plotting <- append(spectra_for_plotting, spectra_hca_node)
+	    }
+	    plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[1], tolerance=1, legend=FALSE)
+	    legend(x="bottomright", legend=class_list, fill=c("green","red"))
+	    legend(x="topright", legend=spectra_for_plotting[[1]]@metaData$file[1])
+	    msi_plots [[p]] <- recordPlot()
+		}
 	}
 	######################### PIXEL-BY-PIXEL CLASSIFICATION
 	if ("pixels" %in% classification_of) {
@@ -2518,58 +2635,60 @@ for (p in 1:length(patient_vector)) {
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
     intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, file_format="imzml", sample_output=TRUE, class_output=FALSE)
     rownames(intensity_matrix) <- intensity_matrix[,"Sample"]
-    # Compute the hierarchical clustering
-    distance_matrix <- dist(intensity_matrix[,1:(ncol(intensity_matrix)-1)])
-    hierarchical_clustering <- hclust(distance_matrix)
-    plot(hierarchical_clustering)
-    hca_graph <- recordPlot()
-    distance_matrix <- as.matrix(distance_matrix)
-    # Remove the first rows (database spectra) and keep only the first columns (database spectra)
-    distance_matrix <- distance_matrix [(length(spectra_database)+1):nrow(distance_matrix),(1:length(spectra_database))]
-    ################### Classification output
-	## Function for matrix apply
-    classification_hca_function <- function (dist_row) {
-        # Set the closest value to NULL
-        closest <- NULL
-        # Scroll the row...
-        for (l in 1:length(dist_row)) {
-            # If closest has not been set yet or the value in the cell is the closest...
-            if (is.null(closest) || dist_row[l] < closest){
-                # Set the closest value to be the one in the cell
-                closest <- dist_row[l]
-            }
-        }
-        # Find the position of the row where the closest is
-        closest_position <- which(dist_row == closest)
-        # The belonging class is corresponding to the element of the database which the spectrum is closer to
-        belonging_class <- names(dist_row)[closest_position]
-        return (belonging_class)
-    }
-    classification_hca  <- cbind(apply(distance_matrix, MARGIN=1, FUN=function(x) classification_hca_function(x)))
-    ### Generate the final output results
-    if (is.null(classification_hca_results_pixel_by_pixel)) {
-        classification_hca_results_pixel_by_pixel <- classification_hca
-    } else {classification_hca_results_pixel_by_pixel <- rbind(classification_hca_results_pixel_by_pixel, classification_hca)}
-	colnames(classification_hca_results_pixel_by_pixel) <- "Pixel-by-pixel Classification"
-    ####################################### MS IMAGES
-    spectra_for_plotting <- patient_spectra
-    # Correspondence between the classificatio_hca matrix classification and the spectra under the hca nodes
-    for (s in 1:length(spectra_for_plotting)) {
-        for (z in 1:length(class_list)) {
-            if (classification_hca[s,1] == class_list[z]) {
-                spectra_for_plotting[[s]]@intensity <- rep(z, length(spectra_for_plotting[[s]]@intensity))
-            }
-        }
-    }
-    plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[1], tolerance=1, legend=FALSE)
-    legend(x="bottomright", legend=class_list, fill=c("green","red"))
-    legend(x="topright", legend=spectra_for_plotting[[1]]@metaData$file)
-    msi_plots_pixel_by_pixel [[p]] <- recordPlot()
+    # Compute the agglomerative hierarchical clustering
+	if (clustering_method == "agglomerative") {
+		distance_matrix <- dist(intensity_matrix[,1:(ncol(intensity_matrix)-1)])
+	    hierarchical_clustering <- hclust(distance_matrix)
+	    plot(hierarchical_clustering)
+	    hca_graph <- recordPlot()
+	    distance_matrix <- as.matrix(distance_matrix)
+	    # Remove the first rows (database spectra) and keep only the first columns (database spectra)
+	    distance_matrix <- distance_matrix [(length(spectra_database)+1):nrow(distance_matrix),(1:length(spectra_database))]
+	    ################### Classification output
+		## Function for matrix apply
+	    classification_hca_function <- function (dist_row) {
+	        # Set the closest value to NULL
+	        closest <- NULL
+	        # Scroll the row...
+	        for (l in 1:length(dist_row)) {
+	            # If closest has not been set yet or the value in the cell is the closest...
+	            if (is.null(closest) || dist_row[l] < closest){
+	                # Set the closest value to be the one in the cell
+	                closest <- dist_row[l]
+	            }
+	        }
+	        # Find the position of the row where the closest is
+	        closest_position <- which(dist_row == closest)
+	        # The belonging class is corresponding to the element of the database which the spectrum is closer to
+	        belonging_class <- names(dist_row)[closest_position]
+	        return (belonging_class)
+	    }
+	    classification_hca  <- cbind(apply(distance_matrix, MARGIN=1, FUN=function(x) classification_hca_function(x)))
+	    ### Generate the final output results
+	    if (is.null(classification_hca_results_pixel_by_pixel)) {
+	        classification_hca_results_pixel_by_pixel <- classification_hca
+	    } else {classification_hca_results_pixel_by_pixel <- rbind(classification_hca_results_pixel_by_pixel, classification_hca)}
+		colnames(classification_hca_results_pixel_by_pixel) <- "Pixel-by-pixel Classification"
+	    ####################################### MS IMAGES
+	    spectra_for_plotting <- patient_spectra
+	    # Correspondence between the classificatio_hca matrix classification and the spectra under the hca nodes
+	    for (s in 1:length(spectra_for_plotting)) {
+	        for (z in 1:length(class_list)) {
+	            if (classification_hca[s,1] == class_list[z]) {
+	                spectra_for_plotting[[s]]@intensity <- rep(z, length(spectra_for_plotting[[s]]@intensity))
+	            }
+	        }
+	    }
+	    plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[1], tolerance=1, legend=FALSE)
+	    legend(x="bottomright", legend=class_list, fill=c("green","red"))
+	    legend(x="topright", legend=spectra_for_plotting[[1]]@metaData$file[1])
+	    msi_plots_pixel_by_pixel [[p]] <- recordPlot()
+		}
 	}
 	############################# AVERAGE SPECTRUM
 	if ("average" %in% classification_of) {
 		# If the spectra per patient are more, average them for patient classification...
-		if (is.list(patient_spectra)) {
+		if (isMassSpectrumList(patient_spectra)) {
 			patient_spectra <- averageMassSpectra(patient_spectra, method="mean")
 		}
 		# Put the database and the spectra together
@@ -2586,30 +2705,32 @@ for (p in 1:length(patient_vector)) {
 	    intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
 	    intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, file_format="imzml", sample_output=TRUE, class_output=FALSE)
 	    rownames(intensity_matrix) <- intensity_matrix[,"Sample"]
-	    # Compute the hierarchical clustering
-	    distance_matrix <- dist(intensity_matrix[,1:(ncol(intensity_matrix)-1)])
-	    hierarchical_clustering <- hclust(distance_matrix)
-	    plot(hierarchical_clustering)
-	    hca_graph <- recordPlot()
-	    distance_matrix <- as.matrix(distance_matrix)
-	    # Remove the first rows (database spectra) and keep only the first columns (database spectra)
-	    distance_matrix <- distance_matrix [(length(spectra_database)+1):nrow(distance_matrix),(1:length(spectra_database))]
-	    ################### Classification output
-	    # Set the closest value to NULL
-	    closest <- NULL
-	    # Scroll the row...
-	    for (l in 1:length(distance_matrix)) {
-	        # If closest has not been set yet or the value in the cell is the closest...
-	        if (is.null(closest) || distance_matrix[l] < closest){
-	            # Set the closest value to be the one in the cell
-	            closest <- distance_matrix[l]
-	        }
-	    }
-	    # Find the position of the row where the closest is
-	    closest_position <- which(distance_matrix == closest)
-	    # The belonging class is corresponding to the element of the database which the spectrum is closer to
-	    classification_hca <- as.matrix(names(distance_matrix)[closest_position])
-		rownames(classification_hca) <- patient_vector[p]
+		# Compute the agglomerative hierarchical clustering
+		if (clustering_method == "agglomerative") {
+		    distance_matrix <- dist(intensity_matrix[,1:(ncol(intensity_matrix)-1)])
+		    hierarchical_clustering <- hclust(distance_matrix)
+		    plot(hierarchical_clustering)
+		    hca_graph <- recordPlot()
+		    distance_matrix <- as.matrix(distance_matrix)
+		    # Remove the first rows (database spectra) and keep only the first columns (database spectra)
+		    distance_matrix <- distance_matrix [(length(spectra_database)+1):nrow(distance_matrix),(1:length(spectra_database))]
+		    ################### Classification output
+		    # Set the closest value to NULL
+		    closest <- NULL
+		    # Scroll the row...
+		    for (l in 1:length(distance_matrix)) {
+		        # If closest has not been set yet or the value in the cell is the closest...
+		        if (is.null(closest) || distance_matrix[l] < closest){
+		            # Set the closest value to be the one in the cell
+		            closest <- distance_matrix[l]
+		        }
+		    }
+		    # Find the position of the row where the closest is
+		    closest_position <- which(distance_matrix == closest)
+		    # The belonging class is corresponding to the element of the database which the spectrum is closer to
+		    classification_hca <- as.matrix(names(distance_matrix)[closest_position])
+			rownames(classification_hca) <- patient_vector[p]
+		}
 	    ### Generate the final output results
 	    if (is.null(classification_hca_results_avg)) {
 	        classification_hca_results_avg <- classification_hca
@@ -2618,17 +2739,17 @@ for (p in 1:length(patient_vector)) {
 	}
 }
 ############################## PERFORMANCES
-if ("average" %in% classification_of && ((is.null(true_class_list) || length(true_class_list) == 0) && true_class_in_filename == TRUE)) {
+if ("average" %in% classification_of && ((is.null(true_class_list) || length(true_class_list) == 0) && true_class_in_file_name == TRUE)) {
 	# Add the true class to the patient classification matrix
 	true_class_list <- character()
 	spectra_to_be_classified <- replace_class_name(spectra_to_be_classified, class_list=class_list)
 	for (sp in spectra_to_be_classified) {
-		true_class_list <- append(true_class_list, sp@metaData$file)
+		true_class_list <- append(true_class_list, sp@metaData$file[1])
 	}
 	classification_hca_results_avg <- cbind(classification_hca_results_avg, true_class_list)
 	hca_classification_performances <- confusionMatrix(classification_hca_results_avg[,1], classification_hca_results_avg[,2], positive="HP")
 	#### ROC analysis
-	hca_roc <- roc(response=classification_hca_results_avg[,2], predictor=as.numeric(classification_hca_results_avg[,1]))
+	#hca_roc <- roc(response=as.numeric(classification_hca_results_avg[,2]), predictor=as.numeric(classification_hca_results_avg[,1]))
 }
 # Output returning
 return (list(classification_hca_results_avg=classification_hca_results_avg, classification_hca_results=classification_hca_results, classification_hca_results_pixel_by_pixel=classification_hca_results_pixel_by_pixel, hca_graph=hca_graph, ms_images=msi_plots, ms_images_pixel_by_pixel=msi_plots_pixel_by_pixel, hca_classification_performances=hca_classification_performances, hca_roc=hca_roc))
@@ -2693,7 +2814,7 @@ for (f in 1:length(features_model)) {
 ###### For each imzML file...
 for (p in 1:length(filepath_test_imzml)) {
 ################ SPECTRA IMPORT AND PROCESSING
-if(!is.list(spectra)) {
+if(!isMassSpectrumList(spectra)) {
 	# Import the spectra (one imzML at a time)
 	sample_spectra <- importImzMl(filepath_test_imzml[p])
 }
@@ -2787,7 +2908,7 @@ for (n in 1:length(colnames(final_sample_matrix))) {
 predicted_classes <- predict(svm_model, newdata = final_sample_matrix)
 # Generate a matrix with the results
 result_matrix <- matrix (nrow=length(predicted_classes), ncol=1)
-sample_name <- unlist(strsplit(sample_spectra[[1]]@metaData$file,"/"))
+sample_name <- unlist(strsplit(sample_spectra[[1]]@metaData$file[1],"/"))
 sample_name <- sample_name[length(sample_name)]
 sample_name <- unlist(strsplit(sample_name, ".imzML"))
 sample_name <- sample_name[1]
@@ -3013,7 +3134,7 @@ features_model <- pls_model$finalModel$xNames
 ###### For each imzML file...
 for (p in 1:length(filepath_test_imzml)) {
 ################ SPECTRA IMPORT AND PROCESSING
-if(!is.list(spectra)) {
+if(!isMassSpectrumList(spectra)) {
 	# Import the spectra (one imzML at a time)
 	sample_spectra <- importImzMl(filepath_test_imzml[p])
 }
@@ -3102,7 +3223,7 @@ for (f in features_to_add) {
 predicted_classes <- predict(pls_model, newdata = final_sample_matrix)
 # Generate a matrix with the results
 result_matrix <- matrix (nrow=length(predicted_classes), ncol=1)
-sample_name <- unlist(strsplit(sample_spectra[[1]]@metaData$file,"/"))
+sample_name <- unlist(strsplit(sample_spectra[[1]]@metaData$file[1],"/"))
 sample_name <- sample_name[length(sample_name)]
 sample_name <- unlist(strsplit(sample_name, ".imzML"))
 sample_name <- sample_name[1]
@@ -3323,7 +3444,7 @@ features_model <- nbc_model$finalModel$xNames
 ###### For each imzML file...
 for (p in 1:length(filepath_test_imzml)) {
 ################ SPECTRA IMPORT AND PROCESSING
-if(!is.list(spectra)) {
+if(!isMassSpectrumList(spectra)) {
 	# Import the spectra (one imzML at a time)
 	sample_spectra <- importImzMl(filepath_test_imzml[p])
 }
@@ -3412,7 +3533,7 @@ for (f in features_to_add) {
 predicted_classes <- predict(nbc_model, newdata = final_sample_matrix)
 # Generate a matrix with the results
 result_matrix <- matrix (nrow=length(predicted_classes), ncol=1)
-sample_name <- unlist(strsplit(sample_spectra[[1]]@metaData$file,"/"))
+sample_name <- unlist(strsplit(sample_spectra[[1]]@metaData$file[1],"/"))
 sample_name <- sample_name[length(sample_name)]
 sample_name <- unlist(strsplit(sample_name, ".imzML"))
 sample_name <- sample_name[1]
@@ -3592,7 +3713,8 @@ return (list(pixel_by_pixel_classification=final_result_matrix, patient_classifi
 ######################################################## ENSEMBLE CLASSIFICATION
 # This function takes as input the folder containing the spectra to be classified (one imzML for each patient) or an imzML file or a list of MALDIquant spectra, and the folder where the R workspaces containing the models are stored (with a name resembling the model), and the model names in each workspace, along with the folder containing the spectra to be used as database for clustering classification (one representative imzML per class in the order of the class_list input, or with imzML files named according to the class). Moreover, additonal preprocessing details can be specified. Many classifiers at the same time can be chosen, and the function relies on other functions (specific for each classifier).
 # The function outputs a list containing the classification results for each classifier (see the specific functions for details) and the ensemble classificaton result.
-ensemble_classification <- function (spectra_path, folder_R_models, classifiers=c("svm","pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering=NULL, nodes_in_hca=3, discarded_nodes_in_hca=1, smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000, decision_method="majority", vote_weights="equal") {
+ensemble_classification <- function (spectra_path, folder_R_models, classifiers=c("svm","pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering=NULL, nodes_in_hca=3, discarded_nodes_in_hca=1, clustering_method="agglomerative", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000, decision_method="majority", vote_weights="equal") {
+install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 ########################## Outputs (all)
 classification_svm_final <- list()
 classification_hca_final <- list()
@@ -3628,6 +3750,14 @@ for (classif in 1:length(classifiers)) {
         }
     }
     classifiers_r_workspaces[[classif]] <- classifier_r_workspace_list
+}
+if ("hca" %in% classifiers && (!is.null(spectra_database_folder_for_clustering) || length(spectra_database_folder_for_clustering) == 0)) {
+	######################## Database for HCA: import, trim and preprocess (memory efficient import of imzML files)
+	# Generate one spectrum (average) per patient (imzML file)
+	spectra_database_for_hca <- memory_efficient_import(spectra_database_folder, tof_mode=tof_mode, tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength=smoothing_strength_preprocessing, mass_range=mass_range, preprocess_spectra=preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of, generate_representative_spectra=TRUE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", discarded_nodes=0, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=tolerance_ppm, file_format="imzml", seed=seed, output_list="average")
+	spectra_database_for_hca <- spectra_database_for_hca$spectra_average
+	# Generate one representative spectrum per class
+	spectra_database_for_hca <- group_spectra_class(spectra_database_for_hca, class_list=class_list_for_hca, file_format="imzml")
 }
 ################################### For each imzMl (patient)...
 for (f in 1:length(filepath_test_imzml)) {
@@ -3697,20 +3827,15 @@ for (f in 1:length(filepath_test_imzml)) {
 	}
 	########################################## HCA
 	if ("hca" %in% classifiers && (!is.null(spectra_database_folder_for_clustering) || length(spectra_database_folder_for_clustering) == 0)) {
-	    # Database: import, trim and preprocess (memory efficient import of imzML files)
-		# Generate one spectrum (average) per patient (imzML file)
-		spectra_database_for_hca <- memory_efficient_import(spectra_database_folder, tof_mode=tof_mode, tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength=smoothing_strength_preprocessing, mass_range=mass_range, preprocess_spectra=preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of, generate_representative_spectra=TRUE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", discarded_nodes=0, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=tolerance_ppm, file_format="imzml", seed=seed, output_list="average")
-	    spectra_database_for_hca <- spectra_database_for_hca$spectra_average
-		# Generate one representative spectrum per class
-		spectra_database_for_hca <- group_spectra_class(spectra_database_for_hca, class_list=class_list_for_hca, file_format="imzml")
 	    # HCA classification
-	    classification_hca <- hierarchical_clustering_classification(sample_spectra, spectra_database=spectra_database_for_hca, class_list=c("Ben","PTC"), class_in_file_name=TRUE, tof_mode=tof_mode, pixel_by_pixel_classification=FALSE, clustering_algorithm="hca", nodes=nodes_in_hca, discarded_nodes=discarded_nodes_in_hca, seed=seed)
+	    classification_hca <- hierarchical_clustering_classification(sample_spectra, spectra_database=spectra_database_for_hca, class_list=c("Ben","PTC"), class_in_file_name=TRUE, tof_mode=tof_mode, pixel_by_pixel_classification=FALSE, clustering_method=clustering_method, nodes=nodes_in_hca, discarded_nodes=discarded_nodes_in_hca, seed=seed)
 	    classification_hca_final <- append(classification_hca_final, classification_hca)
 	}
 	######################################## ENSEMBLE
 	###################### Ensemble results
 	classification_ensemble <- list(pixel_by_pixel_classification=cbind(classification_svm$pixel_by_pixel_classification, classification_pls$pixel_by_pixel_classification, classification_nbc$pixel_by_pixel_classification, classification_hca$pixel_by_pixel_classification), patient_classification=cbind(classification_svm$patient_classification_matrix, classification_pls$patient_classification_matrix, classification_nbc$patient_classification_matrix, classification_hca$patient_classification_matrix))
 	###################### Vote
+	########## Majority vote
 	if (decision_method == "majority" && vote_weights == "equal") {
 		# Function for matrix apply (x=row)
 		majority_vote_function <- function (x, class_list) {
@@ -3747,7 +3872,7 @@ for (f in 1:length(filepath_test_imzml)) {
 	# Generate the molecular image
 	plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[1], tolerance=1, legend=FALSE)
 	legend(x="bottomright", legend=c(class_list, "No majority"), fill=c("green","red","black"))
-	legend(x="topright", legend=spectra_for_plotting[[1]]@metaData$file)
+	legend(x="topright", legend=spectra_for_plotting[[1]]@metaData$file[1])
 	# Record the plot
 	msi_plots[[f]] <- recordPlot()
 	######################## Final ensemble results
@@ -3846,7 +3971,7 @@ correlation_pvalue <- function (correlation_coefficient, number_of_samples, corr
 
 ##################################### DEFINED SPECTRA GROUPING (PEAKLIST MATRIX)
 # This function takes a peaklist matrix as input and generates a peaklist dataframe with a certain number of rows per patient, by averaging spectra randomly or according to a clustering algorithm.
-group_peaklist <- function (peaklist, rows_per_patient=100, seed=NULL, balanced=TRUE, discard_poor_samples=FALSE, discard_if_lower_than=100, non_features=c("Sample","Class"), algorithm="random", grouping_variable="Sample") {
+group_peaklist <- function (peaklist, rows_per_patient=100, seed=NULL, balanced=TRUE, discard_poor_samples=FALSE, discard_if_lower_than=100, non_features=c("Sample","Class"), algorithm="random", clustering_method="agglomerative", grouping_variable="Sample") {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "stats"))
 # Results
@@ -3937,7 +4062,7 @@ if (rows_per_patient > 1) {
 				}
 			}
 			############################ HCA
-			if (algorithm == "hierarchicalClustering" | algorithm == "hca" | algorithm == "HCA") {
+			if ((algorithm == "hierarchicalClustering" | algorithm == "hca" | algorithm == "HCA") && (clustering_method == "agglomerative" || is.null(clustering_method))) {
 				# Compute the distance matrix
 				distance_matrix <- dist(patient_data_frame[,!(names(patient_data_frame) %in% non_features)], method="euclidean")
 				# Plant the seed only if a specified value is entered
@@ -3974,7 +4099,7 @@ if (rows_per_patient > 1) {
 				}
 			}
 			######################### K-MEANS
-			if (algorithm == "kMeans" | algorithm == "kmeans" | algorithm == "k-Means") {
+			if ((algorithm == "hierarchicalClustering" | algorithm == "hca" | algorithm == "HCA") && (clustering_method == "kMeans" | clustering_method == "kmeans" | clustering_method == "k-Means")) {
 				# Plant the seed only if a specified value is entered
 				if (!is.null(seed)) {
 					# Make the randomness reproducible
@@ -4775,7 +4900,7 @@ return (list(model=nbc_model, classification_results=classification_results_nbc,
 ################################################# ENSEMBLE TUNING AND VALIDATION
 # This function operates the tuning of the ensemble classifier, by relying upon other functions to train, tune and validate the individual classifiers.
 # It returns the best models in terms of classification performances, along with their parameters and performances (cross-validation or external validation, according to if an external dataset is provided).
-ensemble_tuning_and_validation <- function(peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), classifiers=c("svm","pls","hca","bayes"), autotuning=TRUE,  classifier_parameters=list(svm=list(gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial"), pls=data.frame(ncomp=1:5), bayes=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria=data.frame(pls="Accuracy",bayes="Accuracy"), maximise_selection_criteria_values=data.frame(pls=TRUE,bayes=TRUE)) {
+ensemble_tuning_and_validation <- function(peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), classifiers=c("svm","pls","bayes"), autotuning=TRUE,  classifier_parameters=list(svm=list(gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial"), pls=data.frame(ncomp=1:5), bayes=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria=data.frame(pls="Accuracy",bayes="Accuracy"), maximise_selection_criteria_values=data.frame(pls=TRUE,bayes=TRUE)) {
 	if ("svm" %in% classifiers || "SVM" %in% classifiers) {
 		svm_classifier <- svm_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, autotuning=autotuning, tuning_parameters=classifier_parameters$svm, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, parameters=classifier_parameters$svm, positive_class_cv=positive_class_cv, seed=seed, pca=FALSE, numer_of_components=3)
 	}
@@ -4815,3 +4940,387 @@ return (list(original_peaklist=peaklist, peaklist_rounded=peaklist2))
 
 
 ################################################################################
+
+
+
+
+
+############################################################ BIOTYPER-LIKE SCORE
+# The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity comparison.
+biotyper_like_score <- function (filepath_samples, peaks_test, peaks_library, class_list, tolerance_ppm=2000, comparison=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=50, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+# Sample and Library size
+if (isMassPeaksList(peaks_test)) {
+    number_of_samples <- length(peaks_test)
+} else if (isMassPeaks(peaks_test)) {
+    number_of_samples <- 1
+}
+if (isMassPeaksList(peaks_library)) {
+    library_size <- length(peaks_library)
+} else if (isMassPeaks(peaks_library)) {
+    library_size <- 1
+}
+# Replace the sample name, both in the library and in the test set
+peaks_test <- replace_sample_name(peaks_test, file_format=file_format)
+peaks_library <- replace_sample_name(peaks_library, file_format=file_format)
+####### Create the sample vector
+sample_vector <- character()
+if (file_format == "brukerflex") {
+    # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
+	for (s in 1:number_of_samples) {
+		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
+	}
+}
+if (file_format == "imzml" | file_format == "imzML") {
+	for (s in 1:number_of_samples) {
+		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
+	}
+}
+####### Create the library vector
+library_vector <- character()
+if (file_format == "brukerflex") {
+    # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
+	for (s in 1:library_size) {
+		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
+	}
+}
+if (file_format == "imzml" | file_format == "imzML") {
+	for (s in 1:library_size) {
+		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
+	}
+}
+# Read the list of spectra folders in the sample mother folder
+spectra_path_vector <- read_spectra_files(filepath_samples, file_format="brukerflex")
+################# PEAK ALIGNMENT
+# Create a global list for the alignment (with library and tests)
+peaks_global <- append(peaks_library, peaks_test)
+# Alignment (R function)
+peaks_global <- align_and_filter_peaks(peaks_global, tolerance_ppm=tolerance_ppm, peaks_filtering=FALSE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, reference_peaklist=NULL)
+# Empty the two original lists
+peaks_library <- peaks_global[1:library_size]
+peaks_test <- peaks_global[(library_size+1):length(peaks_global)]
+############################################################ SCORE (FRI)
+if ("intensity percentage" %in% comparison && !("standard deviation" %in% comparison)) {
+	# Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
+	# COUNTER 1 - FIT
+	# Create a counter, symmetrical to the database Peaklist
+	counter1 <- matrix (0, nrow=number_of_samples, ncol=library_size)
+    colnames(counter1) <- library_vector
+    rownames(counter1) <- sample_vector
+	# For each sample
+	for (s in 1:number_of_samples) {
+		# For each peaklist in the Library
+		for (l in 1:library_size) {
+			# Scroll the peaks in the sample
+			for (i in 1:length(peaks_test[[s]]@mass)) {
+				# Scroll the peaklist in the library
+				for (j in 1:length(peaks_library[[l]]@mass)) {
+					# Count the number of closely matching signals with the reference in the sample peaklist
+					if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+					counter1 [s,l] <- counter1 [s,l] + 1
+					}
+				}
+			}
+		}
+	}
+	for (s in 1:number_of_samples) {
+		for (l in 1:library_size) {
+			counter1[s,l] <- counter1[s,l] / length(peaks_test[[s]]@mass)
+		}
+	}
+	# Compare the peaks in the library peaklists with the peaks in each sample
+	# COUNTER 2 - RETRO FIT
+	# Create a counter, symmetrical to the database Peaklist
+	counter2 <- matrix (0, nrow=number_of_samples, ncol=library_size)
+    colnames(counter2) <- library_vector
+    rownames(counter2) <- sample_vector
+	# For each peaklist in the library
+	for (l in 1:library_size) {
+		# For each sample
+		for (s in 1:number_of_samples) {
+			# Scroll the peaks in the library
+			for (j in 1:length(peaks_library[[l]]@mass)) {
+				# Scroll the peaklist in the sample
+				for (i in 1:length(peaks_test[[s]]@mass)) {
+					# Count the number of closely matching signals with the reference in the sample peaklist
+					if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+						counter2 [s,l] <- counter2 [s,l] + 1
+					}
+				}
+			}
+		}
+	}
+	for (l in 1:library_size) {
+		for (s in 1:number_of_samples) {
+			counter2[s,l] <- counter2[s,l] / length(peaks_library[[l]]@mass)
+		}
+	}
+	# COUNTER 3
+	# Symmetry -> comparison between intensities
+	# Create a counter, symmetrical to the database Peaklist
+	counter3 <- matrix (0, nrow=number_of_samples, ncol=library_size)
+    colnames(counter3) <- library_vector
+    rownames(counter3) <- sample_vector
+	# For each sample
+	for (s in 1:number_of_samples) {
+		# For each peaklist in the Library
+		for (l in 1:library_size) {
+			# Scroll the peaks in the sample
+			for (i in 1:length(peaks_test[[s]]@mass)) {
+				# Scroll the peaklist in the library
+				for (j in 1:length(peaks_library[[l]]@mass)) {
+					# Count the number of closely matching signals with the reference in the sample peaklist
+					if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+						# Evaluate the difference in intensity
+						if ((abs(peaks_test[[s]]@intensity[i] - peaks_library[[l]]@intensity[j])*100/peaks_library[[l]]@intensity[j]) < intensity_tolerance_percent) {
+							counter3[s,l] <- counter3[s,l] + 1
+						}
+					}
+				}
+			}
+		}
+	}
+	for (s in 1:number_of_samples) {
+		for (l in 1:library_size) {
+			counter3[s,l] <- counter3[s,l] / length(peaks_test[[s]]@mass)
+		}
+	}
+	### Score calculation
+	score <- matrix (0, nrow=number_of_samples, ncol=library_size)
+    colnames(score) <- library_vector
+    rownames(score) <- sample_vector
+	for (i in 1:number_of_samples) {
+		for (j in 1:length(peaks_library)) {
+			score[i,j] <- log10(counter1[i,j]*counter2[i,j]*counter3[i,j]*1000)
+		}
+	}
+	#### Output the classification
+	output <- matrix ("NO", nrow=number_of_samples, ncol=library_size)
+    colnames(output) <- library_vector
+    rownames(output) <- sample_vector
+	if (spectra_path_output == TRUE) {
+		output <- cbind(output, spectra_path_vector)
+        colnames(output) <- c(library_vector, "Spectrum path")
+	}
+	if (score_only == TRUE) {
+		for (r in 1:number_of_samples) {
+			for (w in 1:library_size) {
+				if (score[r,w]>=2) {
+					output[r,w] <- paste("YES","(", round(score[r,w], digits=3), ")")
+				}
+				if (score[r,w]<1.5) {
+					output[r,w] <- paste("NO", "(", round(score[r,w], digits=3), ")")
+				}
+				if (score[r,w]>=1.5 && score[r,w]<2) {
+					output[r,w] <- paste("NI","(", round(score[r,w], digits=3), ")")
+				}
+			}
+		}
+	} else {
+		for (r in 1:number_of_samples) {
+			for (w in 1:library_size) {
+				if (score[r,w]>=2) {
+					output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+				}
+				if (score[r,w]<1.5) {
+					output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+				}
+				if (score[r,w]>=1.5 && score[r,w]<2) {
+					output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+				}
+			}
+		}
+	}
+}
+####################################################### SCORE (FR-STDEV)
+if (!("intensity percentage" %in% comparison) && "standard deviation" %in% comparison) {
+    ########### To be implemented
+}
+return (output)
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+###################### BIOTYPER SCORE ACCORDING TO THE HIERARCHICAL DISTANCE
+# This function computes the biotyper like score by comparing the test spectra with the library spectra, determining the similarity (through the euclidean distance) and assigning a category according to the distance.
+biotyper_like_score_hierarchical_distance <- function (library_list, test_list, filepath_samples, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, file_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
+# Load the required libraries
+install_and_load_required_packages(c("MALDIquant", "stats"))
+# Isolate the spectra and the peaks
+spectra_library <- library_list$spectra
+peaks_library <- library_list$peaks
+spectra_test <- test_list$spectra
+peaks_test <- test_list$peaks
+# Sample and Library size
+if (isMassPeaksList(peaks_test)) {
+    number_of_samples <- length(peaks_test)
+} else if (isMassPeaks(peaks_test)) {
+    number_of_samples <- 1
+}
+if (isMassPeaksList(peaks_library)) {
+    library_size <- length(peaks_library)
+} else if (isMassPeaks(peaks_library)) {
+    library_size <- 1
+}
+# Replace the sample name, both in the library and in the test set
+peaks_test <- replace_sample_name(peaks_test, file_format=file_format)
+peaks_library <- replace_sample_name(peaks_library, file_format=file_format)
+####### Create the sample vector
+sample_vector <- character()
+if (file_format == "brukerflex") {
+	# If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
+	for (s in 1:number_of_samples) {
+		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
+	}
+}
+if (file_format == "imzml" | file_format == "imzML") {
+	for (s in 1:number_of_samples) {
+		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
+	}
+}
+####### Create the library vector
+library_vector <- character()
+if (file_format == "brukerflex") {
+	# If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
+	for (s in 1:library_size) {
+		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
+	}
+}
+if (file_format == "imzml" | file_format == "imzML") {
+	for (s in 1:library_size) {
+		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
+	}
+}
+# Read the list of spectra folders in the sample mother folder
+spectra_path_vector <- read_spectra_files(filepath_samples, file_format=file_format)
+# Merge the library and test peaklist together (for alignment)
+global_peaklist <- c(peaks_library, peaks_test)
+# Align peaks
+global_peaklist <- align_and_filter_peaks(global_peaklist, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25)
+# Merge spectra
+global_spectralist <- c(spectra_library, spectra_test)
+# Generate the matrix (for hca)
+peaklist_matrix <- intensityMatrix(global_peaklist, global_spectralist)
+# Add additional info to the matrix
+peaklist_matrix <- matrix_add_class_and_sample(peaklist_matrix, peaks=global_peaklist, class_list=list(), file_format=file_format, sample_output=TRUE, class_output=FALSE)
+rownames(peaklist_matrix) <- make.names(peaklist_matrix[,"Sample"], unique=TRUE)
+# Compute the hca
+distance_matrix <- dist(peaklist_matrix[,1:(ncol(peaklist_matrix)-1)], method="euclidean")
+hierarchical_clustering <- hclust(distance_matrix)
+plot(hierarchical_clustering, main="Hierarchical clustering analysis - Biotyper-like", xlab="Samples", ylab="Tree height")
+hca_dendrogram <- recordPlot()
+#
+distance_matrix <- as.matrix(distance_matrix)
+# The distance matrix displays the distance between the spectra
+colnames(distance_matrix) <- peaklist_matrix[,"Sample"]
+rownames(distance_matrix) <- peaklist_matrix[,"Sample"]
+# Remove the first rows (the spectra from the database)
+distance_matrix <- distance_matrix[(library_size+1):nrow(distance_matrix),]
+# Keep only the first columns (the spectra from the database)
+distance_matrix <- distance_matrix[,1:library_size]
+### Normalise the euclidean distances
+if (normalise_distances == TRUE) {
+	# TIC
+	if (normalisation_method == "sum") {
+		# Compute the sum of the rows
+		row_sums <- apply(distance_matrix, MARGIN=1, FUN=sum)
+		# Divide each element of the matrix by the sum of the row
+		for (r in 1:nrow(distance_matrix)) {
+			distance_matrix [r,] <- distance_matrix[r,] / row_sums[r]
+		}
+		# Multiply everything by 10, to have more readable results
+		distance_matrix <- distance_matrix * 10
+		# The classification is made by comparing the single sample spectrum with the spectrum of the database class (the distance is displayed in the distance matrix): the closer the better
+		# Scroll the rows, assign the class based upon the distance, create the output matrix for results (create a function to apply to each matrix row)
+		scoring_function <- function (x) {
+			if (x < 1) {
+		    	x <- paste("YES (", round(as.numeric(x),3), ")", sep="")
+			} else if (x >= 1 && x < 1.2) {
+				x <- paste("NI (", round(as.numeric(x),3), ")", sep="")
+			} else if (x >= 1.2) {
+		        x <- paste("NO (", round(as.numeric(x),3), ")", sep="")
+		    }
+		    return (x)
+		}
+		result_matrix <- apply(distance_matrix, MARGIN=c(1,2), FUN=function(x) scoring_function(x))
+	}
+}
+# Spectra path
+if (spectra_path_output == TRUE) {
+	result_matrix <- cbind(result_matrix, sample_vector)
+}
+return (list(result_matrix=result_matrix, plots=hca_dendrogram))
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+################################################################## BIOTYPER LIKE
+# This function includes (and relies upon) all the functions to provide the Biotyper like experience.
+biotyper_like <- function(filepath_library, filepath_test, mass_range=c(3000,15000), similarity_criteria=c("hca", "signal intensity"), signal_itensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peak_picking_mode=c("all", "most intense"), SNR=5, number_of_peaks=20, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, tof_mode="linear", file_format="brukerflex", average_replicates_in_database=FALSE, average_replicates_in_test=FALSE, score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
+###### Outputs
+score_intensity <- NULL
+score_hca <- NULL
+###### Tolerance
+if (tof_mode == "linear") {
+    tolerance_ppm <- 2000
+}
+if (tof_mode == "reflectron" || tof_mode == "reflector") {
+    tolerance_ppm <- 200
+}
+####################################### PEAK PICKING
+if ("most intense" %in% peak_picking_mode) {
+    ########## DATABASE
+    # Generate the library
+    library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=number_of_peaks, low_intensity_peaks_removal=low_intensity_peaks_removal,
+    intensity_threshold_percent=intensity_threshold_percent, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+    # Isolate the peaks and the spectra
+    peaks_library <- library_list$peaks
+    spectra_library <- library_list$spectra
+    ########## SAMPLES
+    test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=number_of_peaks, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_threshold_percent, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+    # Isolate the peaks and the spectra
+    peaks_test <- test_list$peaks
+    spectra_test <- test_list$spectra
+} else if ("all" %in% peak_picking_mode || length(peak_picking_mode) != 1) {
+    ########## DATABASE
+    # Generate the library
+    library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=number_of_peaks, low_intensity_peaks_removal=low_intensity_peaks_removal,
+    intensity_threshold_percent=intensity_threshold_percent, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+    # Isolate the peaks and the spectra
+    peaks_library <- library_list$peaks
+    spectra_library <- library_list$spectra
+    ########## SAMPLES
+    test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=number_of_peaks, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_threshold_percent, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+    # Isolate the peaks and the spectra
+    peaks_test <- test_list$peaks
+    spectra_test <- test_list$spectra
+}
+######################################## SCORE
+####### Most intense signals
+if ("standard deviation" %in% signal_itensity_evaluation) {
+score_intensity <- biotyper_like_score(filepath_test, peaks_test, peaks_library, tolerance_ppm=2000, comparison="standard deviation", intensity_tolerance_percent=intensity_tolerance_percent, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+} else if ("intensity percentage" %in% signal_itensity_evaluation) {
+    score_intensity <- biotyper_like_score(filepath_test, peaks_test, peaks_library, tolerance_ppm=2000, comparison="intensity percentage", intensity_tolerance_percent=intensity_tolerance_percent, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+}
+####### Hierarchical clustering
+score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, filepath_test, tolerance_ppm=tolerance_ppm, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
+#################### RETURN THE OUTPUTS
+return(list(score_hca=score_hca, score_intensity=score_intensity, library_list=library_list, test_list=test_list))
+}
