@@ -2100,16 +2100,16 @@ peaks_average <- detectPeaks(average_spectrum, method="MAD", SNR=SNR)
 # Peak picking on the dataset
 peaks <- detectPeaks(spectra, method="MAD", SNR=SNR)
 # Alignment: merge the two lists and align them all
-peaks_global <- append(peaks, peaks_average)
-peaks_global <- align_and_filter_peaks(peaks_global, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
+peaks_all <- append(peaks, peaks_average)
+peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
 # Empty the lists
 peaks_average <- list()
 peaks <- list()
 # Re-fill the lists with the aligned peaklists
-for (i in 1:(length(peaks_global) - 1)) {
-	peaks <- append(peaks, peaks_global[[i]])
+for (i in 1:(length(peaks_all) - 1)) {
+	peaks <- append(peaks, peaks_all[[i]])
 }
-peaks_average <- peaks_global[[length(peaks_global)]]
+peaks_average <- peaks_all[[length(peaks_all)]]
 ######## Generate a vector with the standard deviations of the peaks in the average peaklist
 st_dev_intensity <- vector(length=0)
 # For each peak in the average peaklist
@@ -2319,9 +2319,9 @@ if (isMassPeaksList(peaks)) {
 
 ################################################ LIBRARY CREATION
 # This function reads the files contained in a provided folder (no memory efficient importing), it can average them according to the class they belong to or according to the folder they are into (average replicate/patient). It also computes the peak picking and can replace the SNR field in the peaklist with the standard deviation of the peaks or the coefficient of variation.
-# It returns a list containing: the spectra and the peaks.
+# It returns a list containing: the spectra and the peaks (already aligned but not filtered).
 # It is used to create the library/database.
-library_creation <- function (filepath_library, class_grouping=TRUE, mass_range=c(3000,15000), spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=length(spectra)), average_replicates=FALSE, average_patients=FALSE, SNR=5, most_intense_peaks=TRUE, signals_to_take=20, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, tof_mode="linear", file_format="brukerflex") {
+library_creation <- function (filepath_library, class_grouping=TRUE, mass_range=c(3000,15000), spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=length(spectra)), average_replicates=FALSE, average_patients=FALSE, SNR=5, most_intense_peaks=FALSE, signals_to_take=20, reference_peaklist_for_alignment=NULL, tof_mode="linear", file_format="brukerflex") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 ### Define the classes (the classes are the folders in the library directory)
@@ -2368,11 +2368,7 @@ if (most_intense_peaks == TRUE) {
 	peaks_library <- most_intense_signals(spectra, signals_to_take=signals_to_take)
 } else {
 	peaks_library <- detectPeaks(spectra, method="MAD", SNR=SNR)
-	peaks_library <- align_and_filter_peaks(peaks_library, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25)
-}
-# Remove low intensity peaks
-if (low_intensity_peaks_removal == TRUE) {
-	peaks_library <- remove_low_intensity_peaks(peaks_library, intensity_threshold_percent=intensity_threshold_percent)
+	peaks_library <- align_and_filter_peaks(peaks_library, tolerance_ppm=tolerance_ppm, peaks_filtering=FALSE, low_intensity_peaks_removal=FALSE, reference_peaklist=reference_peaklist_for_alignment)
 }
 ####
 library_list <- list(spectra = spectra, peaks = peaks_library)
@@ -4920,7 +4916,7 @@ ensemble_tuning_and_validation <- function(peaklist_training, peaklist_test=NULL
 ################################################ ROUND NUMERIC FEATURES PEAKLIST
 # This function rounds the numeric features to a certain decimal digit.
 # It returns the same matrix with the rounded features, along with the original peaklist matrix.
-round_features_peaklist <- function (peaklist, decimal_digits=3, non_features=c("Sample","Class","THY")) {
+round_features_peaklist <- function(peaklist, decimal_digits=3, non_features=c("Sample","Class","THY")) {
 # Take the features
 feature_list <- as.numeric(names(peaklist [,!(names(peaklist) %in% non_features)]))
 # Round the features
@@ -4945,11 +4941,17 @@ return (list(original_peaklist=peaklist, peaklist_rounded=peaklist2))
 
 
 
-############################################################ BIOTYPER-LIKE SCORE
+########################################## BIOTYPER-LIKE SCORE: SIGNAL INTENSITY
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity comparison.
-biotyper_like_score <- function (filepath_samples, peaks_test, peaks_library, class_list, tolerance_ppm=2000, comparison=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=50, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
+# The function takes spectra and (aligned and filtered) peaks from the library_creation function.
+biotyper_like_score_signal_intensity <- function(filepath_samples, test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
+# Isolate the spectra and the peaks
+spectra_library <- library_list$spectra
+peaks_library <- library_list$peaks
+spectra_test <- test_list$spectra
+peaks_test <- test_list$peaks
 # Sample and Library size
 if (isMassPeaksList(peaks_test)) {
     number_of_samples <- length(peaks_test)
@@ -4961,7 +4963,15 @@ if (isMassPeaksList(peaks_library)) {
 } else if (isMassPeaks(peaks_library)) {
     library_size <- 1
 }
-# Replace the sample name, both in the library and in the test set
+####### Peak alignment
+# Merge the peaklists
+peaks_all <- append(peaks_library, peaks_test)
+# Align
+peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
+# Restore the lists
+peaks_library <- peaks_all [1:library_size]
+peaks_test <- peaks_all [(library_size+1):length(peaks_all)]
+##### Replace the sample name, both in the library and in the test set
 peaks_test <- replace_sample_name(peaks_test, file_format=file_format)
 peaks_library <- replace_sample_name(peaks_library, file_format=file_format)
 ####### Create the sample vector
@@ -4992,14 +5002,6 @@ if (file_format == "imzml" | file_format == "imzML") {
 }
 # Read the list of spectra folders in the sample mother folder
 spectra_path_vector <- read_spectra_files(filepath_samples, file_format="brukerflex")
-################# PEAK ALIGNMENT
-# Create a global list for the alignment (with library and tests)
-peaks_global <- append(peaks_library, peaks_test)
-# Alignment (R function)
-peaks_global <- align_and_filter_peaks(peaks_global, tolerance_ppm=tolerance_ppm, peaks_filtering=FALSE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, reference_peaklist=NULL)
-# Empty the two original lists
-peaks_library <- peaks_global[1:library_size]
-peaks_test <- peaks_global[(library_size+1):length(peaks_global)]
 ############################################################ SCORE (FRI)
 if ("intensity percentage" %in% comparison && !("standard deviation" %in% comparison)) {
 	# Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
@@ -5073,7 +5075,7 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 					# Count the number of closely matching signals with the reference in the sample peaklist
 					if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
 						# Evaluate the difference in intensity
-						if ((abs(peaks_test[[s]]@intensity[i] - peaks_library[[l]]@intensity[j])*100/peaks_library[[l]]@intensity[j]) < intensity_tolerance_percent) {
+						if ((abs(peaks_test[[s]]@intensity[i] - peaks_library[[l]]@intensity[j])*100/peaks_library[[l]]@intensity[j]) < intensity_tolerance_percent_threshold) {
 							counter3[s,l] <- counter3[s,l] + 1
 						}
 					}
@@ -5136,6 +5138,7 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 ####################################################### SCORE (FR-STDEV)
 if (!("intensity percentage" %in% comparison) && "standard deviation" %in% comparison) {
     ########### To be implemented
+	output <- NULL
 }
 return (output)
 }
@@ -5152,7 +5155,8 @@ return (output)
 
 ###################### BIOTYPER SCORE ACCORDING TO THE HIERARCHICAL DISTANCE
 # This function computes the biotyper like score by comparing the test spectra with the library spectra, determining the similarity (through the euclidean distance) and assigning a category according to the distance.
-biotyper_like_score_hierarchical_distance <- function (library_list, test_list, filepath_samples, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, file_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
+# The function takes spectra and (aligned and filtered) peaks from the library_creation function.
+biotyper_like_score_hierarchical_distance <- function (library_list, test_list, filepath_samples, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, file_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Isolate the spectra and the peaks
@@ -5171,7 +5175,15 @@ if (isMassPeaksList(peaks_library)) {
 } else if (isMassPeaks(peaks_library)) {
     library_size <- 1
 }
-# Replace the sample name, both in the library and in the test set
+####### Peak alignment
+# Merge the peaklists
+peaks_all <- append(peaks_library, peaks_test)
+# Align
+peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
+# Restore the lists
+peaks_library <- peaks_all [1:library_size]
+peaks_test <- peaks_all [(library_size+1):length(peaks_all)]
+#### Replace the sample name, both in the library and in the test set
 peaks_test <- replace_sample_name(peaks_test, file_format=file_format)
 peaks_library <- replace_sample_name(peaks_library, file_format=file_format)
 ####### Create the sample vector
@@ -5202,12 +5214,6 @@ if (file_format == "imzml" | file_format == "imzML") {
 }
 # Read the list of spectra folders in the sample mother folder
 spectra_path_vector <- read_spectra_files(filepath_samples, file_format=file_format)
-# Merge the library and test peaklist together (for alignment)
-global_peaklist <- c(peaks_library, peaks_test)
-# Align peaks
-global_peaklist <- align_and_filter_peaks(global_peaklist, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25)
-# Merge spectra
-global_spectralist <- c(spectra_library, spectra_test)
 # Generate the matrix (for hca)
 peaklist_matrix <- intensityMatrix(global_peaklist, global_spectralist)
 # Add additional info to the matrix
@@ -5295,10 +5301,11 @@ return (list(result_matrix=result_matrix, plots=hca_dendrogram))
 
 ################################################################## BIOTYPER LIKE
 # This function includes (and relies upon) all the functions to provide the Biotyper like experience.
-biotyper_like <- function(filepath_library, filepath_test, mass_range=c(3000,15000), similarity_criteria=c("hca", "signal intensity"), signal_itensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peak_picking_mode=c("all", "most intense"), SNR=5, number_of_peaks=20, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, tof_mode="linear", file_format="brukerflex", average_replicates_in_database=FALSE, average_replicates_in_test=FALSE, score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
+biotyper_like <- function(filepath_library, filepath_test, mass_range=c(3000,15000), similarity_criteria=c("hca", "signal intensity","correlation"), intensity_correction_coefficient=1, signal_itensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peak_picking_mode=c("all", "most intense"), peaks_filtering=TRUE, peak_filtering_frequency_in_peak_picking=0.05, SNR=5, number_of_peaks=20, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tof_mode="linear", file_format="brukerflex", average_replicates_in_database=FALSE, average_replicates_in_test=FALSE, score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
 ###### Outputs
 score_intensity <- NULL
 score_hca <- NULL
+score_correlation <- NULL
 ###### Tolerance
 if (tof_mode == "linear") {
     tolerance_ppm <- 2000
@@ -5307,42 +5314,262 @@ if (tof_mode == "reflectron" || tof_mode == "reflector") {
     tolerance_ppm <- 200
 }
 ####################################### PEAK PICKING
+########## Most intense peaks
 if ("most intense" %in% peak_picking_mode) {
     ########## DATABASE
     # Generate the library
-    library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=number_of_peaks, low_intensity_peaks_removal=low_intensity_peaks_removal,
-    intensity_threshold_percent=intensity_threshold_percent, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+    library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=number_of_peaks, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
     # Isolate the peaks and the spectra
     peaks_library <- library_list$peaks
     spectra_library <- library_list$spectra
     ########## SAMPLES
-    test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=number_of_peaks, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_threshold_percent, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+    test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=number_of_peaks, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
     # Isolate the peaks and the spectra
     peaks_test <- test_list$peaks
     spectra_test <- test_list$spectra
 } else if ("all" %in% peak_picking_mode || length(peak_picking_mode) != 1) {
+	########## All peaks
     ########## DATABASE
     # Generate the library
-    library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=number_of_peaks, low_intensity_peaks_removal=low_intensity_peaks_removal,
-    intensity_threshold_percent=intensity_threshold_percent, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+    library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=number_of_peaks, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
     # Isolate the peaks and the spectra
     peaks_library <- library_list$peaks
     spectra_library <- library_list$spectra
     ########## SAMPLES
-    test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=number_of_peaks, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_threshold_percent, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+    test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=number_of_peaks, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
     # Isolate the peaks and the spectra
     peaks_test <- test_list$peaks
     spectra_test <- test_list$spectra
 }
 ######################################## SCORE
-####### Most intense signals
-if ("standard deviation" %in% signal_itensity_evaluation) {
-score_intensity <- biotyper_like_score(filepath_test, peaks_test, peaks_library, tolerance_ppm=2000, comparison="standard deviation", intensity_tolerance_percent=intensity_tolerance_percent, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
-} else if ("intensity percentage" %in% signal_itensity_evaluation) {
-    score_intensity <- biotyper_like_score(filepath_test, peaks_test, peaks_library, tolerance_ppm=2000, comparison="intensity percentage", intensity_tolerance_percent=intensity_tolerance_percent, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+####### Signals intensity
+if ("signal intensity" %in% similarity_criteria) {
+	# Standard deviation
+	if ("standard deviation" %in% signal_itensity_evaluation) {
+	score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peak_filtering_frequency_in_peak_picking, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	} else if ("intensity percentage" %in% signal_itensity_evaluation) {
+		# Intensiry percentage
+	    score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peak_filtering_frequency_in_peak_picking, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	}
 }
 ####### Hierarchical clustering
-score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, filepath_test, tolerance_ppm=tolerance_ppm, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
-#################### RETURN THE OUTPUTS
-return(list(score_hca=score_hca, score_intensity=score_intensity, library_list=library_list, test_list=test_list))
+if ("hca" %in% similarity_criteria) {
+	score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, filepath_test, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peak_filtering_frequency_in_peak_picking, low_intensity_percentage_threshold=low_intensity_percentage_threshold, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
 }
+###### Correlation matrix
+if ("correlation" %in% similarity_criteria) {
+	score_correlation_matrix <- biotyper_like_score_correlation_matrix(filepath_test, library_list, test_list, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peak_filtering_frequency_in_peak_picking, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_correction_coefficient=intensity_correction_coefficient, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only)
+}
+#################### RETURN THE OUTPUTS
+return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlation_matrix=score_correlation_matrix, library_list=library_list, test_list=test_list))
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+######################################## BIOTYPER-LIKE SCORE: CORRELATION MATRIX
+# The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity simmetry via the correlation matrix.
+biotyper_like_score_correlation_matrix <- function(filepath_samples, library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
+# Load the required libraries
+install_and_load_required_packages(c("MALDIquant","corrplot", "weights"))
+# Extract the peaks and the spectra from the lists
+spectra_library <- library_list$spectra
+peaks_library <- library_list$peaks
+spectra_test <- test_list$spectra
+peaks_test <- test_list$peaks
+# Sample and Library size
+if (isMassPeaksList(peaks_test)) {
+    number_of_samples <- length(peaks_test)
+} else if (isMassPeaks(peaks_test)) {
+    number_of_samples <- 1
+}
+if (isMassPeaksList(peaks_library)) {
+    library_size <- length(peaks_library)
+} else if (isMassPeaks(peaks_library)) {
+    library_size <- 1
+}
+####### Peak alignment
+# Merge the peaklists
+peaks_all <- append(peaks_library, peaks_test)
+# Align
+peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
+# Restore the lists
+peaks_library <- peaks_all [1:library_size]
+peaks_test <- peaks_all [(library_size+1):length(peaks_all)]
+#### Replace the sample name, both in the library and in the test set
+peaks_test <- replace_sample_name(peaks_test, file_format=file_format)
+peaks_library <- replace_sample_name(peaks_library, file_format=file_format)
+####### Create the sample vector
+sample_vector <- character()
+if (file_format == "brukerflex") {
+    # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
+	for (s in 1:number_of_samples) {
+		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
+	}
+}
+if (file_format == "imzml" | file_format == "imzML") {
+	for (s in 1:number_of_samples) {
+		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
+	}
+}
+####### Create the library vector
+library_vector <- character()
+if (file_format == "brukerflex") {
+    # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
+	for (s in 1:library_size) {
+		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
+	}
+}
+if (file_format == "imzml" | file_format == "imzML") {
+	for (s in 1:library_size) {
+		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
+	}
+}
+# Read the list of spectra folders in the sample mother folder
+spectra_path_vector <- read_spectra_files(filepath_samples, file_format="brukerflex")
+############################################################ SCORE (FRI)
+# Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
+# COUNTER 1 - FIT
+# Create a counter, symmetrical to the database Peaklist
+counter1 <- matrix (0, nrow=number_of_samples, ncol=library_size)
+colnames(counter1) <- library_vector
+rownames(counter1) <- sample_vector
+# For each sample
+for (s in 1:number_of_samples) {
+	# For each peaklist in the Library
+	for (l in 1:library_size) {
+		# Scroll the peaks in the sample
+		for (i in 1:length(peaks_test[[s]]@mass)) {
+			# Scroll the peaklist in the library
+			for (j in 1:length(peaks_library[[l]]@mass)) {
+				# Count the number of closely matching signals with the reference in the sample peaklist
+				if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+				counter1 [s,l] <- counter1 [s,l] + 1
+				}
+			}
+		}
+	}
+}
+for (s in 1:number_of_samples) {
+	for (l in 1:library_size) {
+		counter1[s,l] <- counter1[s,l] / length(peaks_test[[s]]@mass)
+	}
+}
+# Compare the peaks in the library peaklists with the peaks in each sample
+# COUNTER 2 - RETRO FIT
+# Create a counter, symmetrical to the database Peaklist
+counter2 <- matrix (0, nrow=number_of_samples, ncol=library_size)
+colnames(counter2) <- library_vector
+rownames(counter2) <- sample_vector
+# For each peaklist in the library
+for (l in 1:library_size) {
+	# For each sample
+	for (s in 1:number_of_samples) {
+		# Scroll the peaks in the library
+		for (j in 1:length(peaks_library[[l]]@mass)) {
+			# Scroll the peaklist in the sample
+			for (i in 1:length(peaks_test[[s]]@mass)) {
+				# Count the number of closely matching signals with the reference in the sample peaklist
+				if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+					counter2 [s,l] <- counter2 [s,l] + 1
+				}
+			}
+		}
+	}
+}
+for (l in 1:library_size) {
+	for (s in 1:number_of_samples) {
+		counter2[s,l] <- counter2[s,l] / length(peaks_library[[l]]@mass)
+	}
+}
+# COUNTER 3
+# Symmetry -> comparison between intensities
+# Compute the correlation matrix with the library
+# Intensity matrix
+spectra_all <- append(spectra_library, spectra_test)
+peaks_all <- append(peaks_library, peaks_test)
+intensity_matrix_global <- intensityMatrix(peaks_all, spectra_all)
+rownames(intensity_matrix_global) <- c(library_vector, sample_vector)
+# Correlation between samples (library + test samples) (samples must be as columns and features as test) - With weights
+if (intensity_correction_coefficient != 0) {
+	correlation_matrix <- wtd.cors(x=t(intensity_matrix_global), weight=rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
+	counter3 <- correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size]
+} else {counter3 <- matrix(1, nrow=number_of_samples, ncol=library_size)}
+# Extract the absolute values
+for (s in 1:number_of_samples) {
+	for (l in 1:library_size) {
+		counter3[s,l] <- abs(counter3[s,l])
+	}
+}
+# Generate the image
+corrplot(counter3, method="circle")
+correlation_plot <- recordPlot()
+### Score calculation
+score <- matrix (0, nrow=number_of_samples, ncol=library_size)
+colnames(score) <- library_vector
+rownames(score) <- sample_vector
+if (intensity_correction_coefficient != 0) {
+	for (i in 1:number_of_samples) {
+		for (j in 1:length(peaks_library)) {
+			score[i,j] <- log10(counter1[i,j]*counter2[i,j]*counter3[i,j]*1000)
+		}
+	}
+} else {
+	for (i in 1:number_of_samples) {
+		for (j in 1:length(peaks_library)) {
+			score[i,j] <- log10(counter1[i,j]*counter2[i,j]*counter3[i,j]*100)
+		}
+	}
+}
+#### Output the classification
+output <- matrix ("NO", nrow=number_of_samples, ncol=library_size)
+colnames(output) <- library_vector
+rownames(output) <- sample_vector
+if (spectra_path_output == TRUE) {
+	output <- cbind(output, spectra_path_vector)
+    colnames(output) <- c(library_vector, "Spectrum path")
+}
+if (score_only == TRUE) {
+	for (r in 1:number_of_samples) {
+		for (w in 1:library_size) {
+			if (score[r,w]>=2) {
+				output[r,w] <- paste("YES","(", round(score[r,w], digits=3), ")")
+			}
+			if (score[r,w]<1.5) {
+				output[r,w] <- paste("NO", "(", round(score[r,w], digits=3), ")")
+			}
+			if (score[r,w]>=1.5 && score[r,w]<2) {
+				output[r,w] <- paste("NI","(", round(score[r,w], digits=3), ")")
+			}
+		}
+	}
+} else {
+	for (r in 1:number_of_samples) {
+		for (w in 1:library_size) {
+			if (score[r,w]>=2) {
+				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+			}
+			if (score[r,w]<1.5) {
+				output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+			}
+			if (score[r,w]>=1.5 && score[r,w]<2) {
+				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+			}
+		}
+	}
+}
+return (output)
+}
+
+
+
+
+
+################################################################################
