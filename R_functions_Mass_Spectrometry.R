@@ -226,6 +226,8 @@ return (signal_matrix)
 signal_follower_statistics <- function (filepath, signal_list, mass_labels=list(), SNR=5, file_format="imzml", tof_mode="linear", smoothing_strength_preprocessing="medium", process_in_packages_of=length(spectra), tolerance_ppm=2000) {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
+# Rename the trim function
+trim_spectra <- trim
 # Define the column and row headers (if mass labels are provided or not)
 if (length(mass_labels) != 0) {
 	column_names_st_dev <- vector(length=length(signal_list))
@@ -477,6 +479,8 @@ return (spectra)
 # This function computes the standard deviation of each peak of an average spectrum peaklist, by replacing the existing SNR slot with the SD or CV: all the peaks (average and dataset) are aligned and each peak of the average peaklist is searched across the dataset thanks to the intensity matrix.
 replace_SNR_in_avg_peaklist <- function (spectra, SNR=5, tof_mode="linear", tolerance_ppm=2000, file_format="imzml", replace_snr_with="std") {
 install_and_load_required_packages(c("MALDIquant", "stats"))
+# Rename the trim function
+trim_spectra <- trim
 # Check if it is not a single spectrum
 # If the spectra are many...
 if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
@@ -618,6 +622,8 @@ return (list (vector=v, outliers_position=outliers_position))
 peak_statistics <- function (spectra, SNR=3, class_list=list(), class_in_file_name=TRUE, tof_mode="linear", file_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, remove_outliers=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
+# Rename the trim function
+trim_spectra <- trim
 # Determine the number of classes
 if (length(class_list) == 0 | length(class_list) == 1) {
 number_of_classes <- 1
@@ -975,6 +981,8 @@ return (peak_stat_matrix)
 average_spectrum_bars_signals_of_interest <- function (spectra, SNR=5, signals_of_interest=peaks_average@mass, tolerance_ppm=2000, half_window_plot=1000, graph_title="Spectrum", average_spectrum_colour="black", peak_points=TRUE, points_colour="red", bar_width=40, bar_colour="blue") {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
+# Rename the trim function
+trim_spectra <- trim
 # Outputs
 spectrum_images <- list()
 # Generate the average spectrum
@@ -1053,7 +1061,8 @@ return (spectrum_images)
 memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", mass_range=c(0,0), preprocess_spectra=TRUE, process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", clustering_method_for_hca="agglomerative", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=2000, file_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
 ################################################### Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
-#
+# Rename the trim function
+trim_spectra <- trim
 setwd(folder)
 folder_files <- read_spectra_files(folder, file_format=file_format, full_path=FALSE)
 ####################################################################### OUTPUTS
@@ -1143,17 +1152,17 @@ for (i in 1:length(folder_files)) {
 if ("spectra" %in% output_list) {
 	if (length(spectra_dataset) > 0) {
 	    if (mass_range[1] == 0 && mass_range[2] == 0) {
-	    	spectra_dataset <- trim(spectra_dataset)
+	    	spectra_dataset <- trim_spectra(spectra_dataset)
 	    }
 	    if (mass_range[1] == 0 && mass_range[2] != 0) {
-	    	spectra_dataset <- trim(spectra_dataset, range=mass_range)
+	    	spectra_dataset <- trim_spectra(spectra_dataset, range=mass_range)
 	    }
 	    if (mass_range[1] != 0 && mass_range[2] == 0) {
 	    	mass_range[2] <- Inf
-	    	spectra_dataset <- trim(spectra_dataset, range=mass_range)
+	    	spectra_dataset <- trim_spectra(spectra_dataset, range=mass_range)
 	    }
 	    if (mass_range[1] != 0 && mass_range[2] != 0) {
-	    	spectra_dataset <- trim(spectra_dataset, range=mass_range)
+	    	spectra_dataset <- trim_spectra(spectra_dataset, range=mass_range)
 	    }
 	    spectra_dataset <- calibrateIntensity(spectra_dataset, method="TIC")
 	}
@@ -1162,17 +1171,17 @@ if ("spectra" %in% output_list) {
 if (generate_representative_spectra == TRUE && spectra_per_patient != 1 && "representative" %in% output_list) {
 	if (length(spectra_dataset_grouped) > 0) {
 	    if (mass_range[1] == 0 && mass_range[2] == 0) {
-	    	spectra_dataset_grouped <- trim(spectra_dataset_grouped)
+	    	spectra_dataset_grouped <- trim_spectra(spectra_dataset_grouped)
 	    }
 	    if (mass_range[1] == 0 && mass_range[2] != 0) {
-	    	spectra_dataset_grouped <- trim(spectra_dataset_grouped, range=mass_range)
+	    	spectra_dataset_grouped <- trim_spectra(spectra_dataset_grouped, range=mass_range)
 	    }
 	    if (mass_range[1] != 0 && mass_range[2] == 0) {
 	    	mass_range[2] <- Inf
-	    	spectra_dataset_grouped <- trim(spectra_dataset_grouped, range=mass_range)
+	    	spectra_dataset_grouped <- trim_spectra(spectra_dataset_grouped, range=mass_range)
 	    }
 	    if (mass_range[1] != 0 && mass_range[2] != 0) {
-	    	spectra_dataset_grouped <- trim(spectra_dataset_grouped, range=mass_range)
+	    	spectra_dataset_grouped <- trim_spectra(spectra_dataset_grouped, range=mass_range)
 	    }
 	    spectra_dataset_grouped <- calibrateIntensity(spectra_dataset_grouped, method="TIC")
 	}
@@ -1181,17 +1190,17 @@ if (generate_representative_spectra == TRUE && spectra_per_patient != 1 && "repr
 if (generate_representative_spectra == TRUE && spectra_per_patient == 1 && "average" %in% output_list) {
 	if (length(spectra_dataset_average) > 0) {
 	    if (mass_range[1] == 0 && mass_range[2] == 0) {
-	    	spectra_dataset_average <- trim(spectra_dataset_average)
+	    	spectra_dataset_average <- trim_spectra(spectra_dataset_average)
 	    }
 	    if (mass_range[1] == 0 && mass_range[2] != 0) {
-	    	spectra_dataset_average <- trim(spectra_dataset_average, range=mass_range)
+	    	spectra_dataset_average <- trim_spectra(spectra_dataset_average, range=mass_range)
 	    }
 	    if (mass_range[1] != 0 && mass_range[2] == 0) {
 	    	mass_range[2] <- Inf
-	    	spectra_dataset_average <- trim(spectra_dataset_average, range=mass_range)
+	    	spectra_dataset_average <- trim_spectra(spectra_dataset_average, range=mass_range)
 	    }
 	    if (mass_range[1] != 0 && mass_range[2] != 0) {
-	    	spectra_dataset_average <- trim(spectra_dataset_average, range=mass_range)
+	    	spectra_dataset_average <- trim_spectra(spectra_dataset_average, range=mass_range)
 	    }
 	    spectra_dataset_average <- calibrateIntensity(spectra_dataset_average, method="TIC")
 	}
@@ -1200,17 +1209,17 @@ if (generate_representative_spectra == TRUE && spectra_per_patient == 1 && "aver
 if (generate_representative_spectra == TRUE && spectra_per_patient == 1 && "skyline" %in% output_list) {
 	if (length(spectra_dataset_skyline) > 0) {
 	    if (mass_range[1] == 0 && mass_range[2] == 0) {
-	    	spectra_dataset_skyline <- trim(spectra_dataset_skyline)
+	    	spectra_dataset_skyline <- trim_spectra(spectra_dataset_skyline)
 	    }
 	    if (mass_range[1] == 0 && mass_range[2] != 0) {
-	    	spectra_dataset_skyline <- trim(spectra_dataset_skyline, range=mass_range)
+	    	spectra_dataset_skyline <- trim_spectra(spectra_dataset_skyline, range=mass_range)
 	    }
 	    if (mass_range[1] != 0 && mass_range[2] == 0) {
 	    	mass_range[2] <- Inf
-	    	spectra_dataset_skyline <- trim(spectra_dataset_skyline, range=mass_range)
+	    	spectra_dataset_skyline <- trim_spectra(spectra_dataset_skyline, range=mass_range)
 	    }
 	    if (mass_range[1] != 0 && mass_range[2] != 0) {
-	    	spectra_dataset_skyline <- trim(spectra_dataset_skyline, range=mass_range)
+	    	spectra_dataset_skyline <- trim_spectra(spectra_dataset_skyline, range=mass_range)
 	    }
 	    spectra_dataset_skyline <- calibrateIntensity(spectra_dataset_skyline, method="TIC")
 	}
@@ -1432,6 +1441,8 @@ return (spectra)
 preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra), sampling_method="sequential") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "parallel"))
+# Rename the trim function
+trim_spectra <- trim
 # Check if it is not a single spectrum
 ######################################### Multiple spectra
 if (isMassSpectrumList(spectra)) {
@@ -1654,6 +1665,8 @@ return (preprocessed_spectra)
 group_spectra <- function (spectra, spectra_per_patient=1, file_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", clustering_method="agglomerative", discarded_nodes=1, balanced=TRUE, method="mean") {
 # Load the required libraries
 install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
+# Rename the trim function
+trim_spectra <- trim
 # Check if it is not a single spectrum
 ### Create the file Vector
 if (file_format == "imzml" | file_format == "imzML") {
@@ -2091,7 +2104,8 @@ return (class_spectra_grouped)
 average_spectrum_bars <- function (spectra, SNR=5, tolerance_ppm=2000, mass_range_plot=c(4000,15000), graph_title="Spectrum", average_spectrum_colour="black", peak_points="yes", points_colour="red", bar_width=40, bar_colour="blue") {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
-#
+# Rename the trim function
+trim_spectra <- trim
 # Generate the average spectrum
 average_spectrum <- averageMassSpectra(spectra, method="mean")
 average_spectrum <- removeBaseline(average_spectrum, method="TopHat")
@@ -2164,6 +2178,8 @@ return(avg_spectrum_with_bars)
 most_intense_signals <- function (spectra, signals_to_take=20) {
 # Load the required libraries
 install_and_load_required_packages(c("parallel", "MALDIquant"))
+# Rename the trim function
+trim_spectra <- trim
 ####################################################### PICKING FUNCTION
 picking_function <- function (peaks, signals_to_take) {
 	# Create a dataframe with mass and intensity
@@ -2217,6 +2233,8 @@ return (most_intense_peaks)
 average_replicates_by_folder <- function (spectra, folder, file_format="brukerflex") {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
+# Rename the trim function
+trim_spectra <- trim
 # List the spectra files
 folder_files <- read_spectra_files(folder, file_format=file_format, full_path=TRUE)
 # Split the path into individual folders
@@ -2259,6 +2277,8 @@ align_and_filter_peaks <- function (peaks, tolerance_ppm=2000, peaks_filtering=T
 if (isMassPeaksList(peaks)) {
 	# Load the required libraries
 	install_and_load_required_packages(c("MALDIquant", "parallel"))
+	# Rename the trim function
+	trim_spectra <- trim
 	# Peak alignment
 	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
 	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
@@ -2324,6 +2344,8 @@ if (isMassPeaksList(peaks)) {
 library_creation <- function (filepath_library, class_grouping=TRUE, mass_range=c(3000,15000), spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=length(spectra)), average_replicates=FALSE, average_patients=FALSE, SNR=5, most_intense_peaks=FALSE, signals_to_take=20, reference_peaklist_for_alignment=NULL, tof_mode="linear", file_format="brukerflex") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
+# Rename the trim function
+trim_spectra <- trim
 ### Define the classes (the classes are the folders in the library directory)
 class_list <- dir(filepath_library, ignore.case=TRUE, full.names=FALSE, recursive=FALSE, include.dirs=TRUE)
 if (tof_mode == "linear") {
@@ -2341,7 +2363,7 @@ if (file_format == "imzml" | file_format == "imzML") {
 	spectra <- importImzMl(filepath_library)
 }
 ### Truncation
-spectra <- trim(spectra, range = mass_range)
+spectra <- trim_spectra(spectra, range = mass_range)
 ### Preprocessing
 spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=spectra_preprocessing$smoothing_strength, process_in_packages_of=spectra_preprocessing$preprocess_in_packages_of, sampling_method="sequential")
 ### Average the replicates
@@ -2491,6 +2513,8 @@ hierarchical_clustering_classification <- function (spectra_to_be_classified, sp
 if (!is.null(classification_of) && length(classification_of) > 0) {
 ################################################## Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign", "stats", "caret", "pROC"))
+# Rename the trim function
+trim_spectra <- trim
 ########################################################### Outputs
 classification_hca_results <- NULL
 classification_hca_results_pixel_by_pixel <- NULL
@@ -2768,6 +2792,8 @@ return (list(classification_hca_results_avg=classification_hca_results_avg, clas
 classify_patients_svm <- function (spectra_path, filepath_R, svm_model_name="SVMModel", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
+# Rename the trim function
+trim_spectra <- trim
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
@@ -2817,17 +2843,17 @@ if(!isMassSpectrumList(spectra)) {
 sample_spectra <- replace_sample_name(sample_spectra)
 # Trim the spectra
 if (mass_range[1] == 0 && mass_range[2] == 0) {
-	sample_spectra <- trim(sample_spectra)
+	sample_spectra <- trim_spectra(sample_spectra)
 }
 if (mass_range[1] == 0 && mass_range[2] != 0) {
-	sample_spectra <- trim(sample_spectra, range=mass_range)
+	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 }
 if (mass_range[1] != 0 && mass_range[2] == 0) {
 	mass_range[2] <- Inf
-	sample_spectra <- trim(sample_spectra, range=mass_range)
+	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 }
 if (mass_range[1] != 0 && mass_range[2] != 0) {
-	sample_spectra <- trim(sample_spectra, range=mass_range)
+	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 }
 ################################################# PIXEL BY PIXEL CLASSIFICATION
 if (preprocessing == TRUE) {
@@ -3097,6 +3123,8 @@ return (list(pixel_by_pixel_classification=final_result_matrix, patient_classifi
 classify_patients_pls <- function (spectra_path, filepath_R, pls_model_name="pls_model", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
+# Rename the trim function
+trim_spectra <- trim
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
@@ -3137,17 +3165,17 @@ if(!isMassSpectrumList(spectra)) {
 sample_spectra <- replace_sample_name(sample_spectra)
 # Trim the spectra
 if (mass_range[1] == 0 && mass_range[2] == 0) {
-	sample_spectra <- trim(sample_spectra)
+	sample_spectra <- trim_spectra(sample_spectra)
 }
 if (mass_range[1] == 0 && mass_range[2] != 0) {
-	sample_spectra <- trim(sample_spectra, range=mass_range)
+	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 }
 if (mass_range[1] != 0 && mass_range[2] == 0) {
 	mass_range[2] <- Inf
-	sample_spectra <- trim(sample_spectra, range=mass_range)
+	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 }
 if (mass_range[1] != 0 && mass_range[2] != 0) {
-	sample_spectra <- trim(sample_spectra, range=mass_range)
+	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 }
 ################################################# PIXEL BY PIXEL CLASSIFICATION
 if (preprocessing == TRUE) {
@@ -3407,6 +3435,8 @@ return (list(pixel_by_pixel_classification=final_result_matrix, patient_classifi
 classify_patients_nbc <- function (spectra_path, filepath_R, nbc_model_name="bayes_model", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
+# Rename the trim function
+trim_spectra <- trim
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
@@ -3447,17 +3477,17 @@ if(!isMassSpectrumList(spectra)) {
 sample_spectra <- replace_sample_name(sample_spectra)
 # Trim the spectra
 if (mass_range[1] == 0 && mass_range[2] == 0) {
-	sample_spectra <- trim(sample_spectra)
+	sample_spectra <- trim_spectra(sample_spectra)
 }
 if (mass_range[1] == 0 && mass_range[2] != 0) {
-	sample_spectra <- trim(sample_spectra, range=mass_range)
+	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 }
 if (mass_range[1] != 0 && mass_range[2] == 0) {
 	mass_range[2] <- Inf
-	sample_spectra <- trim(sample_spectra, range=mass_range)
+	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 }
 if (mass_range[1] != 0 && mass_range[2] != 0) {
-	sample_spectra <- trim(sample_spectra, range=mass_range)
+	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 }
 ################################################# PIXEL BY PIXEL CLASSIFICATION
 if (preprocessing == TRUE) {
@@ -3711,6 +3741,8 @@ return (list(pixel_by_pixel_classification=final_result_matrix, patient_classifi
 # The function outputs a list containing the classification results for each classifier (see the specific functions for details) and the ensemble classificaton result.
 ensemble_classification <- function (spectra_path, folder_R_models, classifiers=c("svm","pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering=NULL, nodes_in_hca=3, discarded_nodes_in_hca=1, clustering_method="agglomerative", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000, decision_method="majority", vote_weights="equal") {
 install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
+# Rename the trim function
+trim_spectra <- trim
 ########################## Outputs (all)
 classification_svm_final <- list()
 classification_hca_final <- list()
@@ -3773,17 +3805,17 @@ for (f in 1:length(filepath_test_imzml)) {
 	sample_spectra <- replace_sample_name(sample_spectra)
 	# Trim the spectra
 	if (mass_range[1] == 0 && mass_range[2] == 0) {
-		sample_spectra <- trim(sample_spectra)
+		sample_spectra <- trim_spectra(sample_spectra)
 	}
 	if (mass_range[1] == 0 && mass_range[2] != 0) {
-		sample_spectra <- trim(sample_spectra, range=mass_range)
+		sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 	}
 	if (mass_range[1] != 0 && mass_range[2] == 0) {
 		mass_range[2] <- Inf
-		sample_spectra <- trim(sample_spectra, range=mass_range)
+		sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 	}
 	if (mass_range[1] != 0 && mass_range[2] != 0) {
-		sample_spectra <- trim(sample_spectra, range=mass_range)
+		sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
 	}
 	if (preprocessing == TRUE) {
 		sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
@@ -4947,6 +4979,8 @@ return (list(original_peaklist=peaklist, peaklist_rounded=peaklist2))
 biotyper_like_score_signal_intensity <- function(filepath_samples, test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
+# Rename the trim function
+trim_spectra <- trim
 # Isolate the spectra and the peaks
 spectra_library <- library_list$spectra
 peaks_library <- library_list$peaks
@@ -5140,7 +5174,7 @@ if (!("intensity percentage" %in% comparison) && "standard deviation" %in% compa
     ########### To be implemented
 	output <- NULL
 }
-return (output)
+return (list(output=output, library_list=list(spectra=spectra_library, peaks=peaks_library), test_list=list(spectra=spectra_test, peaks=peaks_test)))
 }
 
 
@@ -5159,6 +5193,8 @@ return (output)
 biotyper_like_score_hierarchical_distance <- function (library_list, test_list, filepath_samples, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, file_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
+# Rename the trim function
+trim_spectra <- trim
 # Isolate the spectra and the peaks
 spectra_library <- library_list$spectra
 peaks_library <- library_list$peaks
@@ -5286,7 +5322,7 @@ if (normalise_distances == TRUE) {
 if (spectra_path_output == TRUE) {
 	result_matrix <- cbind(result_matrix, sample_vector)
 }
-return (list(result_matrix=result_matrix, plots=hca_dendrogram))
+return (list(result_matrix=result_matrix, plots=hca_dendrogram, library_list=list(spectra=spectra_library, peaks=peaks_library), test_list=list(spectra=spectra_test, peaks=peaks_test)))
 }
 
 
@@ -5301,7 +5337,7 @@ return (list(result_matrix=result_matrix, plots=hca_dendrogram))
 
 ################################################################## BIOTYPER LIKE
 # This function includes (and relies upon) all the functions to provide the Biotyper like experience.
-biotyper_like <- function(filepath_library, filepath_test, mass_range=c(3000,15000), similarity_criteria=c("hca", "signal intensity","correlation"), intensity_correction_coefficient=1, signal_itensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peak_picking_mode=c("all", "most intense"), peaks_filtering=TRUE, peak_filtering_frequency_in_peak_picking=0.05, SNR=5, number_of_peaks=20, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tof_mode="linear", file_format="brukerflex", average_replicates_in_database=FALSE, average_replicates_in_test=FALSE, score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
+biotyper_like <- function(filepath_library, filepath_test, mass_range=c(3000,15000), similarity_criteria=c("hca", "signal intensity","correlation"), intensity_correction_coefficient=1, signal_itensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peak_picking_mode=c("all", "most intense"), peaks_filtering=TRUE, peaks_filtering_threshold=0.05, SNR=5, number_of_peaks=20, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tof_mode="linear", file_format="brukerflex", average_replicates_in_database=FALSE, average_replicates_in_test=FALSE, score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
 ###### Outputs
 score_intensity <- NULL
 score_hca <- NULL
@@ -5346,22 +5382,22 @@ if ("most intense" %in% peak_picking_mode) {
 if ("signal intensity" %in% similarity_criteria) {
 	# Standard deviation
 	if ("standard deviation" %in% signal_itensity_evaluation) {
-	score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peak_filtering_frequency_in_peak_picking, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	} else if ("intensity percentage" %in% signal_itensity_evaluation) {
 		# Intensiry percentage
-	    score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peak_filtering_frequency_in_peak_picking, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	    score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	}
 }
 ####### Hierarchical clustering
 if ("hca" %in% similarity_criteria) {
-	score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, filepath_test, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peak_filtering_frequency_in_peak_picking, low_intensity_percentage_threshold=low_intensity_percentage_threshold, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
+	score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, filepath_test, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_percentage_threshold=low_intensity_percentage_threshold, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
 }
 ###### Correlation matrix
 if ("correlation" %in% similarity_criteria) {
-	score_correlation_matrix <- biotyper_like_score_correlation_matrix(filepath_test, library_list, test_list, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peak_filtering_frequency_in_peak_picking, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_correction_coefficient=intensity_correction_coefficient, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only)
+	score_correlation_matrix <- biotyper_like_score_correlation_matrix(filepath_test, library_list, test_list, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_correction_coefficient=intensity_correction_coefficient, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only)
 }
 #################### RETURN THE OUTPUTS
-return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlation_matrix=score_correlation_matrix, library_list=library_list, test_list=test_list))
+return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlation_matrix=score_correlation_matrix))
 }
 
 
@@ -5377,8 +5413,13 @@ return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlat
 ######################################## BIOTYPER-LIKE SCORE: CORRELATION MATRIX
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity simmetry via the correlation matrix.
 biotyper_like_score_correlation_matrix <- function(filepath_samples, library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
+install_and_load_required_packages(c("MALDIquant","corrplot"))
+# Rename the trim function
+trim_spectra <- trim
 # Load the required libraries
-install_and_load_required_packages(c("MALDIquant","corrplot", "weights"))
+install_and_load_required_packages("weights")
+# Rename the trim function to avoid conflicts
+trim_weights <- trim
 # Extract the peaks and the spectra from the lists
 spectra_library <- library_list$spectra
 peaks_library <- library_list$peaks
@@ -5509,8 +5550,8 @@ for (s in 1:number_of_samples) {
 	}
 }
 # Generate the image
-corrplot(counter3, method="circle")
-correlation_plot <- recordPlot()
+#corrplot(counter3, method="circle")
+#correlation_plot <- recordPlot()
 ### Score calculation
 score <- matrix (0, nrow=number_of_samples, ncol=library_size)
 colnames(score) <- library_vector
@@ -5565,7 +5606,7 @@ if (score_only == TRUE) {
 		}
 	}
 }
-return (output)
+return (list(output=output, library_list=list(spectra=spectra_library, peaks=peaks_library), test_list=list(spectra=spectra_test, peaks=peaks_test)))
 }
 
 
