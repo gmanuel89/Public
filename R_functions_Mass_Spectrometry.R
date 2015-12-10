@@ -227,7 +227,7 @@ signal_follower_statistics <- function (filepath, signal_list, mass_labels=list(
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Define the column and row headers (if mass labels are provided or not)
 if (length(mass_labels) != 0) {
 	column_names_st_dev <- vector(length=length(signal_list))
@@ -480,7 +480,7 @@ return (spectra)
 replace_SNR_in_avg_peaklist <- function (spectra, SNR=5, tof_mode="linear", tolerance_ppm=2000, file_format="imzml", replace_snr_with="std") {
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Check if it is not a single spectrum
 # If the spectra are many...
 if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
@@ -623,7 +623,7 @@ peak_statistics <- function (spectra, SNR=3, class_list=list(), class_in_file_na
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Determine the number of classes
 if (length(class_list) == 0 | length(class_list) == 1) {
 number_of_classes <- 1
@@ -982,7 +982,7 @@ average_spectrum_bars_signals_of_interest <- function (spectra, SNR=5, signals_o
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Outputs
 spectrum_images <- list()
 # Generate the average spectrum
@@ -1062,7 +1062,7 @@ memory_efficient_import <- function (folder, tof_mode="linear", tic_purification
 ################################################### Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 setwd(folder)
 folder_files <- read_spectra_files(folder, file_format=file_format, full_path=FALSE)
 ####################################################################### OUTPUTS
@@ -1442,7 +1442,7 @@ preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "parallel"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Check if it is not a single spectrum
 ######################################### Multiple spectra
 if (isMassSpectrumList(spectra)) {
@@ -1666,7 +1666,7 @@ group_spectra <- function (spectra, spectra_per_patient=1, file_format="imzml", 
 # Load the required libraries
 install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Check if it is not a single spectrum
 ### Create the file Vector
 if (file_format == "imzml" | file_format == "imzML") {
@@ -2105,7 +2105,7 @@ average_spectrum_bars <- function (spectra, SNR=5, tolerance_ppm=2000, mass_rang
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Generate the average spectrum
 average_spectrum <- averageMassSpectra(spectra, method="mean")
 average_spectrum <- removeBaseline(average_spectrum, method="TopHat")
@@ -2179,7 +2179,7 @@ most_intense_signals <- function (spectra, signals_to_take=20) {
 # Load the required libraries
 install_and_load_required_packages(c("parallel", "MALDIquant"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ####################################################### PICKING FUNCTION
 picking_function <- function (peaks, signals_to_take) {
 	# Create a dataframe with mass and intensity
@@ -2234,7 +2234,7 @@ average_replicates_by_folder <- function (spectra, folder, file_format="brukerfl
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # List the spectra files
 folder_files <- read_spectra_files(folder, file_format=file_format, full_path=TRUE)
 # Split the path into individual folders
@@ -2278,7 +2278,7 @@ if (isMassPeaksList(peaks)) {
 	# Load the required libraries
 	install_and_load_required_packages(c("MALDIquant", "parallel"))
 	# Rename the trim function
-	trim_spectra <- trim
+	trim_spectra <- get(x="trim", pos="package:MALDIquant")
 	# Peak alignment
 	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
 	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
@@ -2345,7 +2345,7 @@ library_creation <- function (filepath_library, class_grouping=TRUE, mass_range=
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ### Define the classes (the classes are the folders in the library directory)
 class_list <- dir(filepath_library, ignore.case=TRUE, full.names=FALSE, recursive=FALSE, include.dirs=TRUE)
 if (tof_mode == "linear") {
@@ -2514,7 +2514,7 @@ if (!is.null(classification_of) && length(classification_of) > 0) {
 ################################################## Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign", "stats", "caret", "pROC"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ########################################################### Outputs
 classification_hca_results <- NULL
 classification_hca_results_pixel_by_pixel <- NULL
@@ -2793,7 +2793,7 @@ classify_patients_svm <- function (spectra_path, filepath_R, svm_model_name="SVM
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
@@ -3124,7 +3124,7 @@ classify_patients_pls <- function (spectra_path, filepath_R, pls_model_name="pls
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
@@ -3436,7 +3436,7 @@ classify_patients_nbc <- function (spectra_path, filepath_R, nbc_model_name="bay
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
@@ -3742,7 +3742,7 @@ return (list(pixel_by_pixel_classification=final_result_matrix, patient_classifi
 ensemble_classification <- function (spectra_path, folder_R_models, classifiers=c("svm","pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering=NULL, nodes_in_hca=3, discarded_nodes_in_hca=1, clustering_method="agglomerative", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000, decision_method="majority", vote_weights="equal") {
 install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ########################## Outputs (all)
 classification_svm_final <- list()
 classification_hca_final <- list()
@@ -4980,7 +4980,7 @@ biotyper_like_score_signal_intensity <- function(filepath_samples, test_list, li
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Isolate the spectra and the peaks
 spectra_library <- library_list$spectra
 peaks_library <- library_list$peaks
@@ -5194,7 +5194,7 @@ biotyper_like_score_hierarchical_distance <- function (library_list, test_list, 
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
-trim_spectra <- trim
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Isolate the spectra and the peaks
 spectra_library <- library_list$spectra
 peaks_library <- library_list$peaks
@@ -5413,13 +5413,11 @@ return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlat
 ######################################## BIOTYPER-LIKE SCORE: CORRELATION MATRIX
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity simmetry via the correlation matrix.
 biotyper_like_score_correlation_matrix <- function(filepath_samples, library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
-install_and_load_required_packages(c("MALDIquant","corrplot"))
+install_and_load_required_packages(c("MALDIquant","corrplot","weights"))
 # Rename the trim function
-trim_spectra <- trim
-# Load the required libraries
-install_and_load_required_packages("weights")
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Rename the trim function to avoid conflicts
-trim_weights <- trim
+trim_weights <- get(x="trim", pos="package:weights")
 # Extract the peaks and the spectra from the lists
 spectra_library <- library_list$spectra
 peaks_library <- library_list$peaks
