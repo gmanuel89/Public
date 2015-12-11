@@ -279,7 +279,7 @@ for (lib in 1:length(filepath)) {
 	if (tof_mode == "reflectron" || tof_mode == "reflector") {
 		peaks <- detectPeaks(spectra, method="MAD", SNR=SNR, halfWindowSize=5)
 	}
-	peaks <- align_and_filter_peaks(peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25)
+	peaks <- align_and_filter_peaks(peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25)
 	# Generate the intensity matrix
 	intensity_matrix <- intensityMatrix(peaks, spectra)
 	#### Create the partial result matrices
@@ -502,7 +502,7 @@ if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
 		peaks_avg <- detectPeaks(avg_spectrum, SNR=SNR, method="MAD", halfWindowSize=20)
 		# Merge for the alignment
 		global_peaks <- append(peaks_avg, peaks)
-		global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25)
+		global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25)
 		peaks_avg <- global_peaks[[1]]
 		peaks <- global_peaks [2:length(global_peaks)]
 	}
@@ -511,7 +511,7 @@ if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
 		peaks_avg <- detectPeaks(avg_spectrum, SNR=SNR, method="MAD", halfWindowSize=5)
 		# Merge for the alignment
 		global_peaks <- append(peaks_avg, peaks)
-		global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25)
+		global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25)
 		peaks_avg <- global_peaks[[1]]
 		peaks <- global_peaks [2:length(global_peaks)]
 	}
@@ -627,7 +627,7 @@ return (list (vector=v, outliers_position=outliers_position))
 
 ######################################### PEAK STATISTICS (on processed Spectra)
 # This function computes the peak statistics onto a selected spectra dataset, both when the spectra belong to no (or one) class and more classes.
-peak_statistics <- function (spectra, SNR=3, class_list=list(), class_in_file_name=TRUE, tof_mode="linear", file_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, remove_outliers=TRUE) {
+peak_statistics <- function (spectra, SNR=3, class_list=list(), class_in_file_name=TRUE, tof_mode="linear", file_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
@@ -646,7 +646,7 @@ if (tof_mode == "linear") {
 if (tof_mode == "reflector" | tof_mode == "reflectron") {
 	peaks <- detectPeaks(spectra, method="MAD", SNR=SNR, halfWindowSize=5)
 }
-peaks <- align_and_filter_peaks(peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold=frequency_threshold)
+peaks <- align_and_filter_peaks(peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=frequency_threshold_percent)
 # Generate the matrix (and convert it into a data frame)
 signal_matrix <- intensityMatrix(peaks, spectra)
 # Peak vector
@@ -1817,11 +1817,11 @@ if (spectra_per_patient > 1) {
 				# Detect and align peaks
 				if (tof_mode=="linear") {
 					peaks <- detectPeaks(patient_spectra, method="MAD", SNR=3, halfWindowSize=20)
-					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
+					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
 				}
 				if (tof_mode=="reflectron" | tof_mode=="reflector") {
 					peaks <- detectPeaks(patient_spectra, method="MAD", SNR=3, halfWindowSize=5)
-					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
+					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
 				}
 				# Generate the peaklist matrix
 				peaklist <- intensityMatrix(peaks, patient_spectra)
@@ -1927,11 +1927,11 @@ if (spectra_per_patient > 1) {
 				# Detect and align peaks
 				if (tof_mode=="linear") {
 					peaks <- detectPeaks(patient_spectra, method="MAD", SNR=3, halfWindowSize=20)
-					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
+					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
 				}
 				if (tof_mode=="reflectron" | tof_mode=="reflector") {
 					peaks <- detectPeaks(patient_spectra, method="MAD", SNR=3, halfWindowSize=5)
-					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
+					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
 				}
 				# Generate the peaklist matrix
 				peaklist <- intensityMatrix(peaks, patient_spectra)
@@ -2123,7 +2123,7 @@ peaks_average <- detectPeaks(average_spectrum, method="MAD", SNR=SNR)
 peaks <- detectPeaks(spectra, method="MAD", SNR=SNR)
 # Alignment: merge the two lists and align them all
 peaks_all <- append(peaks, peaks_average)
-peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
+peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
 # Empty the lists
 peaks_average <- list()
 peaks <- list()
@@ -2280,7 +2280,7 @@ return (spectra_replicates_averaged)
 
 ################################################################# PEAK ALIGNMENT
 # This function takes a list of peaks (MALDIquant) and computes the peak alignment, along with the false positive removal and the removal of low-intensity peaks.
-align_and_filter_peaks <- function (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, reference_peaklist=NULL) {
+align_and_filter_peaks <- function (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, reference_peaklist=NULL) {
 # Align only if there are many peaklists
 if (isMassPeaksList(peaks)) {
 	# Load the required libraries
@@ -2295,7 +2295,7 @@ if (isMassPeaksList(peaks)) {
 	peaks_aligned <- binPeaks(peaks, method="relaxed", tolerance=(tolerance_ppm/10^6))
 	# False positive removal
 	if (peaks_filtering == TRUE) {
-		peaks_aligned <- filterPeaks(peaks_aligned, minFrequency=frequency_threshold)
+		peaks_aligned <- filterPeaks(peaks_aligned, minFrequency=(frequency_threshold_percent/100))
 	}
 	# Low-intensity peaks removal
 	if (low_intensity_peaks_removal == TRUE) {
@@ -2584,11 +2584,11 @@ for (p in 1:length(patient_vector)) {
     global_spectra <- append(spectra_database, patient_spectra_clustered_average)
     if (tof_mode == "linear") {
         global_peaks <- detectPeaks(global_spectra, SNR=3, method="MAD", halfWindowSize=20)
-        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
+        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
     }
     if (tof_mode == "reflectron" || tof_mode =="reflector") {
         global_peaks <- detectPeaks(global_spectra, SNR=3, method="MAD", halfWindowSize=5)
-        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
+        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
     }
     # Compute the intensity matrix
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
@@ -2657,11 +2657,11 @@ for (p in 1:length(patient_vector)) {
     global_spectra <- append(spectra_database, patient_spectra)
     if (tof_mode == "linear") {
         global_peaks <- detectPeaks(global_spectra, SNR=3, method="MAD", halfWindowSize=20)
-        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
+        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
     }
     if (tof_mode == "reflectron" || tof_mode =="reflector") {
         global_peaks <- detectPeaks(global_spectra, SNR=3, method="MAD", halfWindowSize=5)
-        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
+        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
     }
     # Compute the intensity matrix
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
@@ -2727,11 +2727,11 @@ for (p in 1:length(patient_vector)) {
 	    global_spectra <- append(spectra_database, patient_spectra)
 	    if (tof_mode == "linear") {
 	        global_peaks <- detectPeaks(global_spectra, SNR=3, method="MAD", halfWindowSize=20)
-	        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold=0.25)
+	        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
 	    }
 	    if (tof_mode == "reflectron" || tof_mode =="reflector") {
 	        global_peaks <- detectPeaks(global_spectra, SNR=3, method="MAD", halfWindowSize=5)
-	        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold=0.25)
+	        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
 	    }
 	    # Compute the intensity matrix
 	    intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
@@ -2873,7 +2873,7 @@ if (preprocessing == TRUE) {
 }
 # Peak picking and alignment
 sample_peaks <- detectPeaks(sample_spectra, method="MAD", SNR=5)
-sample_peaks <- align_and_filter_peaks(sample_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
+sample_peaks <- align_and_filter_peaks(sample_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
 # Generate the intensity matrix for classification
 sample_matrix <- intensityMatrix(sample_peaks, sample_spectra)
 ########################### Determine the columns to keep and the column to add
@@ -3195,7 +3195,7 @@ if (preprocessing == TRUE) {
 }
 # Peak picking and alignment
 sample_peaks <- detectPeaks(sample_spectra, method="MAD", SNR=5)
-sample_peaks <- align_and_filter_peaks(sample_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
+sample_peaks <- align_and_filter_peaks(sample_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
 # Generate the intensity matrix for classification
 sample_matrix <- intensityMatrix(sample_peaks, sample_spectra)
 ########################### Determine the columns to keep and the column to add
@@ -3507,7 +3507,7 @@ if (preprocessing == TRUE) {
 }
 # Peak picking and alignment
 sample_peaks <- detectPeaks(sample_spectra, method="MAD", SNR=5)
-sample_peaks <- align_and_filter_peaks(sample_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold=0.25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
+sample_peaks <- align_and_filter_peaks(sample_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
 # Generate the intensity matrix for classification
 sample_matrix <- intensityMatrix(sample_peaks, sample_spectra)
 ########################### Determine the columns to keep and the column to add
@@ -4988,7 +4988,7 @@ return (list(original_peaklist=peaklist, peaklist_rounded=peaklist2))
 ########################################## BIOTYPER-LIKE SCORE: SIGNAL INTENSITY
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity comparison.
 # The function takes spectra and (aligned and filtered) peaks from the library_creation function.
-biotyper_like_score_signal_intensity <- function(filepath_samples, test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
+biotyper_like_score_signal_intensity <- function(filepath_samples, test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
@@ -5013,7 +5013,7 @@ if (isMassPeaksList(peaks_library)) {
 # Merge the peaklists
 peaks_all <- append(peaks_library, peaks_test)
 # Align
-peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
+peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
 # Restore the lists
 peaks_library <- peaks_all [1:library_size]
 peaks_test <- peaks_all [(library_size+1):length(peaks_all)]
@@ -5192,7 +5192,7 @@ return (list(output=output, library_list=list(spectra=spectra_library, peaks=pea
 ###################### BIOTYPER SCORE ACCORDING TO THE HIERARCHICAL DISTANCE
 # This function computes the biotyper like score by comparing the test spectra with the library spectra, determining the similarity (through the euclidean distance) and assigning a category according to the distance.
 # The function takes spectra and (aligned and filtered) peaks from the library_creation function.
-biotyper_like_score_hierarchical_distance <- function (library_list, test_list, filepath_samples, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, file_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
+biotyper_like_score_hierarchical_distance <- function (library_list, test_list, filepath_samples, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, file_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
@@ -5217,7 +5217,7 @@ if (isMassPeaksList(peaks_library)) {
 # Merge the peaklists
 peaks_all <- append(peaks_library, peaks_test)
 # Align
-peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
+peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
 # Restore the lists
 peaks_library <- peaks_all [1:library_size]
 peaks_test <- peaks_all [(library_size+1):length(peaks_all)]
@@ -5340,7 +5340,7 @@ return (list(result_matrix=result_matrix, plots=hca_dendrogram, library_list=lis
 ################################################################## BIOTYPER LIKE
 # This function includes (and relies upon) all the functions to provide the Biotyper like experience.
 # It takes the library and test lists that come out from the library_creation function.
-biotyper_like <- function(library_list, test_list, similarity_criteria=c("hca", "signal intensity","correlation"), intensity_correction_coefficient=1, signal_intensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peaks_filtering=TRUE, peaks_filtering_threshold=0.05, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tof_mode="linear", file_format="brukerflex", score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
+biotyper_like <- function(library_list, test_list, similarity_criteria=c("hca", "signal intensity","correlation"), intensity_correction_coefficient=1, signal_intensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peaks_filtering=TRUE, peaks_filtering_threshold_percent=5, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tof_mode="linear", file_format="brukerflex", score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
 ###### Outputs
 score_intensity <- NULL
 score_hca <- NULL
@@ -5357,19 +5357,19 @@ if (tof_mode == "reflectron" || tof_mode == "reflector") {
 if ("signal intensity" %in% similarity_criteria) {
 	# Standard deviation
 	if ("standard deviation" %in% signal_intensity_evaluation) {
-	score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	} else if ("intensity percentage" %in% signal_intensity_evaluation) {
 		# Intensiry percentage
-	    score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	    score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	}
 }
 ####### Hierarchical clustering
 if ("hca" %in% similarity_criteria) {
-	score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, filepath_test, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_percentage_threshold=low_intensity_percentage_threshold, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
+	score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, filepath_test, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
 }
 ###### Correlation matrix
 if ("correlation" %in% similarity_criteria) {
-	score_correlation_matrix <- biotyper_like_score_correlation_matrix(filepath_test, library_list, test_list, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_correction_coefficient=intensity_correction_coefficient, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only)
+	score_correlation_matrix <- biotyper_like_score_correlation_matrix(filepath_test, library_list, test_list, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_correction_coefficient=intensity_correction_coefficient, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only)
 }
 #################### RETURN THE OUTPUTS
 return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlation_matrix=score_correlation_matrix))
@@ -5387,7 +5387,7 @@ return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlat
 
 ######################################## BIOTYPER-LIKE SCORE: CORRELATION MATRIX
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity simmetry via the correlation matrix.
-biotyper_like_score_correlation_matrix <- function(filepath_samples, library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=0.25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
+biotyper_like_score_correlation_matrix <- function(filepath_samples, library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
 install_and_load_required_packages(c("MALDIquant","corrplot","weights"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
@@ -5413,7 +5413,7 @@ if (isMassPeaksList(peaks_library)) {
 # Merge the peaklists
 peaks_all <- append(peaks_library, peaks_test)
 # Align
-peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
+peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
 # Restore the lists
 peaks_library <- peaks_all [1:library_size]
 peaks_test <- peaks_all [(library_size+1):length(peaks_all)]
