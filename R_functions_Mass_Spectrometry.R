@@ -342,15 +342,23 @@ intensity_filtering_function <- function (peaks, intensity_threshold_percent) {
 	# Store mass and intensity into vectors
 	intensity_values <- peaks@intensity
 	mass_values <- peaks@mass
+	snr_values <- peaks@snr
 	# Identify the positions of the values to be discarded
-	values_to_be_discarded <- intensity_values[((abs(intensity_values - max(intensity_values,na.rm=TRUE))*100/max(intensity_values,na.rm=TRUE)) < intensity_threshold_percent)]
-	positions_to_be_discarded <- which(intensity_values == values_to_be_discarded)
+	values_to_be_discarded <- intensity_values[((intensity_values*100/max(intensity_values,na.rm=TRUE)) < intensity_threshold_percent)]
+	# Identify the positions
+	positions_to_be_discarded <- numeric()
+	for (i in 1:length(values_to_be_discarded)) {
+		value_position <- which(intensity_values == values_to_be_discarded[i])
+		positions_to_be_discarded <- append(positions_to_be_discarded, value_position)
+	}
 	# Discard the values from the vectors
 	intensity_values <- intensity_values [-positions_to_be_discarded]
 	mass_values <- mass_values [-positions_to_be_discarded]
+	snr_values <- snr_values [-positions_to_be_discarded]
 	# Put the values back into the MALDIquant list
 	peaks@mass <- mass_values
 	peaks@intensity <- intensity_values
+	peaks@snr <- snr_values
 	return (peaks)
 }
 ######################################### Multiple peaks elements
@@ -361,7 +369,7 @@ if (isMassPeaksList(peaks)) {
 	# Make the CPU cluster for parallelisation
 	cl <- makeCluster(cpu_core_number)
 	# Apply the multicore function
-	peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_function (peaks, intensity_threshold_percent=intensity_threshold_percent))
+	peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_function(peaks, intensity_threshold_percent))
 	stopCluster(cl)
 } else {
 	######################################### Single peaks element
@@ -2323,6 +2331,10 @@ if (isMassPeaksList(peaks)) {
 	}
 	return (peaks_aligned)
 } else {
+	# Low-intensity peaks removal
+	if (low_intensity_peaks_removal == TRUE) {
+		peaks <- remove_low_intensity_peaks(peaks, intensity_threshold_percent=intensity_threshold_percent)
+	}
 	return (peaks)
 }
 }
@@ -5039,57 +5051,45 @@ spectra_path_vector <- read_spectra_files(filepath_samples, file_format="brukerf
 ############################################################ SCORE (FRI)
 if ("intensity percentage" %in% comparison && !("standard deviation" %in% comparison)) {
 	# Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
-	# COUNTER 1 - FIT
 	# Create a counter, symmetrical to the database Peaklist
-	counter1 <- matrix (0, nrow=number_of_samples, ncol=library_size)
-    colnames(counter1) <- library_vector
-    rownames(counter1) <- sample_vector
+	counter <- matrix (0, nrow=number_of_samples, ncol=library_size)
 	# For each sample
 	for (s in 1:number_of_samples) {
 		# For each peaklist in the Library
 		for (l in 1:library_size) {
+			if (length(peaks_test[[s]]@mass) > 0) {
 			# Scroll the peaks in the sample
-			for (i in 1:length(peaks_test[[s]]@mass)) {
-				# Scroll the peaklist in the library
-				for (j in 1:length(peaks_library[[l]]@mass)) {
-					# Count the number of closely matching signals with the reference in the sample peaklist
-					if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
-					counter1 [s,l] <- counter1 [s,l] + 1
-					}
+				for (i in 1:length(peaks_test[[s]]@mass)) {
+					if (length(peaks_library[[l]]@mass) > 0) {
+						# Scroll the peaklist in the library
+						for (j in 1:length(peaks_library[[l]]@mass)) {
+							# Count the number of closely matching signals with the reference in the sample peaklist
+							if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+							counter [s,l] <- counter [s,l] + 1
+							}
+						}
+					} else {counter[s,l] <- 0}
 				}
-			}
+			} else {counter [s,l] <- 0}
 		}
 	}
+	# COUNTER 1 - FIT
+	counter1 <- matrix (0, nrow=number_of_samples, ncol=library_size)
+	colnames(counter1) <- library_vector
+	rownames(counter1) <- sample_vector
 	for (s in 1:number_of_samples) {
 		for (l in 1:library_size) {
-			counter1[s,l] <- counter1[s,l] / length(peaks_test[[s]]@mass)
+			counter1[s,l] <- counter[s,l] / length(peaks_test[[s]]@mass)
 		}
 	}
 	# Compare the peaks in the library peaklists with the peaks in each sample
 	# COUNTER 2 - RETRO FIT
-	# Create a counter, symmetrical to the database Peaklist
 	counter2 <- matrix (0, nrow=number_of_samples, ncol=library_size)
-    colnames(counter2) <- library_vector
-    rownames(counter2) <- sample_vector
-	# For each peaklist in the library
-	for (l in 1:library_size) {
-		# For each sample
-		for (s in 1:number_of_samples) {
-			# Scroll the peaks in the library
-			for (j in 1:length(peaks_library[[l]]@mass)) {
-				# Scroll the peaklist in the sample
-				for (i in 1:length(peaks_test[[s]]@mass)) {
-					# Count the number of closely matching signals with the reference in the sample peaklist
-					if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
-						counter2 [s,l] <- counter2 [s,l] + 1
-					}
-				}
-			}
-		}
-	}
+	colnames(counter2) <- library_vector
+	rownames(counter2) <- sample_vector
 	for (l in 1:library_size) {
 		for (s in 1:number_of_samples) {
-			counter2[s,l] <- counter2[s,l] / length(peaks_library[[l]]@mass)
+			counter2[s,l] <- counter[s,l] / length(peaks_library[[l]]@mass)
 		}
 	}
 	# COUNTER 3
@@ -5102,19 +5102,21 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 	for (s in 1:number_of_samples) {
 		# For each peaklist in the Library
 		for (l in 1:library_size) {
-			# Scroll the peaks in the sample
-			for (i in 1:length(peaks_test[[s]]@mass)) {
-				# Scroll the peaklist in the library
-				for (j in 1:length(peaks_library[[l]]@mass)) {
-					# Count the number of closely matching signals with the reference in the sample peaklist
-					if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
-						# Evaluate the difference in intensity
-						if ((abs(peaks_test[[s]]@intensity[i] - peaks_library[[l]]@intensity[j])*100/peaks_library[[l]]@intensity[j]) < intensity_tolerance_percent_threshold) {
-							counter3[s,l] <- counter3[s,l] + 1
+			if (length(peaks_test[[s]]@mass > 0)) {
+				# Scroll the peaks in the sample
+				for (i in 1:length(peaks_test[[s]]@mass)) {
+					# Scroll the peaklist in the library
+					for (j in 1:length(peaks_library[[l]]@mass)) {
+						# Count the number of closely matching signals with the reference in the sample peaklist
+						if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+							# Evaluate the difference in intensity
+							if ((abs(peaks_test[[s]]@intensity[i] - peaks_library[[l]]@intensity[j])*100/peaks_library[[l]]@intensity[j]) < intensity_tolerance_percent_threshold) {
+								counter3[s,l] <- counter3[s,l] + 1
+							}
 						}
 					}
 				}
-			}
+			} else {counter3[s,l] <- 0}
 		}
 	}
 	for (s in 1:number_of_samples) {
@@ -5337,7 +5339,8 @@ return (list(result_matrix=result_matrix, plots=hca_dendrogram, library_list=lis
 
 ################################################################## BIOTYPER LIKE
 # This function includes (and relies upon) all the functions to provide the Biotyper like experience.
-biotyper_like <- function(filepath_library, filepath_test, mass_range=c(3000,15000), similarity_criteria=c("hca", "signal intensity","correlation"), intensity_correction_coefficient=1, signal_itensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peak_picking_mode=c("all", "most intense"), peaks_filtering=TRUE, peaks_filtering_threshold=0.05, SNR=5, number_of_peaks=20, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tof_mode="linear", file_format="brukerflex", average_replicates_in_database=FALSE, average_replicates_in_test=FALSE, score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
+# It takes the library and test lists that come out from the library_creation function.
+biotyper_like <- function(library_list, test_list, similarity_criteria=c("hca", "signal intensity","correlation"), intensity_correction_coefficient=1, signal_intensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peaks_filtering=TRUE, peaks_filtering_threshold=0.05, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tof_mode="linear", file_format="brukerflex", score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
 ###### Outputs
 score_intensity <- NULL
 score_hca <- NULL
@@ -5349,41 +5352,13 @@ if (tof_mode == "linear") {
 if (tof_mode == "reflectron" || tof_mode == "reflector") {
     tolerance_ppm <- 200
 }
-####################################### PEAK PICKING
-########## Most intense peaks
-if ("most intense" %in% peak_picking_mode) {
-    ########## DATABASE
-    # Generate the library
-    library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=number_of_peaks, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
-    # Isolate the peaks and the spectra
-    peaks_library <- library_list$peaks
-    spectra_library <- library_list$spectra
-    ########## SAMPLES
-    test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=number_of_peaks, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
-    # Isolate the peaks and the spectra
-    peaks_test <- test_list$peaks
-    spectra_test <- test_list$spectra
-} else if ("all" %in% peak_picking_mode || length(peak_picking_mode) != 1) {
-	########## All peaks
-    ########## DATABASE
-    # Generate the library
-    library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=number_of_peaks, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
-    # Isolate the peaks and the spectra
-    peaks_library <- library_list$peaks
-    spectra_library <- library_list$spectra
-    ########## SAMPLES
-    test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=number_of_peaks, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
-    # Isolate the peaks and the spectra
-    peaks_test <- test_list$peaks
-    spectra_test <- test_list$spectra
-}
 ######################################## SCORE
 ####### Signals intensity
 if ("signal intensity" %in% similarity_criteria) {
 	# Standard deviation
-	if ("standard deviation" %in% signal_itensity_evaluation) {
+	if ("standard deviation" %in% signal_intensity_evaluation) {
 	score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
-	} else if ("intensity percentage" %in% signal_itensity_evaluation) {
+	} else if ("intensity percentage" %in% signal_intensity_evaluation) {
 		# Intensiry percentage
 	    score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	}
@@ -5475,57 +5450,48 @@ if (file_format == "imzml" | file_format == "imzML") {
 spectra_path_vector <- read_spectra_files(filepath_samples, file_format="brukerflex")
 ############################################################ SCORE (FRI)
 # Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
-# COUNTER 1 - FIT
+# Intensity matrix: the NAs indicate absence f the signal, the number the presence of it.
+#intensity_matrix <- intensityMatrix(peaks_all)
+#rownames(intensity_matrix) <- c(library_vector, sample_vector)
 # Create a counter, symmetrical to the database Peaklist
-counter1 <- matrix (0, nrow=number_of_samples, ncol=library_size)
-colnames(counter1) <- library_vector
-rownames(counter1) <- sample_vector
+counter <- matrix (0, nrow=number_of_samples, ncol=library_size)
 # For each sample
 for (s in 1:number_of_samples) {
 	# For each peaklist in the Library
 	for (l in 1:library_size) {
-		# Scroll the peaks in the sample
-		for (i in 1:length(peaks_test[[s]]@mass)) {
-			# Scroll the peaklist in the library
-			for (j in 1:length(peaks_library[[l]]@mass)) {
-				# Count the number of closely matching signals with the reference in the sample peaklist
-				if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
-				counter1 [s,l] <- counter1 [s,l] + 1
-				}
+		if (length(peaks_test[[s]]@mass) > 0) {
+			# Scroll the peaks in the sample
+			for (i in 1:length(peaks_test[[s]]@mass)) {
+				if (length(peaks_library[[l]]@mass) > 0) {
+					# Scroll the peaklist in the library
+					for (j in 1:length(peaks_library[[l]]@mass)) {
+						# Count the number of closely matching signals with the reference in the sample peaklist
+						if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+						counter [s,l] <- counter [s,l] + 1
+						}
+					}
+				} else {counter [s,l] <- 0}
 			}
-		}
+		} else {counter [s,l] <- 0}
 	}
 }
+# COUNTER 1 - FIT
+counter1 <- matrix (0, nrow=number_of_samples, ncol=library_size)
+colnames(counter1) <- library_vector
+rownames(counter1) <- sample_vector
 for (s in 1:number_of_samples) {
 	for (l in 1:library_size) {
-		counter1[s,l] <- counter1[s,l] / length(peaks_test[[s]]@mass)
+		counter1[s,l] <- counter[s,l] / length(peaks_test[[s]]@mass)
 	}
 }
 # Compare the peaks in the library peaklists with the peaks in each sample
 # COUNTER 2 - RETRO FIT
-# Create a counter, symmetrical to the database Peaklist
 counter2 <- matrix (0, nrow=number_of_samples, ncol=library_size)
 colnames(counter2) <- library_vector
 rownames(counter2) <- sample_vector
-# For each peaklist in the library
-for (l in 1:library_size) {
-	# For each sample
-	for (s in 1:number_of_samples) {
-		# Scroll the peaks in the library
-		for (j in 1:length(peaks_library[[l]]@mass)) {
-			# Scroll the peaklist in the sample
-			for (i in 1:length(peaks_test[[s]]@mass)) {
-				# Count the number of closely matching signals with the reference in the sample peaklist
-				if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
-					counter2 [s,l] <- counter2 [s,l] + 1
-				}
-			}
-		}
-	}
-}
 for (l in 1:library_size) {
 	for (s in 1:number_of_samples) {
-		counter2[s,l] <- counter2[s,l] / length(peaks_library[[l]]@mass)
+		counter2[s,l] <- counter[s,l] / length(peaks_library[[l]]@mass)
 	}
 }
 # COUNTER 3
@@ -5593,13 +5559,13 @@ if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
 		for (w in 1:library_size) {
 			if (score[r,w]>=2) {
-				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), ")")
 			}
 			if (score[r,w]<1.5) {
-				output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+				output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), ")")
 			}
 			if (score[r,w]>=1.5 && score[r,w]<2) {
-				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), ")")
 			}
 		}
 	}
