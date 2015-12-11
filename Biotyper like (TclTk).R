@@ -59,6 +59,11 @@ end_session_function <- function () {
 # Import the spectra
 import_spectra_function <- function() {
 	###### Get the values
+	## Peak picking mode
+	peak_picking_mode <- tclvalue(peak_picking_mode)
+	## Signals to take in most intense peaks
+	signals_to_take <- tclvalue(signals_to_take)
+	signals_to_take <- as.integer(signals_to_take)
 	## Mass range
 	mass_range <- tclvalue(mass_range)
 	mass_range <- as.numeric(unlist(strsplit(mass_range, ",")))
@@ -105,18 +110,33 @@ import_spectra_function <- function() {
 	}
 	#tkconfigure(imzml_format, variable=file_format, value="imzml")
 	#tkconfigure(brukerflex_format, variable=file_format, value="brukerflex")
-	########## DATABASE
-	# Generate the library
-	library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=25, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
-	# Isolate the peaks and the spectra
-	peaks_library <- library_list$peaks
-	spectra_library <- library_list$spectra
-	########## SAMPLES
-	# Generate the library
-	test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=25, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
-	# Isolate the peaks and the spectra
-	peaks_test <- test_list$peaks
-	spectra_test <- test_list$spectra
+	if ("most intense" %in% peak_picking_mode) {
+		########## DATABASE
+		# Generate the library
+		library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=signals_to_take, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+		# Isolate the peaks and the spectra
+		peaks_library <- library_list$peaks
+		spectra_library <- library_list$spectra
+		########## SAMPLES
+		# Generate the library
+		test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=signals_to_take, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+		# Isolate the peaks and the spectra
+		peaks_test <- test_list$peaks
+		spectra_test <- test_list$spectra
+	} else {
+		########## DATABASE
+		# Generate the library
+		library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=25, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+		# Isolate the peaks and the spectra
+		peaks_library <- library_list$peaks
+		spectra_library <- library_list$spectra
+		########## SAMPLES
+		# Generate the library
+		test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=25, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+		# Isolate the peaks and the spectra
+		peaks_test <- test_list$peaks
+		spectra_test <- test_list$spectra
+	}
 	# Exit the function and put the variable into the R workspace
 	.GlobalEnv$library_list <- library_list
 	.GlobalEnv$peaks_library <- peaks_library
@@ -217,17 +237,29 @@ run_biotyper_like_function <- function() {
 	.GlobalEnv$score_intensity_matrix <- score$score_intensity
 	.GlobalEnv$score_correlation_matrix <- score$score_correlation_matrix$output
 	# Save the files
+	filename <- set_file_name()
 	if (!is.null(score_intensity_matrix)) {
-	    write.csv(score_intensity_matrix, file="Classification_results_Biotyper-like (intensity).csv")
+	    write.csv(score_intensity_matrix, file=paste("1_", filename, sep=""))
 	}
 	if (!is.null(score_hca_matrix)) {
-	    write.csv(score_hca_matrix, file="Classification_results_Biotyper-like (hierarchical clustering).csv")
+	    write.csv(score_hca_matrix, file=paste("2_", filename, sep=""))
 	}
 	if (!is.null(score_correlation_matrix)) {
-	    write.csv(score_correlation_matrix, file="Classification_results_Biotyper-like (correlation matrix).csv")
+	    write.csv(score_correlation_matrix, file=paste("3_", filename, sep=""))
 	}
 	### Messagebox
 	tkmessageBox(title = "Done!", message = "The file(s) have been dumped", icon = "info")
+}
+
+set_file_name <- function() {
+	filename <- tclvalue(file_name)
+	# Add the extension if it is not present in the filename
+	if (length(grep(".csv", filename, fixed=TRUE)) == 1) {
+		filename <- filename
+	}	else {filename <- paste (filename, ".csv", sep="")}
+	#### Exit the function and put the variable into the R workspace
+	.GlobalEnv$filename <- filename
+	return (filename)
 }
 
 
@@ -252,7 +284,8 @@ low_intensity_peaks_removal <- tclVar("")
 intensity_percentage_threshold <- tclVar("")
 score_only <- tclVar("")
 spectra_path_output <- tclVar("")
-
+signals_to_take <- tclVar("")
+file_name <- tclVar("")
 
 
 
@@ -263,10 +296,10 @@ window <- tktoplevel()
 tktitle(window) <- "Biotyper-like"
 #### Browse
 # Library
-select_library_label <- tklabel(window, text="Select the folder for the spectra for the library.\nThe library should be structured like this:\nDatabase folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data")
+select_library_label <- tklabel(window, text="Select the folder for the spectra for the library.\nThe library should be structured like this:\nDatabase folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/1/1SLin/Spectrum_data")
 select_library_button <- tkbutton(window, text="Browse database", command=select_library_function)
 # Samples
-select_samples_label <- tklabel(window, text="Select the folder for the spectra for the library.\nThe library should be structured like this:\nDatabase folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data")
+select_samples_label <- tklabel(window, text="Select the folder for the spectra for the library.\nThe library should be structured like this:\nDatabase folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/1/1SLin/Spectrum_data")
 select_samples_button <- tkbutton(window, text="Browse samples", command=select_samples_function)
 # Output
 select_output_label <- tklabel(window, text="Select the folder where to save all the outputs")
@@ -292,6 +325,10 @@ tkinsert(signal_intensity_evaluation_entry, "end", "intensity percentage")
 peak_picking_mode_label <- tklabel(window, text="Peak picking mode")
 peak_picking_mode_entry <- tkentry(window, width=30, textvariable=peak_picking_mode)
 tkinsert(peak_picking_mode_entry, "end", "all")
+# Signals to take
+signals_to_take_label <- tklabel(window, text="Most intense signals to take")
+signals_to_take_entry <- tkentry(window, width=30, textvariable=signals_to_take)
+tkinsert(signals_to_take_entry, "end", "25")
 # SNR
 SNR_label <- tklabel(window, text="Signal-to-noise ratio")
 SNR_entry <- tkentry(window, width=30, textvariable=SNR)
@@ -315,7 +352,7 @@ tkinsert(low_intensity_peaks_removal_entry, "end", "no")
 #low_intensity_peaks_removal_yes <- tkradiobutton(window)
 #low_intensity_peaks_removal_no <- tkradiobutton(window)
 # Intensity percentage threshold
-intensity_percentage_threshold_label <- tklabel(window, text="Intensity perecentage threshold")
+intensity_percentage_threshold_label <- tklabel(window, text="Intensity percentage threshold")
 intensity_percentage_threshold_entry <- tkentry(window, width=30, textvariable=intensity_percentage_threshold)
 tkinsert(intensity_percentage_threshold_entry, "end", "0.1")
 # Average replicates in database
@@ -364,16 +401,23 @@ end_session_button <- tkbutton(window, text="End R session", command=quit_functi
 import_spectra_button <- tkbutton(window, text="Import and preprocess spectra", command=import_spectra_function)
 # Run the Biotyper-like!
 run_biotyper_like_button <- tkbutton(window, text="Run the Biotyper-like!", command=run_biotyper_like_function)
+# Set the file name
+set_file_name_label <- tklabel(window, text="Set the file name")
+set_file_name_entry <- tkentry(window, width=30, textvariable=file_name)
+tkinsert(set_file_name_entry, "end", "Biotyper-like score output")
+
 #### Geometry manager
 # Scrollbar
 #window_scrollbar <- tkscrollbar(window, command=function(...)tkyview(window,...))
 # tkgrid
-tkgrid(select_library_label, row=1, column=1)
-tkgrid(select_library_button, row=1, column=2)
-tkgrid(select_samples_label, row=2, column=1)
-tkgrid(select_samples_button, row=2, column=2)
-tkgrid(select_output_label, row=3, column=1)
-tkgrid(browse_output_button, row=3, column=2)
+tkgrid(set_file_name_label, row=1, column=4)
+tkgrid(set_file_name_entry, row=2, column=4)
+tkgrid(select_library_label, row=1, column=2)
+tkgrid(select_library_button, row=1, column=3)
+tkgrid(select_samples_label, row=2, column=2)
+tkgrid(select_samples_button, row=2, column=3)
+tkgrid(select_output_label, row=3, column=2)
+tkgrid(browse_output_button, row=3, column=3)
 tkgrid(mass_range_label, row=4, column=1)
 tkgrid(mass_range_entry, row=4, column=2)
 tkgrid(similarity_criteria_label, row=4, column=3)
@@ -384,31 +428,33 @@ tkgrid(signal_intensity_evaluation_label, row=5, column=3)
 tkgrid(signal_intensity_evaluation_entry, row=5, column=4)
 tkgrid(peak_picking_mode_label, row=6, column=1)
 tkgrid(peak_picking_mode_entry, row=6, column=2)
-tkgrid(SNR_label, row=6, column=3)
-tkgrid(SNR_entry, row=6, column=4)
-tkgrid(peaks_filtering_label, row=7, column=1)
-tkgrid(peaks_filtering_entry, row=7, column=2)
-tkgrid(peaks_filtering_threshold_percent_label, row=7, column=3)
-tkgrid(peaks_filtering_threshold_percent_entry, row=7, column=4)
-tkgrid(low_intensity_peaks_removal_label, row=8, column=1)
-tkgrid(low_intensity_peaks_removal_entry, row=8, column=2)
-tkgrid(intensity_percentage_threshold_label, row=8, column=3)
-tkgrid(intensity_percentage_threshold_entry, row=8, column=4)
-tkgrid(average_replicates_in_database_label, row=9, column=1)
-tkgrid(average_replicates_in_database_entry, row=9, column=2)
-tkgrid(average_replicates_in_test_label, row=9, column=3)
-tkgrid(average_replicates_in_test_entry, row=9, column=4)
-tkgrid(score_only_label, row=10, column=1)
-tkgrid(score_only_entry, row=10, column=2)
-tkgrid(spectra_path_output_label, row=10, column=3)
-tkgrid(spectra_path_output_entry, row=10, column=4)
-tkgrid(tof_mode_label, row=11, column=1)
-tkgrid(tof_mode_entry, row=11, column=2)
-tkgrid(file_format_label, row=11, column=3)
-tkgrid(file_format_entry, row=11, column=4)
-tkgrid(import_spectra_button, row=12, column=1)
-tkgrid(run_biotyper_like_button, row=12, column=4)
-tkgrid(exit_label, row=13, column=1)
-tkgrid(quit_button, row=13, column=2)
-tkgrid(end_session_button, row=13, column=4)
+tkgrid(signals_to_take_label, row=6, column=3)
+tkgrid(signals_to_take_entry, row=6, column=4)
+tkgrid(SNR_label, row=7, column=2)
+tkgrid(SNR_entry, row=7, column=3)
+tkgrid(peaks_filtering_label, row=8, column=1)
+tkgrid(peaks_filtering_entry, row=8, column=2)
+tkgrid(peaks_filtering_threshold_percent_label, row=8, column=3)
+tkgrid(peaks_filtering_threshold_percent_entry, row=8, column=4)
+tkgrid(low_intensity_peaks_removal_label, row=9, column=1)
+tkgrid(low_intensity_peaks_removal_entry, row=9, column=2)
+tkgrid(intensity_percentage_threshold_label, row=9, column=3)
+tkgrid(intensity_percentage_threshold_entry, row=9, column=4)
+tkgrid(average_replicates_in_database_label, row=10, column=1)
+tkgrid(average_replicates_in_database_entry, row=10, column=2)
+tkgrid(average_replicates_in_test_label, row=10, column=3)
+tkgrid(average_replicates_in_test_entry, row=10, column=4)
+tkgrid(score_only_label, row=11, column=1)
+tkgrid(score_only_entry, row=11, column=2)
+tkgrid(spectra_path_output_label, row=11, column=3)
+tkgrid(spectra_path_output_entry, row=11, column=4)
+tkgrid(tof_mode_label, row=12, column=1)
+tkgrid(tof_mode_entry, row=12, column=2)
+tkgrid(file_format_label, row=12, column=3)
+tkgrid(file_format_entry, row=12, column=4)
+tkgrid(import_spectra_button, row=13, column=1)
+tkgrid(run_biotyper_like_button, row=13, column=4)
+tkgrid(exit_label, row=14, column=1)
+tkgrid(quit_button, row=14, column=2)
+tkgrid(end_session_button, row=14, column=4)
 #window_scrollbar
