@@ -345,20 +345,28 @@ intensity_filtering_function <- function (peaks, intensity_threshold_percent) {
 	snr_values <- peaks@snr
 	# Identify the positions of the values to be discarded
 	values_to_be_discarded <- intensity_values[((intensity_values*100/max(intensity_values,na.rm=TRUE)) < intensity_threshold_percent)]
-	# Identify the positions
-	positions_to_be_discarded <- numeric()
-	for (i in 1:length(values_to_be_discarded)) {
-		value_position <- which(intensity_values == values_to_be_discarded[i])
-		positions_to_be_discarded <- append(positions_to_be_discarded, value_position)
+	# If there are values to be discarded...
+	if (length(values_to_be_discarded) > 0) {
+		# Identify the positions
+		positions_to_be_discarded <- numeric()
+		for (i in 1:length(values_to_be_discarded)) {
+			value_position <- which(intensity_values == values_to_be_discarded[i])
+			positions_to_be_discarded <- append(positions_to_be_discarded, value_position)
+		}
+		# Discard the values from the vectors
+		intensity_values <- intensity_values [-positions_to_be_discarded]
+		mass_values <- mass_values [-positions_to_be_discarded]
+		snr_values <- snr_values [-positions_to_be_discarded]
+		# Put the values back into the MALDIquant list
+		peaks@mass <- mass_values
+		peaks@intensity <- intensity_values
+		peaks@snr <- snr_values
+	} else {
+		# If there aren't any values to be discarded...
+		peaks@mass <- mass_values
+		peaks@intensity <- intensity_values
+		peaks@snr <- snr_values
 	}
-	# Discard the values from the vectors
-	intensity_values <- intensity_values [-positions_to_be_discarded]
-	mass_values <- mass_values [-positions_to_be_discarded]
-	snr_values <- snr_values [-positions_to_be_discarded]
-	# Put the values back into the MALDIquant list
-	peaks@mass <- mass_values
-	peaks@intensity <- intensity_values
-	peaks@snr <- snr_values
 	return (peaks)
 }
 ######################################### Multiple peaks elements
@@ -369,7 +377,12 @@ if (isMassPeaksList(peaks)) {
 	# Make the CPU cluster for parallelisation
 	cl <- makeCluster(cpu_core_number)
 	# Apply the multicore function
-	peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_function(peaks, intensity_threshold_percent))
+	#peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_function(peaks, intensity_threshold_percent))
+	peaks_filtered <- list()
+	for (p in 1:length(peaks)) {
+		temp_peaks <- intensity_filtering_function(peaks[[p]], intensity_threshold_percent)
+		peaks_filtered <- append(peaks_filtered, temp_peaks)
+	}
 	stopCluster(cl)
 } else {
 	######################################### Single peaks element
@@ -5057,18 +5070,16 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 	for (s in 1:number_of_samples) {
 		# For each peaklist in the Library
 		for (l in 1:library_size) {
-			if (length(peaks_test[[s]]@mass) > 0) {
+			if (length(peaks_test[[s]]@mass) > 0 && length(peaks_library[[l]]@mass) > 0) {
 			# Scroll the peaks in the sample
 				for (i in 1:length(peaks_test[[s]]@mass)) {
-					if (length(peaks_library[[l]]@mass) > 0) {
-						# Scroll the peaklist in the library
-						for (j in 1:length(peaks_library[[l]]@mass)) {
-							# Count the number of closely matching signals with the reference in the sample peaklist
-							if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
-							counter [s,l] <- counter [s,l] + 1
-							}
+					# Scroll the peaklist in the library
+					for (j in 1:length(peaks_library[[l]]@mass)) {
+						# Count the number of closely matching signals with the reference in the sample peaklist
+						if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+						counter [s,l] <- counter [s,l] + 1
 						}
-					} else {counter[s,l] <- 0}
+					}
 				}
 			} else {counter [s,l] <- 0}
 		}
@@ -5102,7 +5113,7 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 	for (s in 1:number_of_samples) {
 		# For each peaklist in the Library
 		for (l in 1:library_size) {
-			if (length(peaks_test[[s]]@mass > 0)) {
+			if (length(peaks_test[[s]]@mass) > 0 && length(peaks_library[[l]]@mass)) {
 				# Scroll the peaks in the sample
 				for (i in 1:length(peaks_test[[s]]@mass)) {
 					# Scroll the peaklist in the library
@@ -5459,18 +5470,16 @@ counter <- matrix (0, nrow=number_of_samples, ncol=library_size)
 for (s in 1:number_of_samples) {
 	# For each peaklist in the Library
 	for (l in 1:library_size) {
-		if (length(peaks_test[[s]]@mass) > 0) {
+		if (length(peaks_test[[s]]@mass) > 0 && length(peaks_library[[l]]@mass) > 0) {
 			# Scroll the peaks in the sample
 			for (i in 1:length(peaks_test[[s]]@mass)) {
-				if (length(peaks_library[[l]]@mass) > 0) {
-					# Scroll the peaklist in the library
-					for (j in 1:length(peaks_library[[l]]@mass)) {
-						# Count the number of closely matching signals with the reference in the sample peaklist
-						if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
-						counter [s,l] <- counter [s,l] + 1
-						}
+				# Scroll the peaklist in the library
+				for (j in 1:length(peaks_library[[l]]@mass)) {
+					# Count the number of closely matching signals with the reference in the sample peaklist
+					if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
+					counter [s,l] <- counter [s,l] + 1
 					}
-				} else {counter [s,l] <- 0}
+				}
 			}
 		} else {counter [s,l] <- 0}
 	}
