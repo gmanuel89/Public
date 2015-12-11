@@ -149,8 +149,8 @@ run_biotyper_like_function <- function() {
 		peaks_filtering == "N" <- FALSE
 	}
 	## Peaks filtering threshold
-	peaks_filtering_threshold <- tclvalue(peaks_filtering_threshold)
-	peaks_filtering_threshold <- as.numeric(peaks_filtering_threshold)
+	peaks_filtering_threshold_percent <- tclvalue(peaks_filtering_threshold_percent)
+	peaks_filtering_threshold_percent <- as.numeric(peaks_filtering_threshold_percent)
 	## Low intensity peaks removal
 	low_intensity_peaks_removal <- tclvalue(low_intensity_peaks_removal)
 	if (low_intensity_peaks_removal == "Y" || low_intensity_peaks_removal == "y" || low_intensity_peaks_removal == "YES" || low_intensity_peaks_removal == "yes") {
@@ -205,7 +205,7 @@ run_biotyper_like_function <- function() {
 	#tkconfigure(spectra_path_output_yes, variable=spectra_path_output, value=TRUE)
 	#tkconfigure(spectra_path_output_no, variable=spectra_path_output, value=FALSE)
 	#### Run the function
-	score <- biotyper_like(library_list, test_list, similarity_criteria=similarity_criteria, intensity_correction_coefficient=intensity_correction_coefficient, signal_intensity_evaluation=signal_intensity_evaluation, intensity_tolerance_percent=70, peaks_filtering=peaks_filtering, peaks_filtering_threshold=peaks_filtering_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, tof_mode=tof_mode, file_format=file_format, score_only=score_only, spectra_path_output=spectra_path_output)
+	score <- biotyper_like(library_list, test_list, similarity_criteria=similarity_criteria, intensity_correction_coefficient=intensity_correction_coefficient, signal_intensity_evaluation=signal_intensity_evaluation, intensity_tolerance_percent=70, peaks_filtering=peaks_filtering, peaks_filtering_threshold_percent=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, tof_mode=tof_mode, file_format=file_format, score_only=score_only, spectra_path_output=spectra_path_output)
 	# Matrices
 	score_hca_matrix <- score$score_hca$result_matrix$output
 	score_intensity_matrix <- score$score_intensity
@@ -247,7 +247,7 @@ intensity_correction_coefficient <- tclVar("")
 signal_intensity_evaluation <- tclVar("")
 peak_picking_mode <- tclVar("")
 peaks_filtering <- tclVar("")
-peaks_filtering_threshold <- tclVar("")
+peaks_filtering_threshold_percent <- tclVar("")
 low_intensity_peaks_removal <- tclVar("")
 intensity_percentage_threshold <- tclVar("")
 score_only <- tclVar("")
@@ -305,9 +305,9 @@ tkinsert(peaks_filtering_entry, "end", "yes")
 #tkconfigure(peaks_filtering_yes, variable=peaks_filtering, value=TRUE)
 #tkconfigure(peaks_filtering_no, variable=peaks_filtering, value=FALSE)
 # Peaks filtering threshold
-peaks_filtering_threshold_label <- tklabel(window, text="Peaks filtering threshold")
-peaks_filtering_threshold_entry <- tkentry(window, width=30, textvariable=peaks_filtering_threshold)
-tkinsert(peaks_filtering_threshold_entry, "end", "0.25")
+peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold frequency")
+peaks_filtering_threshold_percent_entry <- tkentry(window, width=30, textvariable=peaks_filtering_threshold_percent)
+tkinsert(peaks_filtering_threshold_percent_entry, "end", "25")
 # Low intensity peaks removal
 low_intensity_peaks_removal_label <- tklabel(window, text="Low intensity peaks removal")
 low_intensity_peaks_removal_entry <- tkentry(window, width=30, textvariable=low_intensity_peaks_removal)
@@ -388,8 +388,8 @@ tkgrid(SNR_label, row=6, column=3)
 tkgrid(SNR_entry, row=6, column=4)
 tkgrid(peaks_filtering_label, row=7, column=1)
 tkgrid(peaks_filtering_entry, row=7, column=2)
-tkgrid(peaks_filtering_threshold_label, row=7, column=3)
-tkgrid(peaks_filtering_threshold_entry, row=7, column=4)
+tkgrid(peaks_filtering_threshold_percent_label, row=7, column=3)
+tkgrid(peaks_filtering_threshold_percent_entry, row=7, column=4)
 tkgrid(low_intensity_peaks_removal_label, row=8, column=1)
 tkgrid(low_intensity_peaks_removal_entry, row=8, column=2)
 tkgrid(intensity_percentage_threshold_label, row=8, column=3)
