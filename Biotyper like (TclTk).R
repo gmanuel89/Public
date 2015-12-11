@@ -396,7 +396,7 @@ exit_label <- tklabel(window, text="Exit")
 quit_button <- tkbutton(window, text="Quit", command=quit_function)
 # End session
 #end_session_label <- tklabel(window, text="Quit")
-end_session_button <- tkbutton(window, text="End R session", command=quit_function)
+end_session_button <- tkbutton(window, text="End R session", command=end_session_function)
 # Import the spectra
 import_spectra_button <- tkbutton(window, text="Import and preprocess spectra", command=import_spectra_function)
 # Run the Biotyper-like!
