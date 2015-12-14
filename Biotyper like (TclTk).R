@@ -1,4 +1,4 @@
-################ BIOTYPER-LIKE PROGRAM 2015.12.11
+################ BIOTYPER-LIKE PROGRAM 2015.12.14
 
 install_and_load_required_packages("tcltk")
 
@@ -67,6 +67,11 @@ import_spectra_function <- function() {
 	## Mass range
 	mass_range <- tclvalue(mass_range)
 	mass_range <- as.numeric(unlist(strsplit(mass_range, ",")))
+	# Preprocessing
+	preprocess_spectra_in_packages_of <- tclvalue(preprocess_spectra_in_packages_of)
+	if (preprocess_spectra_in_packages_of == "Preprocess spectra in packages of (default 200)") {
+		preprocess_spectra_in_packages_of <- 200
+	} else {preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)}
 	## Average replicates database
 	average_replicates_in_database <- tclvalue(average_replicates_in_database)
 	if (average_replicates_in_database == "Y" || average_replicates_in_database == "y" || average_replicates_in_database == "YES" || average_replicates_in_database == "yes") {
@@ -113,7 +118,7 @@ import_spectra_function <- function() {
 	if ("most intense" %in% peak_picking_mode) {
 		########## DATABASE
 		# Generate the library
-		library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=signals_to_take, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
+		library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=preprocess_spectra_in_packages_of), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=signals_to_take, tof_mode=tof_mode, file_format=file_format, average_patients=FALSE)
 		# Isolate the peaks and the spectra
 		peaks_library <- library_list$peaks
 		spectra_library <- library_list$spectra
@@ -286,7 +291,7 @@ score_only <- tclVar("")
 spectra_path_output <- tclVar("")
 signals_to_take <- tclVar("")
 file_name <- tclVar("")
-
+preprocess_spectra_in_packages_of <- tclVar("")
 
 
 
@@ -309,6 +314,9 @@ browse_output_button <- tkbutton(window, text="Browse", command=browse_output_fu
 mass_range_label <- tklabel(window, text="Mass range")
 mass_range_entry <- tkentry(window, width=30, textvariable=mass_range)
 tkinsert(mass_range_entry, "end", "3000, 15000")
+# Preprocessing (in packages of)
+preprocess_spectra_in_packages_of_entry <- tkentry(window, width=30, textvariable=preprocess_spectra_in_packages_of)
+tkinsert(preprocess_spectra_in_packages_of_entry, "end", "Preprocess spectra in packages of (default 200)")
 # Similarity criteria
 similarity_criteria_label <- tklabel(window, text="Similarity criteria")
 similarity_criteria_entry <- tkentry(window, width=30, textvariable=similarity_criteria)
@@ -398,7 +406,7 @@ quit_button <- tkbutton(window, text="Quit", command=quit_function)
 #end_session_label <- tklabel(window, text="Quit")
 end_session_button <- tkbutton(window, text="End R session", command=end_session_function)
 # Import the spectra
-import_spectra_button <- tkbutton(window, text="Import and preprocess spectra", command=import_spectra_function)
+import_spectra_button <- tkbutton(window, text="Import spectra, preprocessing and peak picking", command=import_spectra_function)
 # Run the Biotyper-like!
 run_biotyper_like_button <- tkbutton(window, text="Run the Biotyper-like!", command=run_biotyper_like_function)
 # Set the file name
@@ -453,6 +461,7 @@ tkgrid(tof_mode_entry, row=12, column=2)
 tkgrid(file_format_label, row=12, column=3)
 tkgrid(file_format_entry, row=12, column=4)
 tkgrid(import_spectra_button, row=13, column=1)
+tkgrid(preprocess_spectra_in_packages_of_entry, row=13, column=2)
 tkgrid(run_biotyper_like_button, row=13, column=4)
 tkgrid(exit_label, row=14, column=1)
 tkgrid(quit_button, row=14, column=2)
