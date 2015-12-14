@@ -5059,8 +5059,11 @@ if (file_format == "imzml" | file_format == "imzML") {
 		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
 	}
 }
-# Read the list of spectra folders in the sample mother folder
-spectra_path_vector <- read_spectra_files(filepath_samples, file_format="brukerflex")
+# Generate the path vector
+spectra_path_vector <- character()
+for (spectrum in spectra_test) {
+	spectra_path_vector <- append(spectra_path_vector, spectrum@metaData$file[1])
+}
 ############################################################ SCORE (FRI)
 if ("intensity percentage" %in% comparison && !("standard deviation" %in% comparison)) {
 	# Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
@@ -5261,8 +5264,11 @@ if (file_format == "imzml" | file_format == "imzML") {
 		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
 	}
 }
-# Read the list of spectra folders in the sample mother folder
-spectra_path_vector <- read_spectra_files(filepath_samples, file_format=file_format)
+# Generate the path vector
+spectra_path_vector <- character()
+for (spectrum in spectra_test) {
+	spectra_path_vector <- append(spectra_path_vector, spectrum@metaData$file[1])
+}
 # Generate the matrix (for hca)
 peaklist_matrix <- intensityMatrix(global_peaklist, global_spectralist)
 # Add additional info to the matrix
@@ -5457,8 +5463,11 @@ if (file_format == "imzml" | file_format == "imzML") {
 		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
 	}
 }
-# Read the list of spectra folders in the sample mother folder
-spectra_path_vector <- read_spectra_files(filepath_samples, file_format="brukerflex")
+# Generate the path vector
+spectra_path_vector <- character()
+for (spectrum in spectra_test) {
+	spectra_path_vector <- append(spectra_path_vector, spectrum@metaData$file[1])
+}
 ############################################################ SCORE (FRI)
 # Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
 # Intensity matrix: the NAs indicate absence f the signal, the number the presence of it.
