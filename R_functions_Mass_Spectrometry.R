@@ -5001,7 +5001,7 @@ return (list(original_peaklist=peaklist, peaklist_rounded=peaklist2))
 ########################################## BIOTYPER-LIKE SCORE: SIGNAL INTENSITY
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity comparison.
 # The function takes spectra and (aligned and filtered) peaks from the library_creation function.
-biotyper_like_score_signal_intensity <- function(filepath_samples, test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
+biotyper_like_score_signal_intensity <- function(test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
@@ -5206,7 +5206,7 @@ return (list(output=output, library_list=list(spectra=spectra_library, peaks=pea
 ###################### BIOTYPER SCORE ACCORDING TO THE HIERARCHICAL DISTANCE
 # This function computes the biotyper like score by comparing the test spectra with the library spectra, determining the similarity (through the euclidean distance) and assigning a category according to the distance.
 # The function takes spectra and (aligned and filtered) peaks from the library_creation function.
-biotyper_like_score_hierarchical_distance <- function (library_list, test_list, filepath_samples, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, file_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
+biotyper_like_score_hierarchical_distance <- function (library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, file_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
@@ -5374,19 +5374,19 @@ if (tof_mode == "reflectron" || tof_mode == "reflector") {
 if ("signal intensity" %in% similarity_criteria) {
 	# Standard deviation
 	if ("standard deviation" %in% signal_intensity_evaluation) {
-	score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	} else if ("intensity percentage" %in% signal_intensity_evaluation) {
 		# Intensiry percentage
-	    score_intensity <- biotyper_like_score_signal_intensity(filepath_test, test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	    score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	}
 }
 ####### Hierarchical clustering
 if ("hca" %in% similarity_criteria) {
-	score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, filepath_test, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
+	score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
 }
 ###### Correlation matrix
 if ("correlation" %in% similarity_criteria) {
-	score_correlation_matrix <- biotyper_like_score_correlation_matrix(filepath_test, library_list, test_list, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_correction_coefficient=intensity_correction_coefficient, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only)
+	score_correlation_matrix <- biotyper_like_score_correlation_matrix(library_list, test_list, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_correction_coefficient=intensity_correction_coefficient, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only)
 }
 #################### RETURN THE OUTPUTS
 return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlation_matrix=score_correlation_matrix))
@@ -5404,7 +5404,7 @@ return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlat
 
 ######################################## BIOTYPER-LIKE SCORE: CORRELATION MATRIX
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity simmetry via the correlation matrix.
-biotyper_like_score_correlation_matrix <- function(filepath_samples, library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
+biotyper_like_score_correlation_matrix <- function(library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
 install_and_load_required_packages(c("MALDIquant","corrplot","weights"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
