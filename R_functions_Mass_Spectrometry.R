@@ -1389,6 +1389,7 @@ print(paste("Equal distance between datapoints", (all(sapply(spectra_binned, isR
 # This function replaces the sample name field in the spectrum with the actual sample name (keeping only the last part of the file path and discarding the folder tree)
 # The input can be both spectra or peaks (MALDIquant)
 replace_sample_name <- function (spectra, file_format="imzml") {
+#### imzML
 if (file_format == "imzml" || file_format=="imzML") {
     # Scroll the spectra...
     for (i in 1:length(spectra)) {
@@ -1403,6 +1404,7 @@ if (file_format == "imzml" || file_format=="imzML") {
         spectra[[i]]@metaData$file <- sample_name
     }
 }
+#### Xmass
 if (file_format == "brukerflex" || file_format == "xmass") {
     # Scroll the spectra...
     for (i in 1:length(spectra)) {
@@ -1428,22 +1430,65 @@ return (spectra)
 
 
 ########################################################## CLASS NAME REPLACING
-# This function replaces the sample name field in the spectrum with the class the spectrum belongs to (the file name must contain the class)
+# This function replaces the sample name field in the spectrum with the class the spectrum belongs to. If the filename contains the class, it replaces the filename with the class name, otherwise a class list symmetrical to the spectra must be provided.
 # The input can be both spectra or peaks (MALDIquant)
-replace_class_name <- function (spectra, class_list, class_in_file_name=TRUE, file_format="imzml") {
-class_list <- sort(class_list)
-if (class_in_file_name == TRUE) {
-	spectra <- replace_sample_name(spectra, file_format=file_format)
-}
-# Scroll the class list...
-for (w in 1:length(class_list)) {
-    # Scroll the spectra...
-	for (i in 1:length(spectra)) {
-        # If there is a match between the file name and the class
-		if (length(grep(class_list[w],spectra[[i]]@metaData$file[1], fixed=TRUE)) == 1) {
-            # Replace the file name with the class name
-			spectra[[i]]@metaData$file <- class_list [w]
+replace_class_name <- function (spectra, class_list=NULL, class_in_file_name=TRUE, file_format="imzml") {
+# If a class list is provided...
+if (!is.null(class_list)) {
+	# If the class name is in the name
+	if (class_in_file_name == TRUE) {
+		# Extract the file name from the path
+		spectra <- replace_sample_name(spectra, file_format=file_format)
+		# Scroll the class list...
+		for (w in 1:length(class_list)) {
+    		# Scroll the spectra...
+			for (i in 1:length(spectra)) {
+        		# If there is a match between the file name and the class
+				if (length(grep(class_list[w],spectra[[i]]@metaData$file[1], fixed=TRUE)) != 0) {
+            		# Replace the file name with the class name
+					spectra[[i]]@metaData$file <- class_list [w]
+				}
+			}
 		}
+	} else {
+		# If the class name is not in the name
+		# The class list and the spectra are symmetrical
+		for (w in 1:length(class_list)) {
+			spectra[[w]]@metaData$file <- class_list [w]
+		}
+	}
+}
+# If a class list is not provided...
+if (is.null(class_list)) {
+	# It's guessed from the filepath
+	if (class_in_file_name == TRUE) {
+		#### imzML
+		if (file_format == "imzml" || file_format=="imzML") {
+		    # Scroll the spectra...
+		    for (i in 1:length(spectra)) {
+		        # Split the filepath at / (universal for different OSs)
+		        class_name <- unlist(strsplit(spectra[[i]]@metaData$file[1],"/"))
+		        # The sample name is the last part of the path
+		        class_name <- class_name[(length(class_name)-1)]
+		        # Put the name back into the spectra
+		        spectra[[i]]@metaData$file <- class_name
+		    }
+		}
+		#### Xmass
+		if (file_format == "brukerflex" || file_format == "xmass") {
+		    # Scroll the spectra...
+		    for (i in 1:length(spectra)) {
+		        # Split the filepath at / (universal for different OSs)
+		        class_name <- unlist(strsplit(spectra[[i]]@metaData$file[1],"/"))
+		        # The sample name is the last part of the path
+		        class_name <- class_name[length(class_name)-6]
+		        # Put the name back into the spectra
+		        spectra[[i]]@metaData$file <- class_name
+		    }
+		}
+	} else {
+		# The worst case returns the list of spectra as it is.
+		spectra <- spectra
 	}
 }
 return (spectra)
@@ -2375,6 +2420,7 @@ install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ### Define the classes (the classes are the folders in the library directory)
 class_list <- dir(filepath_library, ignore.case=TRUE, full.names=FALSE, recursive=FALSE, include.dirs=TRUE)
+# TOF mode
 if (tof_mode == "linear") {
 	tolerance_ppm <- 2000
 }
@@ -5407,7 +5453,7 @@ return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlat
 ######################################## BIOTYPER-LIKE SCORE: CORRELATION MATRIX
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity simmetry via the correlation matrix.
 biotyper_like_score_correlation_matrix <- function(library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
-install_and_load_required_packages(c("MALDIquant","corrplot","weights"))
+install_and_load_required_packages(c("MALDIquant","corrplot","weights","stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Rename the trim function to avoid conflicts
@@ -5522,11 +5568,16 @@ spectra_all <- append(spectra_library, spectra_test)
 peaks_all <- append(peaks_library, peaks_test)
 intensity_matrix_global <- intensityMatrix(peaks_all, spectra_all)
 rownames(intensity_matrix_global) <- c(library_vector, sample_vector)
-# Correlation between samples (library + test samples) (samples must be as columns and features as test) - With weights
-if (intensity_correction_coefficient != 0) {
-	correlation_matrix <- wtd.cors(x=t(intensity_matrix_global), weight=rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
+# Weighted correlation between samples (library + test samples) (samples must be as columns and features as test) - With weights
+if (intensity_correction_coefficient != 0 && intensity_correction_coefficient != 1) {
+	# Compute the vector of weights
+	weights_vector <- c(rep(1, length(library_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
+	correlation_matrix <- wtd.cors(x=t(intensity_matrix_global), weight=weights_vector)
 	counter3 <- correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size]
-} else {counter3 <- matrix(1, nrow=number_of_samples, ncol=library_size)}
+} else if (intensity_correction_coefficient == 1) {
+		correlation_matrix <- cor(t(intensity_matrix_global))
+		counter3 <- correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size]
+} else if (intensity_correction_coefficient == 0) {counter3 <- matrix(1, nrow=number_of_samples, ncol=library_size)}
 # Extract the absolute values
 for (s in 1:number_of_samples) {
 	for (l in 1:library_size) {
