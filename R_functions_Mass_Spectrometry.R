@@ -1,4 +1,7 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2015.12.14
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.13
+
+# Update the packages
+update.packages()
 
 ########################################################################## MISC
 
@@ -1280,11 +1283,6 @@ return (list(spectra=spectra_dataset, spectra_dataset_grouped=spectra_dataset_gr
 ################################################################ SPECTRA BINNING
 # The function performs the binning onto a selected spectra dataset (list of MALDIquant spectra objects)
 resample_spectra <- function (spectra, final_data_points=lowest_data_points, binning_method="sum") {
-# Load the required libraries
-install_and_load_required_packages("parallel")
-# Detect the number of cores
-cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
 ####################################################### BINNING FUNCTION
 binning_function <- function (spectra, final_data_points, binning_method) {
 	# Create the new spectra_binned list
@@ -1321,7 +1319,7 @@ binning_function <- function (spectra, final_data_points, binning_method) {
 		if (binning_method == "median") {
 			data_point_intensity <- median(bin_intensity)
 		}
-		if (method == "RMS" | method == "rms") {
+		if (binning_method == "RMS" | binning_method == "rms") {
 			data_point_intensity <- sqrt(sum(bin_intensity^2))
 		}
 		# Store it in the new spectra_binned list
@@ -1333,46 +1331,61 @@ binning_function <- function (spectra, final_data_points, binning_method) {
 	}
 	return (spectra_binned)
 }
-#######################################################################
-# Calculate the lowest amount of data points, that corresponds to the maximum
-# number of data points that can be used for the binning
-# Use this value as default if final_data_points is not specified (Function)
-lowest_data_points <- NULL
-# Compare it with all the others
-for (s in 1:length(spectra)) {
-	if (lowest_data_points == NULL || length(spectra[[s]]@mass) < lowest_data_points) {
-		lowest_data_points <- length(spectra[[s]]@mass)
+############# More spectra
+if (isMassSpectrumList(spectra)) {
+	# Load the required libraries
+	install_and_load_required_packages("parallel")
+	# Detect the number of cores
+	cpu_thread_number <- detectCores(logical=TRUE)
+	cpu_core_number <- cpu_thread_number/2
+	########################
+	# Calculate the lowest amount of data points, that corresponds to the maximum
+	# number of data points that can be used for the binning
+	# Use this value as default if final_data_points is not specified (Function)
+	lowest_data_points <- NULL
+	# Compare it with all the others
+	for (s in 1:length(spectra)) {
+		if (lowest_data_points == NULL || length(spectra[[s]]@mass) < lowest_data_points) {
+			lowest_data_points <- length(spectra[[s]]@mass)
+		}
 	}
-}
-# Check the qualities of the spectral dataset
-data_points_table <- table(sapply(spectra, length))
-datapoints_dataset <- as.numeric(names(data_points_table))
-equality_data_points <- length(data_points_table)
-######## Do not bin if all the spectra are of the same lengthand have the same number of datapoints as defined
-cl <- makeCluster(cpu_core_number)
-if ((equality_data_points == 1) && (datapoints_dataset == final_data_points)) {
-	spectra_binned <- spectra
-}
-######## Perform the binning if the spectra are not of the same lengthor
-# they are of the same lengthbut with a different number of datapoints than
-# the desired one
-if (!(equality_data_points == 1) || ((equality_data_points == 1) && !(datapoints_dataset == final_data_points))) {
-	# Do the binning only if the number of final data points is lower than the
-	# lowest number of original data points
-	if (final_data_points > lowest_data_points) {
-		finalDatapoints <- lowest_data_points
-		print("Binning at this sample rate is not possible, the highest number of data points possible will be used")
-		spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_function (spectra, final_data_points, binning_method))
+	# Check the qualities of the spectral dataset
+	data_points_table <- table(sapply(spectra, length))
+	datapoints_dataset <- as.numeric(names(data_points_table))
+	equality_data_points <- length(data_points_table)
+	######## Do not bin if all the spectra are of the same lengthand have the same number of datapoints as defined
+	cl <- makeCluster(cpu_core_number)
+	if ((equality_data_points == 1) && (datapoints_dataset == final_data_points)) {
+		spectra_binned <- spectra
 	}
-	if (final_data_points <= lowest_data_points) {
-		spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_function (spectra, final_data_points, binning_method))
+	######## Perform the binning if the spectra are not of the same lengthor
+	# they are of the same lengthbut with a different number of datapoints than
+	# the desired one
+	if (!(equality_data_points == 1) || ((equality_data_points == 1) && !(datapoints_dataset == final_data_points))) {
+		# Do the binning only if the number of final data points is lower than the
+		# lowest number of original data points
+		if (final_data_points > lowest_data_points) {
+			finalDatapoints <- lowest_data_points
+			print("Binning at this sample rate is not possible, the highest number of data points possible will be used")
+			spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_function (spectra, final_data_points, binning_method))
+		}
+		if (final_data_points <= lowest_data_points) {
+			spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_function (spectra, final_data_points, binning_method))
+		}
 	}
+	# Close the processes
+	stopCluster(cl)
+	print(table(sapply(spectra_binned, length)))
+	print(paste("Equal distance between datapoints", (all(sapply(spectra_binned, isRegular)))))
+} else {
+	# Retrieve the number of datapoints
+	lowest_data_points <- length(spectra@mass)
+	# Perform the binning only if necessary
+	if (final_data_points < lowest_data_points) {
+		spectra_binned <- binning_function(spectra, final_data_points, binning_method)
+	} else {spectra_binned <- spectra}
 }
-# Close the processes
-stopCluster(cl)
 return (spectra_binned)
-print(table(sapply(spectra_binned, length)))
-print(paste("Equal distance between datapoints", (all(sapply(spectra_binned, isRegular)))))
 }
 
 
@@ -2305,25 +2318,43 @@ install_and_load_required_packages("MALDIquant")
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # List the spectra files
 folder_files <- read_spectra_files(folder, file_format=file_format, full_path=TRUE)
-# Split the path into individual folders
+# Split the path into individual folders (list, each element is a vector with the path splitted for that spectrum)
 folder_files_splitted <- list()
 # Split the paths into folders
 for (f in 1:length(folder_files)) {
 	folder_files_splitted[f] <- strsplit(folder_files[f], "/")
 }
+#### The n-5 folder (where n is the length of the folder_splitted) is not unique, since it can represent the treatment folder; the n-4 folder is not unique, since one can call the replicates all in the same way (e.g. rep1, rep2), because they are placed in the sample folder; the combination n-5/n-4 should be almost unique, but to guarantee the uniqueness it is better to use the n-6/n-5/n-4 combination, so that it can be folder/sample/replicate or sample/treatment/replicate.
+# The folder in which the samples are should be the same, there shouldn't be a more complicate folder structure, in that case this method should be revised.
+# Generate a file_vector with only the folder to identify the replicates
+file_vector_folders <- character()
+for (f in 1:(length(folder_files_splitted))) {
+	unique_sample_name <- paste(folder_files_splitted[[f]][length(folder_files_splitted[[f]])-6], folder_files_splitted[[f]][length(folder_files_splitted[[f]])-5], folder_files_splitted[[f]][length(folder_files_splitted[[f]])-4], sep="/")
+	file_vector_folders <- append(file_vector_folders, unique_sample_name)
+}
+# Split again the path into individual folders (list, each element is a vector with the path splitted for that spectrum)
+for (f in 1:length(folder_files_splitted)) {
+	folder_files_splitted[f] <- strsplit(file_vector_folders[f], "/")
+}
 # Check for replicates in the same folder
 for (f in 1:(length(folder_files_splitted)-1)) {
 	# If the spectrum folder name is different between two samples but the folder above is the same, they are replicates (based on the brukerflex folder structure)
-	if ((folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 4] != folder_files_splitted[[f+1]] [length(folder_files_splitted[[f+1]]) - 4]) && (folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 5] == folder_files_splitted[[f+1]] [length(folder_files_splitted[[f+1]]) - 5])) {
-		folder_files_splitted[[f+1]] [length(folder_files_splitted[[f+1]]) - 4] <- folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 5]
-		folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 4] <- folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) - 5]
+	if ((folder_files_splitted[[f]][length(folder_files_splitted[[f]])] != folder_files_splitted[[f+1]][length(folder_files_splitted[[f+1]])]) && (folder_files_splitted[[f]][length(folder_files_splitted[[f]])-1] == folder_files_splitted[[f+1]][length(folder_files_splitted[[f+1]])-1])) {
+		# The name of the replicate becomes the name of the first replicate
+		folder_files_splitted[[f+1]][length(folder_files_splitted[[f+1]])] <- folder_files_splitted[[f]][length(folder_files_splitted[[f]])]
 	}
 }
-# Recreate the sample Vector
-sample_vector <- character(length=length(folder_files_splitted))
+# Recreate the sample Vector (for averaging)
+sample_vector <- character()
+# Rejoin the path fragments (for each element of the list)
 for (f in 1:length(folder_files_splitted)) {
-	sample_vector[f] <- folder_files_splitted[[f]] [length(folder_files_splitted[[f]]) -4]
+	rejoined_filepath <- ""
+	for (e in 1:length(folder_files_splitted[[f]])) {
+		rejoined_filepath <- paste(rejoined_filepath,folder_files_splitted[[f]][e], sep="/")
+	}
+	sample_vector <- append(sample_vector, rejoined_filepath)
 }
+# Average the mass spectra, grouping them according to the sample_vector
 spectra_replicates_averaged <- averageMassSpectra(spectra, labels=sample_vector)
 return (spectra_replicates_averaged)
 }
@@ -2437,19 +2468,16 @@ if (file_format == "imzml" | file_format == "imzML") {
 }
 ### Truncation
 spectra <- trim_spectra(spectra, range = mass_range)
-### Preprocessing
-spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=spectra_preprocessing$smoothing_strength, process_in_packages_of=spectra_preprocessing$preprocess_in_packages_of, sampling_method="sequential")
 ### Average the replicates
 if (average_replicates == TRUE) {
 	spectra <- average_replicates_by_folder(spectra, filepath_library, file_format=file_format)
-	### Baseline correction
-	spectra <- removeBaseline(spectra, method="TopHat")
 }
+# Average the patients
 if (average_patients == TRUE) {
 	spectra <- group_spectra(spectra, spectra_per_patient=1, file_format=file_format, tof_mode=tof_mode)
-	### Baseline correction
-	spectra <- removeBaseline(spectra, method="TopHat")
 }
+### Preprocessing
+spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=spectra_preprocessing$smoothing_strength, process_in_packages_of=spectra_preprocessing$preprocess_in_packages_of, sampling_method="sequential")
 ### Peak picking on the individual spectra
 if (class_grouping == TRUE) {
 	### Spectra grouping (class)
