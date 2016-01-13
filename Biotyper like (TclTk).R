@@ -1,5 +1,7 @@
-################ BIOTYPER-LIKE PROGRAM 2015.12.14
+################ BIOTYPER-LIKE PROGRAM 2016.01.13
 
+# Update packages and load the required packages
+update.packages()
 install_and_load_required_packages("tcltk")
 
 
@@ -256,6 +258,7 @@ run_biotyper_like_function <- function() {
 	tkmessageBox(title = "Done!", message = "The file(s) have been dumped", icon = "info")
 }
 
+# File name
 set_file_name <- function() {
 	filename <- tclvalue(file_name)
 	# Add the extension if it is not present in the filename
