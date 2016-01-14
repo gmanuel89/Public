@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.13
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.14
 
 # Update the packages
 update.packages()
@@ -5304,8 +5304,9 @@ if (isMassPeaksList(peaks_library)) {
     library_size <- 1
 }
 ####### Peak alignment
-# Merge the peaklists
+# Merge the peaklists and the spectra
 peaks_all <- append(peaks_library, peaks_test)
+spectra_all <- append(spectra_library, spectra_test)
 # Align
 peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold)
 # Restore the lists
@@ -5346,9 +5347,9 @@ for (spectrum in spectra_test) {
 	spectra_path_vector <- append(spectra_path_vector, spectrum@metaData$file[1])
 }
 # Generate the matrix (for hca)
-peaklist_matrix <- intensityMatrix(global_peaklist, global_spectralist)
+peaklist_matrix <- intensityMatrix(peaks_all, spectra_all)
 # Add additional info to the matrix
-peaklist_matrix <- matrix_add_class_and_sample(peaklist_matrix, peaks=global_peaklist, class_list=list(), file_format=file_format, sample_output=TRUE, class_output=FALSE)
+peaklist_matrix <- matrix_add_class_and_sample(peaklist_matrix, peaks=peaks_all, class_list=list(), file_format=file_format, sample_output=TRUE, class_output=FALSE)
 rownames(peaklist_matrix) <- make.names(peaklist_matrix[,"Sample"], unique=TRUE)
 # Compute the hca
 distance_matrix <- dist(peaklist_matrix[,1:(ncol(peaklist_matrix)-1)], method="euclidean")
@@ -5437,7 +5438,7 @@ biotyper_like <- function(library_list, test_list, similarity_criteria=c("hca", 
 ###### Outputs
 score_intensity <- NULL
 score_hca <- NULL
-score_correlation <- NULL
+score_correlation_matrix <- NULL
 ###### Tolerance
 if (tof_mode == "linear") {
     tolerance_ppm <- 2000
