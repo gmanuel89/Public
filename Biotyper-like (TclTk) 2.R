@@ -1,4 +1,4 @@
-################ BIOTYPER-LIKE PROGRAM 2016.01.13
+################ BIOTYPER-LIKE PROGRAM 2016.01.14
 
 # Update packages and load the required packages
 install_and_load_required_packages("tcltk")
@@ -7,7 +7,7 @@ install_and_load_required_packages("tcltk")
 
 
 
-# Initialise the variables (default values)
+###################################### Initialise the variables (default values)
 average_replicates_in_database <- FALSE
 average_replicates_in_test <- FALSE
 peaks_filtering <- TRUE
@@ -18,13 +18,14 @@ score_only <- FALSE
 spectra_path_output <- TRUE
 peak_picking_mode <- "all"
 similarity_criteria <- "correlation"
+signal_intensity_evaluation <- "intensity percentage"
 
 
 
 
-############################# DEFINE WHAT THE BUTTONS DO
+##################################################### DEFINE WHAT THE BUTTONS DO
 
-# Library
+##### Library
 select_library_function <- function() {
 	#filepath_library_select <- tkmessageBox(title = "Library", message = "Select the folder for the spectra for the library.\nThe library should be structured like this: Database folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
 	filepath_library <- tclvalue(tkchooseDirectory())
@@ -36,7 +37,8 @@ select_library_function <- function() {
 	# Exit the function and put the variable into the R workspace
 	.GlobalEnv$filepath_library <- filepath_library
 }
-# Samples
+
+##### Samples
 select_samples_function <-function() {
 	#filepath_test_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\nThe library should be structured like this: Sample folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
 	filepath_test <- tclvalue(tkchooseDirectory())
@@ -49,7 +51,7 @@ select_samples_function <-function() {
 	.GlobalEnv$filepath_test <- filepath_test
 }
 
-# Output
+##### Output
 browse_output_function <- function() {
 	output_folder <- tclvalue(tkchooseDirectory())
 	if (!nchar(output_folder)) {
@@ -60,17 +62,17 @@ browse_output_function <- function() {
 	setwd(output_folder)
 }
 
-# Close
+##### Close
 quit_function <-function() {
 	tkdestroy(window)
 }
 
-# Exit
+##### Exit
 end_session_function <- function () {
 	q(save="no")
 }
 
-# Import the spectra
+##### Import the spectra
 import_spectra_function <- function() {
 	###### Get the values
 	## Signals to take in most intense peaks
@@ -81,34 +83,29 @@ import_spectra_function <- function() {
 	mass_range <- as.numeric(unlist(strsplit(mass_range, ",")))
 	# Preprocessing
 	preprocess_spectra_in_packages_of <- tclvalue(preprocess_spectra_in_packages_of)
-	if (preprocess_spectra_in_packages_of == "Preprocess spectra in packages of (default 200)") {
-		preprocess_spectra_in_packages_of <- 200
-	} else {preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)}
+	preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)
 	## Average replicates database
 	if (average_replicates_in_database == "Y" || average_replicates_in_database == "y" || average_replicates_in_database == "YES" || average_replicates_in_database == "yes") {
 		average_replicates_in_database <- TRUE
 	}
-	if (average_replicates_in_database == "N" || average_replicates_in_database == "n" || average_replicates_in_database == "NO" || average_replicates_in_database == "no") {
+	if (average_replicates_in_database == "N" || average_replicates_in_database == "n" || average_replicates_in_database == "NO" || average_replicates_in_database == "no" || average_replicates_in_database == "") {
 		average_replicates_in_database <- FALSE
 	}
 	## Average replicates samples
 	if (average_replicates_in_test == "Y" || average_replicates_in_test == "y" || average_replicates_in_test == "YES" || average_replicates_in_test == "yes") {
 		average_replicates_in_test <- TRUE
 	}
-	if (average_replicates_in_test == "N" || average_replicates_in_test == "n" || average_replicates_in_test == "NO" || average_replicates_in_test == "no") {
+	if (average_replicates_in_test == "N" || average_replicates_in_test == "n" || average_replicates_in_test == "NO" || average_replicates_in_test == "no" || average_replicates_in_test == "") {
 		average_replicates_in_test <- FALSE
 	}
 	## SNR
 	SNR <- tclvalue(SNR)
 	SNR <- as.numeric(SNR)
 	## File format
-	if (is.null(file_format)) {
-		file_format <- "brukerflex"
-	}
 	if (file_format == "imzml" || file_format == "imzML") {
 		file_format <- "imzml"
 	}
-	if (file_format == "brukerflex" || file_format == "xmass" || file_format == "Xmass" || file_format == "XMass") {
+	if (file_format == "brukerflex" || file_format == "xmass" || file_format == "Xmass" || file_format == "XMass" || file_format == "") {
 		file_format <- "brukerflex"
 	}
 	# Peak picking mode
@@ -150,14 +147,17 @@ import_spectra_function <- function() {
 	tkmessageBox(title = "Import successful", message = "The spectra have been successfully imported", icon = "info")
 }
 
-# Run the biotyper_like
+##### Run the biotyper_like
 run_biotyper_like_function <- function() {
 	#### Get the values
 	## Intensity correction coefficient
 	intensity_correction_coefficient <- tclvalue(intensity_correction_coefficient)
 	intensity_correction_coefficient <- as.numeric(intensity_correction_coefficient)
+	## Intensity tolerance percent
+	intensity_tolerance_percent <- tclvalue(intensity_tolerance_percent)
+	intensity_tolerance_percent <- as.numeric(intensity_tolerance_percent)
 	## Peaks filtering
-	if (peaks_filtering == "Y" || peaks_filtering == "y" || peaks_filtering == "YES" || peaks_filtering == "yes") {
+	if (peaks_filtering == "Y" || peaks_filtering == "y" || peaks_filtering == "YES" || peaks_filtering == "yes" || peaks_filtering == "") {
 		peaks_filtering <- TRUE
 	}
 	if (peaks_filtering == "N" || peaks_filtering == "n" || peaks_filtering == "NO" || peaks_filtering == "no") {
@@ -170,14 +170,14 @@ run_biotyper_like_function <- function() {
 	if (low_intensity_peaks_removal == "Y" || low_intensity_peaks_removal == "y" || low_intensity_peaks_removal == "YES" || low_intensity_peaks_removal == "yes") {
 		low_intensity_peaks_removal <- TRUE
 	}
-	if (low_intensity_peaks_removal == "N" || low_intensity_peaks_removal == "n" || low_intensity_peaks_removal == "NO" || low_intensity_peaks_removal == "no") {
+	if (low_intensity_peaks_removal == "N" || low_intensity_peaks_removal == "n" || low_intensity_peaks_removal == "NO" || low_intensity_peaks_removal == "no" || low_intensity_peaks_removal == "") {
 		low_intensity_peaks_removal <- FALSE
 	}
 	## Low intensity threshold
 	intensity_percentage_threshold <- tclvalue(intensity_percentage_threshold)
 	intensity_percentage_threshold <- as.numeric(intensity_percentage_threshold)
 	## TOF mode
-	if (tof_mode == "L" || tof_mode == "l" || tof_mode == "linear" || tof_mode == "Linear") {
+	if (tof_mode == "L" || tof_mode == "l" || tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "") {
 		tof_mode <- "linear"
 	}
 	if (tof_mode == "R" || tof_mode == "r" || tof_mode == "reflectron" || tof_mode == "reflector" || tof_mode == "Reflectron" || tof_mode == "Reflector") {
@@ -187,34 +187,34 @@ run_biotyper_like_function <- function() {
 	if (file_format == "imzml" || file_format == "imzML") {
 		file_format <- "imzml"
 	}
-	if (file_format == "brukerflex" || file_format == "xmass" || file_format == "Xmass" || file_format == "XMass") {
+	if (file_format == "brukerflex" || file_format == "xmass" || file_format == "Xmass" || file_format == "XMass" || file_format == "") {
 		file_format <- "brukerflex"
 	}
 	## Score only
 	if (score_only == "Y" || score_only == "y" || score_only == "YES" || score_only == "yes") {
 		score_only <- TRUE
 	}
-	if (score_only == "N" || score_only == "n" || score_only == "NO" || score_only == "no") {
+	if (score_only == "N" || score_only == "n" || score_only == "NO" || score_only == "no" || score_only == "") {
 		score_only <- FALSE
 	}
 	## Spectra path output
-	if (spectra_path_output == "Y" || spectra_path_output == "y" || spectra_path_output == "YES" || spectra_path_output == "yes") {
+	if (spectra_path_output == "Y" || spectra_path_output == "y" || spectra_path_output == "YES" || spectra_path_output == "yes" || spectra_path_output == "") {
 		spectra_path_output <- TRUE
 	}
 	if (spectra_path_output == "N" || spectra_path_output == "n" || spectra_path_output == "NO" || spectra_path_output == "no") {
 		spectra_path_output <- FALSE
 	}
 	#### Run the function
-	score <- biotyper_like(library_list, test_list, similarity_criteria=similarity_criteria, intensity_correction_coefficient=intensity_correction_coefficient, signal_intensity_evaluation=signal_intensity_evaluation, intensity_tolerance_percent=70, peaks_filtering=peaks_filtering, peaks_filtering_threshold_percent=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, tof_mode=tof_mode, file_format=file_format, score_only=score_only, spectra_path_output=spectra_path_output)
+	score <- biotyper_like(library_list, test_list, similarity_criteria=similarity_criteria, intensity_correction_coefficient=intensity_correction_coefficient, signal_intensity_evaluation=signal_intensity_evaluation, intensity_tolerance_percent=intensity_tolerance_percent, peaks_filtering=peaks_filtering, peaks_filtering_threshold_percent=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, tof_mode=tof_mode, file_format=file_format, score_only=score_only, spectra_path_output=spectra_path_output)
 	# Matrices
-	score_hca_matrix <- score$score_hca$result_matrix$output
-	score_intensity_matrix <- score$score_intensity
+	score_hca_matrix <- score$score_hca$result_matrix
+	score_intensity_matrix <- score$score_intensity$output
 	score_correlation_matrix <- score$score_correlation_matrix$output
 	#### Exit the function and put the variable into the R workspace
 	.GlobalEnv$score <- score
 	# Matrices
-	.GlobalEnv$score_hca_matrix <- score$score_hca$result_matrix$output
-	.GlobalEnv$score_intensity_matrix <- score$score_intensity
+	.GlobalEnv$score_hca_matrix <- score$score_hca$result_matrix
+	.GlobalEnv$score_intensity_matrix <- score$score_intensity$output
 	.GlobalEnv$score_correlation_matrix <- score$score_correlation_matrix$output
 	# Save the files
 	filename <- set_file_name()
@@ -231,7 +231,7 @@ run_biotyper_like_function <- function() {
 	tkmessageBox(title = "Done!", message = "The file(s) have been dumped", icon = "info")
 }
 
-# File name
+##### File name
 set_file_name <- function() {
 	filename <- tclvalue(file_name)
 	# Add the extension if it is not present in the filename
@@ -243,12 +243,150 @@ set_file_name <- function() {
 	return (filename)
 }
 
+##### Similarity criteria
+similarity_criteria_choice <- function() {
+	# Catch the value from the menu
+	similarity_criteria <- select.list(c("correlation","hca","signal intensity"), title="Choose")
+	# Default
+	if (similarity_criteria == "") {
+		similarity_criteria <- "correlation"
+	}
+	# Escape the function
+	.GlobalEnv$similarity_criteria <- similarity_criteria
+}
+
+##### Signal intensity evaluation
+signal_intensity_evaluation_choice <- function() {
+	# Catch the value from the menu
+	signal_intensity_evaluation <- select.list(c("intensity percentage"), title="Choose")
+	# Default
+	if (signal_intensity_evaluation == "") {
+		signal_intensity_evaluation <- "intensity percentage"
+	}
+	# Escape the function
+	.GlobalEnv$signal_intensity_evaluation <- signal_intensity_evaluation
+}
+
+##### Peak picking mode
+peak_picking_mode_choice <- function() {
+	# Catch the value from the menu
+	peak_picking_mode <- select.list(c("all","most intense"), title="Choose")
+	# Default
+	if (peak_picking_mode == "") {
+		peak_picking_mode <- "all"
+	}
+	# Escape the function
+	.GlobalEnv$peak_picking_mode <- peak_picking_mode
+}
+
+##### Peaks filtering
+peaks_filtering_choice <- function() {
+	# Catch the value from the menu
+	peaks_filtering <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (peaks_filtering == "") {
+		peaks_filtering <- TRUE
+	}
+	# Escape the function
+	.GlobalEnv$peaks_filtering <- peaks_filtering
+}
+
+##### Low intensity peaks removal
+low_intensity_peaks_removal_choice <- function() {
+	# Catch the value from the menu
+	low_intensity_peaks_removal <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (low_intensity_peaks_removal == "") {
+		low_intensity_peaks_removal <- FALSE
+	}
+	# Escape the function
+	.GlobalEnv$low_intensity_peaks_removal <- low_intensity_peaks_removal
+}
+
+##### Average replicates in database
+average_replicates_in_database_choice <- function() {
+	# Catch the value from the menu
+	average_replicates_in_database <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (average_replicates_in_database == "") {
+		average_replicates_in_database <- FALSE
+	}
+	# Escape the function
+	.GlobalEnv$average_replicates_in_database <- average_replicates_in_database
+}
+
+##### Average replicates in test
+average_replicates_in_test_choice <- function() {
+	# Catch the value from the menu
+	average_replicates_in_test <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (average_replicates_in_test == "") {
+		average_replicates_in_test <- FALSE
+	}
+	# Escape the function
+	.GlobalEnv$average_replicates_in_test <- average_replicates_in_test
+}
+
+##### Score only (or all the score components)
+score_only_choice <- function() {
+	# Catch the value from the menu
+	score_only <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (score_only == "") {
+		score_only <- FALSE
+	}
+	# Escape the function
+	.GlobalEnv$score_only <- score_only
+}
+
+##### Spectra path in the output
+spectra_path_output_choice <- function() {
+	# Catch the value from the menu
+	spectra_path_output <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (spectra_path_output == "") {
+		spectra_path_output <- TRUE
+	}
+	# Escape the function
+	.GlobalEnv$spectra_path_output <- spectra_path_output
+}
+
+##### TOF mode
+tof_mode_choice <- function() {
+	# Catch the value from the menu
+	tof_mode <- select.list(c("Linear","Reflector"), title="Choose")
+	# Default
+	if (tof_mode == "") {
+		tof_mode <- "linear"
+	}
+	# Escape the function
+	.GlobalEnv$tof_mode <- tof_mode
+}
+
+##### File format
+file_format_choice <- function() {
+	# Catch the value from the menu
+	file_format <- select.list(c("imzML","Xmass"), title="Choose")
+	# Default
+	if (file_format == "") {
+		file_format <- "brukerflex"
+	}
+	# Escape the function
+	.GlobalEnv$file_format <- file_format
+}
 
 
 
 
-######################################### WINDOW GUI
-# List of variables, whose values are taken from the entries in the GUI
+
+
+
+
+
+
+##################################################################### WINDOW GUI
+
+########## List of variables, whose values are taken from the entries in the GUI
 mass_range <- tclVar("")
 SNR <- tclVar("")
 intensity_correction_coefficient <- tclVar("")
@@ -257,20 +395,21 @@ intensity_percentage_threshold <- tclVar("")
 signals_to_take <- tclVar("")
 file_name <- tclVar("")
 preprocess_spectra_in_packages_of <- tclVar("")
+intensity_tolerance_percent <- tclVar("")
 
 
 
-####### GUI
+######################## GUI
 # The "area" where we will put our input lines
 window <- tktoplevel()
 tktitle(window) <- "Biotyper-like"
 #### Browse
 # Library
-select_library_label <- tklabel(window, text="Select the folder for the spectra for the library.\nThe library should be structured like this:\nDatabase folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/1/1SLin/Spectrum_data")
-select_library_button <- tkbutton(window, text="Browse database", command=select_library_function)
+select_library_label <- tklabel(window, text="The library should be structured like this:\nMain folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/Spectrum_data")
+select_library_button <- tkbutton(window, text="Browse database folder", command=select_library_function)
 # Samples
-select_samples_label <- tklabel(window, text="Select the folder for the spectra for the library.\nThe library should be structured like this:\nDatabase folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/1/1SLin/Spectrum_data")
-select_samples_button <- tkbutton(window, text="Browse samples", command=select_samples_function)
+select_samples_label <- tklabel(window, text="The library should be structured like this:\nMain folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/Spectrum_data")
+select_samples_button <- tkbutton(window, text="Browse samples folder", command=select_samples_function)
 # Output
 select_output_label <- tklabel(window, text="Select the folder where to save all the outputs")
 browse_output_button <- tkbutton(window, text="Browse", command=browse_output_function)
@@ -280,35 +419,28 @@ mass_range_label <- tklabel(window, text="Mass range")
 mass_range_entry <- tkentry(window, width=30, textvariable=mass_range)
 tkinsert(mass_range_entry, "end", "3000, 15000")
 # Preprocessing (in packages of)
+preprocess_spectra_in_packages_of_label <- tklabel(window, text="Preprocess spectra in packages of")
 preprocess_spectra_in_packages_of_entry <- tkentry(window, width=30, textvariable=preprocess_spectra_in_packages_of)
-tkinsert(preprocess_spectra_in_packages_of_entry, "end", "Preprocess spectra in packages of (default 200)")
+tkinsert(preprocess_spectra_in_packages_of_entry, "end", "200")
 # Similarity criteria
-similarity_criteria_choice <- function() {
-	similarity_criteria <- select.list(c("correlation","hca","signal intensity"), title="Choose")
-	.GlobalEnv$similarity_criteria <- similarity_criteria
-}
-similarity_criteria_label <- tklabel(window, text="Similarity criteria (default: 'correlation')")
-similarity_criteria_entry <- tkbutton(window, text="Choose", command=similarity_criteria_choice)
+similarity_criteria_label <- tklabel(window, text="Similarity criteria\n(default: 'correlation')")
+similarity_criteria_entry <- tkbutton(window, text="Choose similarity\ncriteria", command=similarity_criteria_choice)
 # Intensity correction coefficient
 intensity_correction_coefficient_label <- tklabel(window, text="Intensity correction coefficient")
 intensity_correction_coefficient_entry <- tkentry(window, width=30, textvariable=intensity_correction_coefficient)
 tkinsert(intensity_correction_coefficient_entry, "end", "1")
+# Intensty tolerance percent
+intensity_tolerance_percent_label <- tklabel(window, text="Intensity tolerance percent\n(if 'signal intensity' is selected)")
+intensity_tolerance_percent_entry <- tkentry(window, width=30, textvariable=intensity_tolerance_percent)
+tkinsert(intensity_tolerance_percent_entry, "end", "80")
 # Signal intensity evaluation
-signal_intensity_evaluation_choice <- function() {
-	signal_intensity_evaluation <- select.list(c("intensity percentage"), title="Choose")
-	.GlobalEnv$signal_intensity_evaluation <- signal_intensity_evaluation
-}
-signal_intensity_evaluation_label <- tklabel(window, text="Signal intensity evaluation (default: 'intensity percentage')")
-signal_intensity_evaluation_entry <- tkbutton(window, text="Choose", command=signal_intensity_evaluation_choice)
+signal_intensity_evaluation_label <- tklabel(window, text="Signal intensity evaluation\n(default: 'intensity percentage')")
+signal_intensity_evaluation_entry <- tkbutton(window, text="Choose signal intensity\nevaluation method", command=signal_intensity_evaluation_choice)
 # Peak picking mode
-peak_picking_mode_choice <- function() {
-	peak_picking_mode <- select.list(c("all","most intense"), title="Choose")
-	.GlobalEnv$peak_picking_mode <- peak_picking_mode
-}
-peak_picking_mode_label <- tklabel(window, text="Peak picking mode (default: 'all')")
-peak_picking_mode_entry <- tkbutton(window, text="Choose", command=peak_picking_mode_choice)
+peak_picking_mode_label <- tklabel(window, text="Peak picking mode\n(default: 'all')")
+peak_picking_mode_entry <- tkbutton(window, text="Choose pick picking\nmode", command=peak_picking_mode_choice)
 # Signals to take
-signals_to_take_label <- tklabel(window, text="Most intense signals to take")
+signals_to_take_label <- tklabel(window, text="Most intense signals to take\n(if 'most intense' is selected)")
 signals_to_take_entry <- tkentry(window, width=30, textvariable=signals_to_take)
 tkinsert(signals_to_take_entry, "end", "25")
 # SNR
@@ -316,69 +448,37 @@ SNR_label <- tklabel(window, text="Signal-to-noise ratio")
 SNR_entry <- tkentry(window, width=30, textvariable=SNR)
 tkinsert(SNR_entry, "end", "5")
 # Peaks filtering
-peaks_filtering_choice <- function() {
-	peaks_filtering <- select.list(c("YES","NO"), title="Choose")
-	.GlobalEnv$peaks_filtering <- peaks_filtering
-}
-peaks_filtering_label <- tklabel(window, text="Peaks filtering (default: 'YES')")
-peaks_filtering_entry <- tkbutton(window, text="Choose", command=peaks_filtering_choice)
+peaks_filtering_label <- tklabel(window, text="Peaks filtering\n(default: 'YES')")
+peaks_filtering_entry <- tkbutton(window, text="Choose peak filtering", command=peaks_filtering_choice)
 # Peaks filtering threshold
 peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold frequency percentage")
 peaks_filtering_threshold_percent_entry <- tkentry(window, width=30, textvariable=peaks_filtering_threshold_percent)
 tkinsert(peaks_filtering_threshold_percent_entry, "end", "25")
 # Low intensity peaks removal
-low_intensity_peaks_removal_choice <- function() {
-	low_intensity_peaks_removal <- select.list(c("YES","NO"), title="Choose")
-	.GlobalEnv$low_intensity_peaks_removal <- low_intensity_peaks_removal
-}
-low_intensity_peaks_removal_label <- tklabel(window, text="Low intensity peaks removal (default: 'NO')")
-low_intensity_peaks_removal_entry <- tkbutton(window, text="Choose", command=low_intensity_peaks_removal_choice)
+low_intensity_peaks_removal_label <- tklabel(window, text="Low intensity peaks removal\n(default: 'NO')")
+low_intensity_peaks_removal_entry <- tkbutton(window, text="Choose low intensity\npeaks removal", command=low_intensity_peaks_removal_choice)
 # Intensity percentage threshold
 intensity_percentage_threshold_label <- tklabel(window, text="Intensity percentage threshold")
 intensity_percentage_threshold_entry <- tkentry(window, width=30, textvariable=intensity_percentage_threshold)
 tkinsert(intensity_percentage_threshold_entry, "end", "0.1")
 # Average replicates in database
-average_replicates_in_database_choice <- function() {
-	average_replicates_in_database <- select.list(c("YES","NO"), title="Choose")
-	.GlobalEnv$average_replicates_in_database <- average_replicates_in_database
-}
-average_replicates_in_database_label <- tklabel(window, text="Average replicates in the database (default: 'NO')")
-average_replicates_in_database_entry <- tkbutton(window, text="Choose", command=average_replicates_in_database_choice)
+average_replicates_in_database_label <- tklabel(window, text="Average replicates in the database\n(default: 'NO')")
+average_replicates_in_database_entry <- tkbutton(window, text="Choose average replicates\nin the database", command=average_replicates_in_database_choice)
 # Average replicates in samples
-average_replicates_in_test_choice <- function() {
-	average_replicates_in_test <- select.list(c("YES","NO"), title="Choose")
-	.GlobalEnv$average_replicates_in_test <- average_replicates_in_test
-}
-average_replicates_in_test_label <- tklabel(window, text="Average replicates in the samples (default: 'NO')")
-average_replicates_in_test_entry <- tkbutton(window, text="Choose", command=average_replicates_in_test_choice)
+average_replicates_in_test_label <- tklabel(window, text="Average replicates in the samples\n(default: 'NO')")
+average_replicates_in_test_entry <- tkbutton(window, text="Choose average replicates\nin the samples", command=average_replicates_in_test_choice)
 # Score only
-score_only_choice <- function() {
-	score_only <- select.list(c("YES","NO"), title="Choose")
-	.GlobalEnv$score_only <- score_only
-}
-score_only_label <- tklabel(window, text="Score only (default: 'NO', all the score components are displayed)")
+score_only_label <- tklabel(window, text="Score only\n(default: 'NO', all the score components are displayed)")
 score_only_entry <- tkbutton(window, text="Choose", command=score_only_choice)
 # Spectra path output
-spectra_path_output_choice <- function() {
-	spectra_path_output <- select.list(c("YES","NO"), title="Choose")
-	.GlobalEnv$spectra_path_output <- spectra_path_output
-}
-spectra_path_output_label <- tklabel(window, text="Spectra path output (default: 'YES')")
-spectra_path_output_entry <- tkbutton(window, text="Choose", command=spectra_path_output_choice)
+spectra_path_output_label <- tklabel(window, text="Spectra path in the output\n(default: 'YES')")
+spectra_path_output_entry <- tkbutton(window, text="Choose to display\nthe spectra path", command=spectra_path_output_choice)
 # Tof mode
-tof_mode_choice <- function() {
-	tof_mode <- select.list(c("Linear","Reflector"), title="Choose")
-	.GlobalEnv$tof_mode <- tof_mode
-}
-tof_mode_label <- tklabel(window, text="Select the TOF mode (default: 'Linear')")
-tof_mode_entry <- tkbutton(window, text="Choose", command=tof_mode_choice)
+tof_mode_label <- tklabel(window, text="Select the TOF mode\n(default: 'Linear')")
+tof_mode_entry <- tkbutton(window, text="Choose the TOF mode", command=tof_mode_choice)
 # File format
-file_format_choice <- function() {
-	file_format <- select.list(c("imzML","Xmass"), title="Choose")
-	.GlobalEnv$file_format <- file_format
-}
-file_format_label <- tklabel(window, text="Select the file format (default: 'Xmass')")
-file_format_entry <- tkbutton(window, text="Choose", command=file_format_choice)
+file_format_label <- tklabel(window, text="Select the file format\n(default: 'Xmass')")
+file_format_entry <- tkbutton(window, text="Choose the file format", command=file_format_choice)
 #### Close
 exit_label <- tklabel(window, text="Exit")
 quit_button <- tkbutton(window, text="Quit", command=quit_function)
@@ -386,7 +486,7 @@ quit_button <- tkbutton(window, text="Quit", command=quit_function)
 #end_session_label <- tklabel(window, text="Quit")
 end_session_button <- tkbutton(window, text="End R session", command=end_session_function)
 # Import the spectra
-import_spectra_button <- tkbutton(window, text="Import spectra, preprocessing and peak picking", command=import_spectra_function)
+import_spectra_button <- tkbutton(window, text="Import spectra, preprocessing\nand peak picking", command=import_spectra_function)
 # Run the Biotyper-like!
 run_biotyper_like_button <- tkbutton(window, text="Run the Biotyper-like!", command=run_biotyper_like_function)
 # Set the file name
@@ -440,10 +540,13 @@ tkgrid(tof_mode_label, row=12, column=1)
 tkgrid(tof_mode_entry, row=12, column=2)
 tkgrid(file_format_label, row=12, column=3)
 tkgrid(file_format_entry, row=12, column=4)
-tkgrid(import_spectra_button, row=13, column=1)
-tkgrid(preprocess_spectra_in_packages_of_entry, row=13, column=2)
-tkgrid(run_biotyper_like_button, row=13, column=4)
-tkgrid(exit_label, row=14, column=1)
-tkgrid(quit_button, row=14, column=2)
-tkgrid(end_session_button, row=14, column=4)
+tkgrid(intensity_tolerance_percent_label, row=13, column=2)
+tkgrid(intensity_tolerance_percent_entry, row=13, column=3)
+tkgrid(preprocess_spectra_in_packages_of_label, row=14, column=2)
+tkgrid(preprocess_spectra_in_packages_of_entry, row=14, column=3)
+tkgrid(import_spectra_button, row=14, column=1)
+tkgrid(run_biotyper_like_button, row=14, column=4)
+tkgrid(exit_label, row=15, column=1)
+tkgrid(quit_button, row=15, column=2)
+tkgrid(end_session_button, row=15, column=4)
 #window_scrollbar
