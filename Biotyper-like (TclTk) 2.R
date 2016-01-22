@@ -1,7 +1,8 @@
 ################ BIOTYPER-LIKE PROGRAM 2016.01.22
 
 # Update packages and load the required packages
-install_and_load_required_packages(c("tcltk", "xlsx"))
+update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/")
+install_and_load_required_packages(c("tcltk", "WriteXLS"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
 
 
 
@@ -29,7 +30,7 @@ file_type_export <- "xlsx"
 ##### File type (export)
 file_type_export_choice <- function() {
 	# Catch the value from the menu
-	file_type_export <- select.list(c("csv","xlsx"), title="Choose")
+	file_type_export <- select.list(c("csv","xlsx","xls"), title="Choose")
 	# Default
 	if (file_type_export == "") {
 		file_type_export <- "xlsx"
@@ -51,6 +52,11 @@ set_file_name <- function() {
 		if (length(grep(".xlsx", filename, fixed=TRUE)) == 1) {
 			filename <- filename
 		}	else {filename <- paste (filename, ".xlsx", sep="")}
+	}
+	if (file_type_export == "xls") {
+		if (length(grep(".xls", filename, fixed=TRUE)) == 1) {
+			filename <- filename
+		}	else {filename <- paste (filename, ".xls", sep="")}
 	}
 	#### Exit the function and put the variable into the R workspace
 	.GlobalEnv$filename <- filename
@@ -198,16 +204,39 @@ run_biotyper_like_function <- function() {
 		    write.csv(score_correlation_matrix, file=paste("corr_", filename, sep=""))
 		}
 	}
-	if (file_type_export == "xlsx") {
+	if (file_type_export == "xlsx" || file_type_export == "xls") {
 		filename <- set_file_name()
-		if (!is.null(score_intensity_matrix)) {
-		    write.xlsx(score_intensity_matrix, file=paste("int_", filename, sep=""), sheetName="Biotyper-like scores - intensity")
+		# Check if PERL is installed by using the built in function, for WriteXLS package
+		perl_installed <- testPerl(verbose=FALSE)
+		if (perl_installed == FALSE) {
+			tkmessageBox(title = "Perl", message = "The software PERL has not been found on the computer. Please install the Perl software from\nhttps://www.perl.org/get.html\nand restart the R session", icon = "warning")
 		}
-		if (!is.null(score_hca_matrix)) {
-		    write.xlsx(score_hca_matrix, file=paste("hca_", filename, sep=""), sheetName="Biotyper-like scores - hierarchical clustering analysis")
+		if (!is.null(score_intensity_matrix) && perl_installed == TRUE) {
+			# Convert it to a data frame
+			score_intensity_matrix <- as.data.frame(score_intensity_matrix)
+			# Generate unique row names
+			unique_row_names <- make.names(rownames(score_intensity_matrix), unique=TRUE)
+			rownames(score_intensity_matrix) <- unique_row_names
+			# Export
+		    WriteXLS(x=score_intensity_matrix, ExcelFileName=paste("int_", filename, sep=""), SheetNames="Scores - Intensity", row.names=TRUE, AdjWidth=TRUE)
 		}
-		if (!is.null(score_correlation_matrix)) {
-		    write.xlsx(score_correlation_matrix, file=paste("corr_", filename, sep=""), sheetName="Biotyper-like scores - correlation")
+		if (!is.null(score_hca_matrix) && perl_installed == TRUE) {
+			# Convert it to a data frame
+			score_hca_matrix <- as.data.frame(score_hca_matrix)
+			# Generate unique row names
+			unique_row_names <- make.names(rownames(score_hca_matrix), unique=TRUE)
+			rownames(score_hca_matrix) <- unique_row_names
+			# Export
+		    WriteXLS(x=score_hca_matrix, ExcelFileName=paste("hca_", filename, sep=""), SheetNames="Scores - HCA", row.names=TRUE, AdjWidth=TRUE)
+		}
+		if (!is.null(score_correlation_matrix) && perl_installed == TRUE) {
+			# Convert it to a data frame
+			score_correlation_matrix <- as.data.frame(score_correlation_matrix)
+			# Generate unique row names
+			unique_row_names <- make.names(rownames(score_correlation_matrix), unique=TRUE)
+			rownames(score_correlation_matrix) <- unique_row_names
+			# Export
+		    WriteXLS(x=score_correlation_matrix, ExcelFileName=paste("corr_", filename, sep=""), SheetNames="Scores - Correlation", row.names=TRUE, AdjWidth=TRUE)
 		}
 	}
 	### Messagebox
