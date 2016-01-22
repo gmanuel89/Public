@@ -1,7 +1,7 @@
-################ BIOTYPER-LIKE PROGRAM 2016.01.14
+################ BIOTYPER-LIKE PROGRAM 2016.01.22
 
 # Update packages and load the required packages
-install_and_load_required_packages("tcltk")
+install_and_load_required_packages(c("tcltk", "xlsx"))
 
 
 
@@ -19,11 +19,43 @@ spectra_path_output <- TRUE
 peak_picking_mode <- "all"
 similarity_criteria <- "correlation"
 signal_intensity_evaluation <- "intensity percentage"
+file_type_export <- "xlsx"
 
 
 
 
 ##################################################### DEFINE WHAT THE BUTTONS DO
+
+##### File type (export)
+file_type_export_choice <- function() {
+	# Catch the value from the menu
+	file_type_export <- select.list(c("csv","xlsx"), title="Choose")
+	# Default
+	if (file_type_export == "") {
+		file_type_export <- "xlsx"
+	}
+	# Escape the function
+	.GlobalEnv$file_type_export <- file_type_export
+}
+
+##### File name (export)
+set_file_name <- function() {
+	filename <- tclvalue(file_name)
+	# Add the extension if it is not present in the filename
+	if (file_type_export == "csv") {
+		if (length(grep(".csv", filename, fixed=TRUE)) == 1) {
+			filename <- filename
+		}	else {filename <- paste (filename, ".csv", sep="")}
+	}
+	if (file_type_export == "xlsx") {
+		if (length(grep(".xlsx", filename, fixed=TRUE)) == 1) {
+			filename <- filename
+		}	else {filename <- paste (filename, ".xlsx", sep="")}
+	}
+	#### Exit the function and put the variable into the R workspace
+	.GlobalEnv$filename <- filename
+	return (filename)
+}
 
 ##### Library
 select_library_function <- function() {
@@ -84,30 +116,9 @@ import_spectra_function <- function() {
 	# Preprocessing
 	preprocess_spectra_in_packages_of <- tclvalue(preprocess_spectra_in_packages_of)
 	preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)
-	## Average replicates database
-	if (average_replicates_in_database == "Y" || average_replicates_in_database == "y" || average_replicates_in_database == "YES" || average_replicates_in_database == "yes") {
-		average_replicates_in_database <- TRUE
-	}
-	if (average_replicates_in_database == "N" || average_replicates_in_database == "n" || average_replicates_in_database == "NO" || average_replicates_in_database == "no" || average_replicates_in_database == "") {
-		average_replicates_in_database <- FALSE
-	}
-	## Average replicates samples
-	if (average_replicates_in_test == "Y" || average_replicates_in_test == "y" || average_replicates_in_test == "YES" || average_replicates_in_test == "yes") {
-		average_replicates_in_test <- TRUE
-	}
-	if (average_replicates_in_test == "N" || average_replicates_in_test == "n" || average_replicates_in_test == "NO" || average_replicates_in_test == "no" || average_replicates_in_test == "") {
-		average_replicates_in_test <- FALSE
-	}
 	## SNR
 	SNR <- tclvalue(SNR)
 	SNR <- as.numeric(SNR)
-	## File format
-	if (file_format == "imzml" || file_format == "imzML") {
-		file_format <- "imzml"
-	}
-	if (file_format == "brukerflex" || file_format == "xmass" || file_format == "Xmass" || file_format == "XMass" || file_format == "") {
-		file_format <- "brukerflex"
-	}
 	# Peak picking mode
 	if ("most intense" %in% peak_picking_mode) {
 		########## DATABASE
@@ -156,54 +167,12 @@ run_biotyper_like_function <- function() {
 	## Intensity tolerance percent
 	intensity_tolerance_percent <- tclvalue(intensity_tolerance_percent)
 	intensity_tolerance_percent <- as.numeric(intensity_tolerance_percent)
-	## Peaks filtering
-	if (peaks_filtering == "Y" || peaks_filtering == "y" || peaks_filtering == "YES" || peaks_filtering == "yes" || peaks_filtering == "") {
-		peaks_filtering <- TRUE
-	}
-	if (peaks_filtering == "N" || peaks_filtering == "n" || peaks_filtering == "NO" || peaks_filtering == "no") {
-		peaks_filtering == "N" <- FALSE
-	}
 	## Peaks filtering threshold
 	peaks_filtering_threshold_percent <- tclvalue(peaks_filtering_threshold_percent)
 	peaks_filtering_threshold_percent <- as.numeric(peaks_filtering_threshold_percent)
-	## Low intensity peaks removal
-	if (low_intensity_peaks_removal == "Y" || low_intensity_peaks_removal == "y" || low_intensity_peaks_removal == "YES" || low_intensity_peaks_removal == "yes") {
-		low_intensity_peaks_removal <- TRUE
-	}
-	if (low_intensity_peaks_removal == "N" || low_intensity_peaks_removal == "n" || low_intensity_peaks_removal == "NO" || low_intensity_peaks_removal == "no" || low_intensity_peaks_removal == "") {
-		low_intensity_peaks_removal <- FALSE
-	}
 	## Low intensity threshold
 	intensity_percentage_threshold <- tclvalue(intensity_percentage_threshold)
 	intensity_percentage_threshold <- as.numeric(intensity_percentage_threshold)
-	## TOF mode
-	if (tof_mode == "L" || tof_mode == "l" || tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "") {
-		tof_mode <- "linear"
-	}
-	if (tof_mode == "R" || tof_mode == "r" || tof_mode == "reflectron" || tof_mode == "reflector" || tof_mode == "Reflectron" || tof_mode == "Reflector") {
-		tof_mode <- "reflectron"
-	}
-	## File format
-	if (file_format == "imzml" || file_format == "imzML") {
-		file_format <- "imzml"
-	}
-	if (file_format == "brukerflex" || file_format == "xmass" || file_format == "Xmass" || file_format == "XMass" || file_format == "") {
-		file_format <- "brukerflex"
-	}
-	## Score only
-	if (score_only == "Y" || score_only == "y" || score_only == "YES" || score_only == "yes") {
-		score_only <- TRUE
-	}
-	if (score_only == "N" || score_only == "n" || score_only == "NO" || score_only == "no" || score_only == "") {
-		score_only <- FALSE
-	}
-	## Spectra path output
-	if (spectra_path_output == "Y" || spectra_path_output == "y" || spectra_path_output == "YES" || spectra_path_output == "yes" || spectra_path_output == "") {
-		spectra_path_output <- TRUE
-	}
-	if (spectra_path_output == "N" || spectra_path_output == "n" || spectra_path_output == "NO" || spectra_path_output == "no") {
-		spectra_path_output <- FALSE
-	}
 	#### Run the function
 	score <- biotyper_like(library_list, test_list, similarity_criteria=similarity_criteria, intensity_correction_coefficient=intensity_correction_coefficient, signal_intensity_evaluation=signal_intensity_evaluation, intensity_tolerance_percent=intensity_tolerance_percent, peaks_filtering=peaks_filtering, peaks_filtering_threshold_percent=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, tof_mode=tof_mode, file_format=file_format, score_only=score_only, spectra_path_output=spectra_path_output)
 	# Matrices
@@ -216,31 +185,33 @@ run_biotyper_like_function <- function() {
 	.GlobalEnv$score_hca_matrix <- score$score_hca$result_matrix
 	.GlobalEnv$score_intensity_matrix <- score$score_intensity$output
 	.GlobalEnv$score_correlation_matrix <- score$score_correlation_matrix$output
-	# Save the files
-	filename <- set_file_name()
-	if (!is.null(score_intensity_matrix)) {
-	    write.csv(score_intensity_matrix, file=paste("1_", filename, sep=""))
+	# Save the files (CSV)
+	if (file_type_export == "csv") {
+		filename <- set_file_name()
+		if (!is.null(score_intensity_matrix)) {
+		    write.csv(score_intensity_matrix, file=paste("int_", filename, sep=""))
+		}
+		if (!is.null(score_hca_matrix)) {
+		    write.csv(score_hca_matrix, file=paste("hca_", filename, sep=""))
+		}
+		if (!is.null(score_correlation_matrix)) {
+		    write.csv(score_correlation_matrix, file=paste("corr_", filename, sep=""))
+		}
 	}
-	if (!is.null(score_hca_matrix)) {
-	    write.csv(score_hca_matrix, file=paste("2_", filename, sep=""))
-	}
-	if (!is.null(score_correlation_matrix)) {
-	    write.csv(score_correlation_matrix, file=paste("3_", filename, sep=""))
+	if (file_type_export == "xlsx") {
+		filename <- set_file_name()
+		if (!is.null(score_intensity_matrix)) {
+		    write.xlsx(score_intensity_matrix, file=paste("int_", filename, sep=""), sheetName="Biotyper-like scores - intensity")
+		}
+		if (!is.null(score_hca_matrix)) {
+		    write.xlsx(score_hca_matrix, file=paste("hca_", filename, sep=""), sheetName="Biotyper-like scores - hierarchical clustering analysis")
+		}
+		if (!is.null(score_correlation_matrix)) {
+		    write.xlsx(score_correlation_matrix, file=paste("corr_", filename, sep=""), sheetName="Biotyper-like scores - correlation")
+		}
 	}
 	### Messagebox
 	tkmessageBox(title = "Done!", message = "The file(s) have been dumped", icon = "info")
-}
-
-##### File name
-set_file_name <- function() {
-	filename <- tclvalue(file_name)
-	# Add the extension if it is not present in the filename
-	if (length(grep(".csv", filename, fixed=TRUE)) == 1) {
-		filename <- filename
-	}	else {filename <- paste (filename, ".csv", sep="")}
-	#### Exit the function and put the variable into the R workspace
-	.GlobalEnv$filename <- filename
-	return (filename)
 }
 
 ##### Similarity criteria
@@ -284,8 +255,11 @@ peaks_filtering_choice <- function() {
 	# Catch the value from the menu
 	peaks_filtering <- select.list(c("YES","NO"), title="Choose")
 	# Default
-	if (peaks_filtering == "") {
+	if (peaks_filtering == "" || peaks_filtering == "YES") {
 		peaks_filtering <- TRUE
+	}
+	if (peaks_filtering == "NO") {
+		peaks_filtering <- FALSE
 	}
 	# Escape the function
 	.GlobalEnv$peaks_filtering <- peaks_filtering
@@ -296,8 +270,11 @@ low_intensity_peaks_removal_choice <- function() {
 	# Catch the value from the menu
 	low_intensity_peaks_removal <- select.list(c("YES","NO"), title="Choose")
 	# Default
-	if (low_intensity_peaks_removal == "") {
+	if (low_intensity_peaks_removal == "" || low_intensity_peaks_removal == "NO") {
 		low_intensity_peaks_removal <- FALSE
+	}
+	if (low_intensity_peaks_removal == "YES") {
+		low_intensity_peaks_removal <- TRUE
 	}
 	# Escape the function
 	.GlobalEnv$low_intensity_peaks_removal <- low_intensity_peaks_removal
@@ -308,8 +285,11 @@ average_replicates_in_database_choice <- function() {
 	# Catch the value from the menu
 	average_replicates_in_database <- select.list(c("YES","NO"), title="Choose")
 	# Default
-	if (average_replicates_in_database == "") {
+	if (average_replicates_in_database == "" || average_replicates_in_database == "NO") {
 		average_replicates_in_database <- FALSE
+	}
+	if (average_replicates_in_database == "YES") {
+		average_replicates_in_database <- TRUE
 	}
 	# Escape the function
 	.GlobalEnv$average_replicates_in_database <- average_replicates_in_database
@@ -320,8 +300,11 @@ average_replicates_in_test_choice <- function() {
 	# Catch the value from the menu
 	average_replicates_in_test <- select.list(c("YES","NO"), title="Choose")
 	# Default
-	if (average_replicates_in_test == "") {
+	if (average_replicates_in_test == "" || average_replicates_in_test == "NO") {
 		average_replicates_in_test <- FALSE
+	}
+	if (average_replicates_in_test == "YES") {
+		average_replicates_in_test <- TRUE
 	}
 	# Escape the function
 	.GlobalEnv$average_replicates_in_test <- average_replicates_in_test
@@ -332,8 +315,11 @@ score_only_choice <- function() {
 	# Catch the value from the menu
 	score_only <- select.list(c("YES","NO"), title="Choose")
 	# Default
-	if (score_only == "") {
+	if (score_only == "" || score_only == "NO") {
 		score_only <- FALSE
+	}
+	if (score_only == "YES") {
+		score_only <- TRUE
 	}
 	# Escape the function
 	.GlobalEnv$score_only <- score_only
@@ -344,8 +330,11 @@ spectra_path_output_choice <- function() {
 	# Catch the value from the menu
 	spectra_path_output <- select.list(c("YES","NO"), title="Choose")
 	# Default
-	if (spectra_path_output == "") {
+	if (spectra_path_output == "" || spectra_path_output == "YES") {
 		spectra_path_output <- TRUE
+	}
+	if (spectra_path_output == "NO") {
+		spectra_path_output <- FALSE
 	}
 	# Escape the function
 	.GlobalEnv$spectra_path_output <- spectra_path_output
@@ -356,8 +345,11 @@ tof_mode_choice <- function() {
 	# Catch the value from the menu
 	tof_mode <- select.list(c("Linear","Reflector"), title="Choose")
 	# Default
-	if (tof_mode == "") {
+	if (tof_mode == "" || tof_mode == "Linear") {
 		tof_mode <- "linear"
+	}
+	if (tof_mode == "Reflector") {
+		tof_mode <- "reflector"
 	}
 	# Escape the function
 	.GlobalEnv$tof_mode <- tof_mode
@@ -368,8 +360,11 @@ file_format_choice <- function() {
 	# Catch the value from the menu
 	file_format <- select.list(c("imzML","Xmass"), title="Choose")
 	# Default
-	if (file_format == "") {
+	if (file_format == "" || file_format == "Xmass") {
 		file_format <- "brukerflex"
+	}
+	if (file_format == "imzML") {
+		file_format <- "imzml"
 	}
 	# Escape the function
 	.GlobalEnv$file_format <- file_format
@@ -479,6 +474,9 @@ tof_mode_entry <- tkbutton(window, text="Choose the TOF mode", command=tof_mode_
 # File format
 file_format_label <- tklabel(window, text="Select the file format\n(default: 'Xmass')")
 file_format_entry <- tkbutton(window, text="Choose the file format", command=file_format_choice)
+# File type export
+file_type_export_label <- tklabel(window, text="Select the format of the exported file\n(default: 'xlsx')")
+file_type_export_entry <- tkbutton(window, text="Choose the file type", command=file_type_export_choice)
 #### Close
 exit_label <- tklabel(window, text="Exit")
 quit_button <- tkbutton(window, text="Quit", command=quit_function)
@@ -540,10 +538,12 @@ tkgrid(tof_mode_label, row=12, column=1)
 tkgrid(tof_mode_entry, row=12, column=2)
 tkgrid(file_format_label, row=12, column=3)
 tkgrid(file_format_entry, row=12, column=4)
-tkgrid(intensity_tolerance_percent_label, row=13, column=2)
-tkgrid(intensity_tolerance_percent_entry, row=13, column=3)
-tkgrid(preprocess_spectra_in_packages_of_label, row=14, column=2)
-tkgrid(preprocess_spectra_in_packages_of_entry, row=14, column=3)
+tkgrid(intensity_tolerance_percent_label, row=13, column=1)
+tkgrid(intensity_tolerance_percent_entry, row=13, column=2)
+tkgrid(preprocess_spectra_in_packages_of_label, row=13, column=3)
+tkgrid(preprocess_spectra_in_packages_of_entry, row=13, column=4)
+tkgrid(file_type_export_label, row=14, column=2)
+tkgrid(file_type_export_entry, row=14, column=3)
 tkgrid(import_spectra_button, row=14, column=1)
 tkgrid(run_biotyper_like_button, row=14, column=4)
 tkgrid(exit_label, row=15, column=1)
