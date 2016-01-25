@@ -1,23 +1,33 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.14
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.25
 
 # Update the packages
-update.packages()
+update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/")
 
 ########################################################################## MISC
 
 ##################################################### INSTALL REQUIRED PACKAGES
 # This function installs and loads the selected packages
-install_and_load_required_packages <- function (required_packages) {
+install_and_load_required_packages <- function (required_packages, repository="http://cran.mirror.garr.it/mirrors/CRAN/") {
+# Retrieve the installed packages
 installed_packages <- installed.packages() [,1]
+# Determine the missing packages
 missing_packages <- character()
 for (p in 1:length(required_packages)) {
 	if ((required_packages[p] %in% installed_packages) == FALSE) {
 		missing_packages <- append(missing_packages, required_packages[p])
 	}
 }
-if (length(missing_packages) > 0) {
-	install.packages(missing_packages)
+# If a repository is specified
+if (repository != "" || !is.null(repository)) {
+	if (length(missing_packages) > 0) {
+		install.packages(missing_packages, repos=repository)
+	}
+} else {
+	if (length(missing_packages) > 0) {
+		install.packages(missing_packages)
+	}
 }
+# Load the packages
 for (i in 1:length(required_packages)) {
 	library (required_packages[i], character.only=TRUE)
 }
@@ -37,7 +47,7 @@ for (i in 1:length(required_packages)) {
 # This function adds two column to the peaklist matrix (rows: spectra/patients, columns: aligned peaks): Sample and Class, according to the file name.
 ### The name of the rows will be either the sample name or the class name (depending on the function parameter).
 # If the rows are named according to the sample name, an additional column for the class is added
-matrix_add_class_and_sample <- function (signal_matrix, peaks=list(), class_list=list(), file_format="imzml", sample_output=TRUE, class_output=TRUE, row_labels="Sample") {
+matrix_add_class_and_sample <- function (signal_matrix, peaks=list(), class_list=list(), spectra_format="imzml", sample_output=TRUE, class_output=TRUE, row_labels="Sample") {
 signal_matrix <- as.matrix(signal_matrix)
 number_of_spectra <- length(peaks)
 ####################################### FILE VECTOR
@@ -46,7 +56,7 @@ file_vector <- character()
 # Add the file names recursively, scrolling the whole spectral dataset
 for (i in 1:length(peaks)) {
     # Check the length(if averaged, it contains the name of all the single spectra)
-    if (file_format == "imzml" | file_format == "imzML") {
+    if (spectra_format == "imzml" || spectra_format == "imzML") {
         if (length(peaks[[i]]@metaData$file[1]) == 1) {
             file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
         }
@@ -54,7 +64,7 @@ for (i in 1:length(peaks)) {
             file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
         }
     }
-    if (file_format == "brukerflex" || file_format == "xmass") {
+    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
         if (length(peaks[[i]]@metaData$sampleName) == 1) {
             file_vector <- append(file_vector, peaks[[i]]@metaData$sampleName)
         }
@@ -146,16 +156,16 @@ return (signal_matrix)
 
 ###################################### ADD THE THY CLASS TO THE MATRIX (THYROID)
 # This function adds the THY column to the peaklist matrix, by reading the THY value from the sample name (imzML)
-matrix_add_thy <- function (signal_matrix, peaks, file_format="imzml") {
+matrix_add_thy <- function (signal_matrix, peaks, spectra_format="imzml") {
 number_of_spectra <- length(peaks)
 # Create the empty vector
 file_vector <- character()
 # Add the file names recursively, scrolling the whole spectral dataset
 for (i in 1:length(peaks)) {
-	if (file_format == "imzml" | file_format == "imzML") {
+	if (spectra_format == "imzml" || spectra_format == "imzML") {
 		file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
 	}
-	if (file_format == "brukerflex" || file_format == "xmass") {
+	if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 		file_vector <- append(file_vector, peaks[[i]]@metaData$sampleName)
 	}
 }
@@ -228,7 +238,7 @@ return (signal_matrix)
 
 ################################################################ SIGNAL FOLLOWER
 # This function takes a folder containing imzML files in it and a list of signals of interest (along with their possible names). It imports the spectra and returns a matrix listing the signal of interests along with their statistics.
-signal_follower_statistics <- function (filepath, signal_list, mass_labels=list(), SNR=5, file_format="imzml", tof_mode="linear", smoothing_strength_preprocessing="medium", process_in_packages_of=length(spectra), tolerance_ppm=2000) {
+signal_follower_statistics <- function (filepath, signal_list, mass_labels=list(), SNR=5, spectra_format="imzml", tof_mode="linear", smoothing_strength_preprocessing="medium", process_in_packages_of=length(spectra), tolerance_ppm=2000) {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
 # Rename the trim function
@@ -408,8 +418,8 @@ return (peaks_filtered)
 
 ########################################################### SPECTRA FILES READER
 # This function reads all the files from a folder and returns only the imzML files or the fid files.
-read_spectra_files <- function (folder, file_format="imzml", full_path=FALSE) {
-if (file_format=="imzml") {
+read_spectra_files <- function (folder, spectra_format="imzml", full_path=FALSE) {
+if (spectra_format=="imzml") {
 	# Read all the files
 	folder_all_files <- list.files(folder, full.names=full_path)
 	# Create the empty vector in which only the imzML files will be listed
@@ -421,7 +431,7 @@ if (file_format=="imzml") {
 		}
 	}
 }
-if (file_format=="brukerflex") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	# Read all the folders
 	sample_directory_list_all_folders <- dir(folder, ignore.case=TRUE, full.names=full_path, recursive=TRUE, include.dirs=TRUE)
 	# Take only the fid paths (spectra)
@@ -503,7 +513,7 @@ return (spectra)
 
 ######################### REPLACE THE SNR WITH THE STDEV IN THE PEAKS
 # This function computes the standard deviation of each peak of an average spectrum peaklist, by replacing the existing SNR slot with the SD or CV: all the peaks (average and dataset) are aligned and each peak of the average peaklist is searched across the dataset thanks to the intensity matrix.
-replace_SNR_in_avg_peaklist <- function (spectra, SNR=5, tof_mode="linear", tolerance_ppm=2000, file_format="imzml", replace_snr_with="std") {
+replace_SNR_in_avg_peaklist <- function (spectra, SNR=5, tof_mode="linear", tolerance_ppm=2000, spectra_format="imzml", replace_snr_with="std") {
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
@@ -645,7 +655,7 @@ return (list (vector=v, outliers_position=outliers_position))
 
 ######################################### PEAK STATISTICS (on processed Spectra)
 # This function computes the peak statistics onto a selected spectra dataset, both when the spectra belong to no (or one) class and more classes.
-peak_statistics <- function (spectra, SNR=3, class_list=list(), class_in_file_name=TRUE, tof_mode="linear", file_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE) {
+peak_statistics <- function (spectra, SNR=3, class_list=list(), class_in_file_name=TRUE, tof_mode="linear", spectra_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
@@ -723,7 +733,7 @@ if (number_of_classes == 1) {
     }
     ###############
 	# Fix the signal_matrix (Add the sample column)
-	signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, file_format=file_format, sample_output=TRUE, class_output=FALSE)
+	signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, spectra_format=spectra_format, sample_output=TRUE, class_output=FALSE)
 	# Output matrix
 	peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-1), ncol=9)
 	rownames(peak_stat_matrix) <- as.numeric(colnames(signal_matrix)[1:(ncol(signal_matrix)-1)])
@@ -741,7 +751,7 @@ if (number_of_classes == 1) {
 # is referred to a class
 if (number_of_classes > 1) {
 	# Fix the signal_matrix (Add the sample column)
-	signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, class_list=class_list, file_format=file_format, sample_output=TRUE, class_output=TRUE)
+	signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, class_list=class_list, spectra_format=spectra_format, sample_output=TRUE, class_output=TRUE)
 	# Output matrix
 	peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-2), ncol=14)
 	rownames(peak_stat_matrix) <- as.numeric(names(signal_matrix)[1:(ncol(signal_matrix)-2)])
@@ -1084,13 +1094,13 @@ return (spectrum_images)
 # This function imports the spectra in a memory efficient way: it reads spectra from one imzML file at a time, it can discard spectra according to their TIC, it runs the preprocessing of the spectra from the imzML file into packages of spectra, it can generate a set of representative average spectra (by grouping spectra randomly or according to a clustering algorithm). After this, it stores all the spectra from all the imzML files into a variable and from here it can align the spectra with the peaklist of the average spectrum of the dataset and it can crop all the spectra to a selected mass range.
 # It relies upon other functions.
 # The functions returns (the user can select what to compute) a list of elements: all the spectra, the representative spectra, the MS images after clustering.
-memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", mass_range=c(0,0), preprocess_spectra=TRUE, process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", clustering_method_for_hca="agglomerative", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=2000, file_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
+memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", mass_range=c(0,0), preprocess_spectra=TRUE, process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", clustering_method_for_hca="agglomerative", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=2000, spectra_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
 ################################################### Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 setwd(folder)
-folder_files <- read_spectra_files(folder, file_format=file_format, full_path=FALSE)
+folder_files <- read_spectra_files(folder, spectra_format=spectra_format, full_path=FALSE)
 ####################################################################### OUTPUTS
 spectra_dataset <- list ()
 spectra_dataset_grouped <- list()
@@ -1100,10 +1110,10 @@ spectra_dataset_representative <- list()
 ################################### For each imzML file (patient)...
 for (i in 1:length(folder_files)) {
 	### Load the spectra
-	if (file_format == "imzml" | file_format == "imzML") {
+	if (spectra_format == "imzml" || spectra_format == "imzML") {
 		spectra <- importImzMl(folder_files[i])
 	}
-	if (file_format == "brukerflex" || file_format == "xmass") {
+	if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 		spectra <- importBrukerFlex(folder_files[i])
 	}
     ######################################## TIC purification
@@ -1165,7 +1175,7 @@ for (i in 1:length(folder_files)) {
     ### Generate representative spectra (after TIC purification no spectra can be left!)
     if (generate_representative_spectra == TRUE && "representative" %in% output_list) {
 		if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
-	    	spectra_dataset_representative[[i]] <- group_spectra(spectra, spectra_per_patient=spectra_per_patient, file_format=file_format, tof_mode=tof_mode, seed=ifelse(is.null(seed), 0, seed), algorithm=algorithm_for_representative_spectra, clustering_method=clustering_method_for_hca, discarded_nodes=discarded_nodes)
+	    	spectra_dataset_representative[[i]] <- group_spectra(spectra, spectra_per_patient=spectra_per_patient, spectra_format=spectra_format, tof_mode=tof_mode, seed=ifelse(is.null(seed), 0, seed), algorithm=algorithm_for_representative_spectra, clustering_method=clustering_method_for_hca, discarded_nodes=discarded_nodes)
 	        spectra_dataset_grouped <- append(spectra_dataset_grouped,spectra_dataset_representative[[i]]$spectra)
 		}
     }
@@ -1401,9 +1411,9 @@ return (spectra_binned)
 ######################################################### SAMPLE NAME REPLACING
 # This function replaces the sample name field in the spectrum with the actual sample name (keeping only the last part of the file path and discarding the folder tree)
 # The input can be both spectra or peaks (MALDIquant)
-replace_sample_name <- function (spectra, file_format="imzml") {
+replace_sample_name <- function (spectra, spectra_format="imzml") {
 #### imzML
-if (file_format == "imzml" || file_format=="imzML") {
+if (spectra_format == "imzml" || spectra_format=="imzML") {
     # Scroll the spectra...
     for (i in 1:length(spectra)) {
         # Split the filepath at / (universal for different OSs)
@@ -1418,7 +1428,7 @@ if (file_format == "imzml" || file_format=="imzML") {
     }
 }
 #### Xmass
-if (file_format == "brukerflex" || file_format == "xmass") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # Scroll the spectra...
     for (i in 1:length(spectra)) {
         # Split the filepath at / (universal for different OSs)
@@ -1445,13 +1455,13 @@ return (spectra)
 ########################################################## CLASS NAME REPLACING
 # This function replaces the sample name field in the spectrum with the class the spectrum belongs to. If the filename contains the class, it replaces the filename with the class name, otherwise a class list symmetrical to the spectra must be provided.
 # The input can be both spectra or peaks (MALDIquant)
-replace_class_name <- function (spectra, class_list=NULL, class_in_file_name=TRUE, file_format="imzml") {
+replace_class_name <- function (spectra, class_list=NULL, class_in_file_name=TRUE, spectra_format="imzml") {
 # If a class list is provided...
 if (!is.null(class_list)) {
 	# If the class name is in the name
 	if (class_in_file_name == TRUE) {
 		# Extract the file name from the path
-		spectra <- replace_sample_name(spectra, file_format=file_format)
+		spectra <- replace_sample_name(spectra, spectra_format=spectra_format)
 		# Scroll the class list...
 		for (w in 1:length(class_list)) {
     		# Scroll the spectra...
@@ -1476,7 +1486,7 @@ if (is.null(class_list)) {
 	# It's guessed from the filepath
 	if (class_in_file_name == TRUE) {
 		#### imzML
-		if (file_format == "imzml" || file_format=="imzML") {
+		if (spectra_format == "imzml" || spectra_format=="imzML") {
 		    # Scroll the spectra...
 		    for (i in 1:length(spectra)) {
 		        # Split the filepath at / (universal for different OSs)
@@ -1488,7 +1498,7 @@ if (is.null(class_list)) {
 		    }
 		}
 		#### Xmass
-		if (file_format == "brukerflex" || file_format == "xmass") {
+		if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 		    # Scroll the spectra...
 		    for (i in 1:length(spectra)) {
 		        # Split the filepath at / (universal for different OSs)
@@ -1743,14 +1753,14 @@ return (preprocessed_spectra)
 # It is advisable to use a list of spectra coming from one patient (one imzML)
 # Spectra_per_patient = 1 returns the average spectrum of the spectra dataset.
 # The function returns a list of elements: representative spectra, MS images of pixels under the same nodes coloured the same way, list of spectra under the discarded nodes (with their average spectrum), list of spectra grouped according to the node they belong to.
-group_spectra <- function (spectra, spectra_per_patient=1, file_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", clustering_method="agglomerative", discarded_nodes=1, balanced=TRUE, method="mean") {
+group_spectra <- function (spectra, spectra_per_patient=1, spectra_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", clustering_method="agglomerative", discarded_nodes=1, balanced=TRUE, method="mean") {
 # Load the required libraries
 install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Check if it is not a single spectrum
 ### Create the file Vector
-if (file_format == "imzml" | file_format == "imzML") {
+if (spectra_format == "imzml" | spectra_format == "imzML") {
 	# Put the filenames in a vector
 	# Create the empty vector
 	file_vector <- character()
@@ -1760,7 +1770,7 @@ if (file_format == "imzml" | file_format == "imzML") {
 	}
 	patient_vector <- unique(file_vector)
 }
-if (file_format == "brukerflex" || file_format == "xmass") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	# Put the filenames in a vector
 	# Create the empty vector
 	file_vector <- character()
@@ -1801,7 +1811,7 @@ if (spectra_per_patient == 0 || spectra_per_patient == 1) {
 		patient_spectra_final <- averageMassSpectra(spectra, labels=file_vector, method="mean")
 	}
 	if (method == "skyline") {
-		patient_spectra_final <- group_spectra_skyline(spectra, file_format=file_format)
+		patient_spectra_final <- group_spectra_skyline(spectra, spectra_format=spectra_format)
 	}
 }
 # Run this script if there has to be two or more representative spectra per patient
@@ -2115,12 +2125,12 @@ return (list(spectra=patient_spectra_final, ms_images=msi_plots, discarded_spect
 
 #################################################### SPECTRA GROUPING (CLASSES)
 # The functions takes a list of already preprocessed spectra (MALDIquant) and generates a list of representative spectra, averaging spectra according to the class they belong to, generating one average spectrum per class.
-group_spectra_class <- function (spectra, class_list, method="mean", file_format="imzml", class_in_file_name=TRUE) {
+group_spectra_class <- function (spectra, class_list, method="mean", spectra_format="imzml", class_in_file_name=TRUE) {
 class_list <- sort(class_list)
 ####### IMZML
-if (file_format == "imzml" || file_format == "imzML") {
+if (spectra_format == "imzml" || spectra_format == "imzML") {
 	## REPLACE THE filepath PARAMETER FOR EACH SPECTRUM WITH THE CLASS
-	spectra <- replace_class_name(spectra, class_list=class_list, file_format=file_format, class_in_file_name=class_in_file_name)
+	spectra <- replace_class_name(spectra, class_list=class_list, spectra_format=spectra_format, class_in_file_name=class_in_file_name)
 	# Put the filenames/classes in a vector
 	# Create the empty vector
 	class_vector <- character()
@@ -2130,7 +2140,7 @@ if (file_format == "imzml" || file_format == "imzML") {
 	}
 }
 ####### XMASS
-if (file_format == "brukerflex" || file_format == "xmass") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	# Replace the names in the spectra with the class
 	for (class in class_list) {
 		for (s in 1:length(spectra)) {
@@ -2311,13 +2321,13 @@ return (most_intense_peaks)
 
 ############################################# AVERAGE THE REPLICATES (BY FOLDER)
 # This function averages the spectra contained in the same folder (more suitable for brukerflex format)
-average_replicates_by_folder <- function (spectra, folder, file_format="brukerflex") {
+average_replicates_by_folder <- function (spectra, folder, spectra_format="brukerflex") {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # List the spectra files
-folder_files <- read_spectra_files(folder, file_format=file_format, full_path=TRUE)
+folder_files <- read_spectra_files(folder, spectra_format=spectra_format, full_path=TRUE)
 # Split the path into individual folders (list, each element is a vector with the path splitted for that spectrum)
 folder_files_splitted <- list()
 # Split the paths into folders
@@ -2444,7 +2454,7 @@ if (isMassPeaksList(peaks)) {
 # This function reads the files contained in a provided folder (no memory efficient importing), it can average them according to the class they belong to or according to the folder they are into (average replicate/patient). It also computes the peak picking and can replace the SNR field in the peaklist with the standard deviation of the peaks or the coefficient of variation.
 # It returns a list containing: the spectra and the peaks (already aligned but not filtered).
 # It is used to create the library/database.
-library_creation <- function (filepath_library, class_grouping=TRUE, mass_range=c(3000,15000), spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=length(spectra)), average_replicates=FALSE, average_patients=FALSE, SNR=5, most_intense_peaks=FALSE, signals_to_take=20, reference_peaklist_for_alignment=NULL, tof_mode="linear", file_format="brukerflex") {
+library_creation <- function (filepath_library, class_grouping=TRUE, mass_range=c(3000,15000), spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=length(spectra)), average_replicates=FALSE, average_patients=FALSE, SNR=5, most_intense_peaks=FALSE, signals_to_take=20, reference_peaklist_for_alignment=NULL, tof_mode="linear", spectra_format="brukerflex") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 # Rename the trim function
@@ -2458,11 +2468,11 @@ if (tof_mode == "linear") {
 if (tof_mode == "reflectron" || tof_mode == "reflector") {
 	tolerance_ppm <- 200
 }
-if (file_format == "brukerflex" || file_format == "xmass") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	### Load the spectra
 	spectra <- importBrukerFlex(filepath_library)
 }
-if (file_format == "imzml" | file_format == "imzML") {
+if (spectra_format == "imzml" | spectra_format == "imzML") {
 	### Load the spectra
 	spectra <- importImzMl(filepath_library)
 }
@@ -2470,18 +2480,18 @@ if (file_format == "imzml" | file_format == "imzML") {
 spectra <- trim_spectra(spectra, range = mass_range)
 ### Average the replicates
 if (average_replicates == TRUE) {
-	spectra <- average_replicates_by_folder(spectra, filepath_library, file_format=file_format)
+	spectra <- average_replicates_by_folder(spectra, filepath_library, spectra_format=spectra_format)
 }
 # Average the patients
 if (average_patients == TRUE) {
-	spectra <- group_spectra(spectra, spectra_per_patient=1, file_format=file_format, tof_mode=tof_mode)
+	spectra <- group_spectra(spectra, spectra_per_patient=1, spectra_format=spectra_format, tof_mode=tof_mode)
 }
 ### Preprocessing
 spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=spectra_preprocessing$smoothing_strength, process_in_packages_of=spectra_preprocessing$preprocess_in_packages_of, sampling_method="sequential")
 ### Peak picking on the individual spectra
 if (class_grouping == TRUE) {
 	### Spectra grouping (class)
-	spectra <- group_spectra_class(spectra, class_list, file_format=file_format, class_in_file_name=TRUE)
+	spectra <- group_spectra_class(spectra, class_list, spectra_format=spectra_format, class_in_file_name=TRUE)
 	### Baseline correction
 	spectra <- removeBaseline(spectra, method="TopHat")
 } else {spectra <- spectra}
@@ -2633,10 +2643,10 @@ if (class_in_file_name == TRUE) {
     spectra_database <- replace_class_name(spectra_database, class_list)
 }
 # Generate representative spectra for each class
-spectra_database <- group_spectra_class(spectra_database, class_list=class_list, file_format="imzML")
+spectra_database <- group_spectra_class(spectra_database, class_list=class_list, spectra_format="imzML")
 ########################## PATIENT SPECTRA
 # Fix the filenames
-spectra_to_be_classified <- replace_sample_name(spectra_to_be_classified, file_format="imzML")
+spectra_to_be_classified <- replace_sample_name(spectra_to_be_classified, spectra_format="imzML")
 # Create the empty vector
 file_vector <- character()
 # Add the file names recursively, scrolling the whole spectral dataset
@@ -2666,7 +2676,7 @@ for (p in 1:length(patient_vector)) {
     ################## CLASSIFICATION OF ENTIRE SUB-AREAS
 	if ("subareas" %in% classification_of) {
     #### Group spectra
-    patient_spectra_grouped <- group_spectra(patient_spectra, spectra_per_patient=nodes, file_format="imzml", tof_mode=tof_mode, seed=seed, algorithm="hca", clustering_method=clustering_method, discarded_nodes=discarded_nodes, balanced=TRUE, method="mean")
+    patient_spectra_grouped <- group_spectra(patient_spectra, spectra_per_patient=nodes, spectra_format="imzml", tof_mode=tof_mode, seed=seed, algorithm="hca", clustering_method=clustering_method, discarded_nodes=discarded_nodes, balanced=TRUE, method="mean")
     patient_spectra_clustered_average <- patient_spectra_grouped$spectra
     patient_spectra_clustered <- patient_spectra_grouped$spectra_hca_grouped[[1]]
     # Put the database and the spectra together
@@ -2681,7 +2691,7 @@ for (p in 1:length(patient_vector)) {
     }
     # Compute the intensity matrix
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
-    intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, file_format="imzml", sample_output=TRUE, class_output=FALSE)
+    intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, spectra_format="imzml", sample_output=TRUE, class_output=FALSE)
     rownames(intensity_matrix) <- intensity_matrix[,"Sample"]
 	# Compute the agglomerative hierarchical clustering
 	if (clustering_method == "agglomerative") {
@@ -2754,7 +2764,7 @@ for (p in 1:length(patient_vector)) {
     }
     # Compute the intensity matrix
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
-    intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, file_format="imzml", sample_output=TRUE, class_output=FALSE)
+    intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, spectra_format="imzml", sample_output=TRUE, class_output=FALSE)
     rownames(intensity_matrix) <- intensity_matrix[,"Sample"]
     # Compute the agglomerative hierarchical clustering
 	if (clustering_method == "agglomerative") {
@@ -2824,7 +2834,7 @@ for (p in 1:length(patient_vector)) {
 	    }
 	    # Compute the intensity matrix
 	    intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
-	    intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, file_format="imzml", sample_output=TRUE, class_output=FALSE)
+	    intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, spectra_format="imzml", sample_output=TRUE, class_output=FALSE)
 	    rownames(intensity_matrix) <- intensity_matrix[,"Sample"]
 		# Compute the agglomerative hierarchical clustering
 		if (clustering_method == "agglomerative") {
@@ -2897,7 +2907,7 @@ install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
-	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
+	filepath_test_imzml <- read_spectra_files(spectra_path, spectra_format="imzml", full_path=TRUE)
 }
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) != 0) {
 	filepath_test_imzml <- spectra_path
@@ -3228,7 +3238,7 @@ install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
-	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
+	filepath_test_imzml <- read_spectra_files(spectra_path, spectra_format="imzml", full_path=TRUE)
 }
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) != 0) {
 	filepath_test_imzml <- spectra_path
@@ -3540,7 +3550,7 @@ install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
-	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
+	filepath_test_imzml <- read_spectra_files(spectra_path, spectra_format="imzml", full_path=TRUE)
 }
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) != 0) {
 	filepath_test_imzml <- spectra_path
@@ -3854,7 +3864,7 @@ msi_plots <- list()
 classifiers <- sort(classifiers)
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
-	filepath_test_imzml <- read_spectra_files(spectra_path, file_format="imzml", full_path=TRUE)
+	filepath_test_imzml <- read_spectra_files(spectra_path, spectra_format="imzml", full_path=TRUE)
 }
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) != 0) {
 	filepath_test_imzml <- spectra_path
@@ -3883,10 +3893,10 @@ for (classif in 1:length(classifiers)) {
 if ("hca" %in% classifiers && (!is.null(spectra_database_folder_for_clustering) || length(spectra_database_folder_for_clustering) == 0)) {
 	######################## Database for HCA: import, trim and preprocess (memory efficient import of imzML files)
 	# Generate one spectrum (average) per patient (imzML file)
-	spectra_database_for_hca <- memory_efficient_import(spectra_database_folder, tof_mode=tof_mode, tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength=smoothing_strength_preprocessing, mass_range=mass_range, preprocess_spectra=preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of, generate_representative_spectra=TRUE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", discarded_nodes=0, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=tolerance_ppm, file_format="imzml", seed=seed, output_list="average")
+	spectra_database_for_hca <- memory_efficient_import(spectra_database_folder, tof_mode=tof_mode, tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength=smoothing_strength_preprocessing, mass_range=mass_range, preprocess_spectra=preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of, generate_representative_spectra=TRUE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", discarded_nodes=0, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=tolerance_ppm, spectra_format="imzml", seed=seed, output_list="average")
 	spectra_database_for_hca <- spectra_database_for_hca$spectra_average
 	# Generate one representative spectrum per class
-	spectra_database_for_hca <- group_spectra_class(spectra_database_for_hca, class_list=class_list_for_hca, file_format="imzml")
+	spectra_database_for_hca <- group_spectra_class(spectra_database_for_hca, class_list=class_list_for_hca, spectra_format="imzml")
 }
 ################################### For each imzMl (patient)...
 for (f in 1:length(filepath_test_imzml)) {
@@ -5077,7 +5087,7 @@ return (list(original_peaklist=peaklist, peaklist_rounded=peaklist2))
 ########################################## BIOTYPER-LIKE SCORE: SIGNAL INTENSITY
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity comparison.
 # The function takes spectra and (aligned and filtered) peaks from the library_creation function.
-biotyper_like_score_signal_intensity <- function(test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
+biotyper_like_score_signal_intensity <- function(test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
@@ -5107,30 +5117,30 @@ peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peak
 peaks_library <- peaks_all [1:library_size]
 peaks_test <- peaks_all [(library_size+1):length(peaks_all)]
 ##### Replace the sample name, both in the library and in the test set
-peaks_test <- replace_sample_name(peaks_test, file_format=file_format)
-peaks_library <- replace_sample_name(peaks_library, file_format=file_format)
+peaks_test <- replace_sample_name(peaks_test, spectra_format=spectra_format)
+peaks_library <- replace_sample_name(peaks_library, spectra_format=spectra_format)
 ####### Create the sample vector
 sample_vector <- character()
-if (file_format == "brukerflex") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:number_of_samples) {
 		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
 	}
 }
-if (file_format == "imzml" | file_format == "imzML") {
+if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:number_of_samples) {
 		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
 	}
 }
 ####### Create the library vector
 library_vector <- character()
-if (file_format == "brukerflex") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:library_size) {
 		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
 	}
 }
-if (file_format == "imzml" | file_format == "imzML") {
+if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:library_size) {
 		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
 	}
@@ -5282,7 +5292,7 @@ return (list(output=output, library_list=list(spectra=spectra_library, peaks=pea
 ###################### BIOTYPER SCORE ACCORDING TO THE HIERARCHICAL DISTANCE
 # This function computes the biotyper like score by comparing the test spectra with the library spectra, determining the similarity (through the euclidean distance) and assigning a category according to the distance.
 # The function takes spectra and (aligned and filtered) peaks from the library_creation function.
-biotyper_like_score_hierarchical_distance <- function (library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, file_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
+biotyper_like_score_hierarchical_distance <- function (library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, spectra_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
@@ -5313,30 +5323,30 @@ peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peak
 peaks_library <- peaks_all [1:library_size]
 peaks_test <- peaks_all [(library_size+1):length(peaks_all)]
 #### Replace the sample name, both in the library and in the test set
-peaks_test <- replace_sample_name(peaks_test, file_format=file_format)
-peaks_library <- replace_sample_name(peaks_library, file_format=file_format)
+peaks_test <- replace_sample_name(peaks_test, spectra_format=spectra_format)
+peaks_library <- replace_sample_name(peaks_library, spectra_format=spectra_format)
 ####### Create the sample vector
 sample_vector <- character()
-if (file_format == "brukerflex") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	# If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:number_of_samples) {
 		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
 	}
 }
-if (file_format == "imzml" | file_format == "imzML") {
+if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:number_of_samples) {
 		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
 	}
 }
 ####### Create the library vector
 library_vector <- character()
-if (file_format == "brukerflex") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	# If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:library_size) {
 		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
 	}
 }
-if (file_format == "imzml" | file_format == "imzML") {
+if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:library_size) {
 		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
 	}
@@ -5349,7 +5359,7 @@ for (spectrum in spectra_test) {
 # Generate the matrix (for hca)
 peaklist_matrix <- intensityMatrix(peaks_all, spectra_all)
 # Add additional info to the matrix
-peaklist_matrix <- matrix_add_class_and_sample(peaklist_matrix, peaks=peaks_all, class_list=list(), file_format=file_format, sample_output=TRUE, class_output=FALSE)
+peaklist_matrix <- matrix_add_class_and_sample(peaklist_matrix, peaks=peaks_all, class_list=list(), spectra_format=spectra_format, sample_output=TRUE, class_output=FALSE)
 rownames(peaklist_matrix) <- make.names(peaklist_matrix[,"Sample"], unique=TRUE)
 # Compute the hca
 distance_matrix <- dist(peaklist_matrix[,1:(ncol(peaklist_matrix)-1)], method="euclidean")
@@ -5434,7 +5444,7 @@ return (list(result_matrix=result_matrix, plots=hca_dendrogram, library_list=lis
 ################################################################## BIOTYPER LIKE
 # This function includes (and relies upon) all the functions to provide the Biotyper like experience.
 # It takes the library and test lists that come out from the library_creation function.
-biotyper_like <- function(library_list, test_list, similarity_criteria=c("hca", "signal intensity","correlation"), intensity_correction_coefficient=1, signal_intensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peaks_filtering=TRUE, peaks_filtering_threshold_percent=5, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tof_mode="linear", file_format="brukerflex", score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
+biotyper_like <- function(library_list, test_list, similarity_criteria=c("hca", "signal intensity","correlation"), intensity_correction_coefficient=1, signal_intensity_evaluation=c("intensity percentage", "standard deviation"), intensity_tolerance_percent=70, peaks_filtering=TRUE, peaks_filtering_threshold_percent=5, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tof_mode="linear", spectra_format="brukerflex", score_only=TRUE, spectra_path_output=TRUE, normalise_distances_in_hca=TRUE) {
 ###### Outputs
 score_intensity <- NULL
 score_hca <- NULL
@@ -5451,19 +5461,19 @@ if (tof_mode == "reflectron" || tof_mode == "reflector") {
 if ("signal intensity" %in% similarity_criteria) {
 	# Standard deviation
 	if ("standard deviation" %in% signal_intensity_evaluation) {
-	score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	} else if ("intensity percentage" %in% signal_intensity_evaluation) {
 		# Intensiry percentage
-	    score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	    score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	}
 }
 ####### Hierarchical clustering
 if ("hca" %in% similarity_criteria) {
-	score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, spectra_path_output=spectra_path_output, score_only=score_only, file_format=file_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
+	score_hca <- biotyper_like_score_hierarchical_distance(library_list, test_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, spectra_path_output=spectra_path_output, score_only=score_only, spectra_format=spectra_format, normalise_distances=normalise_distances_in_hca, normalisation_method="sum")
 }
 ###### Correlation matrix
 if ("correlation" %in% similarity_criteria) {
-	score_correlation_matrix <- biotyper_like_score_correlation_matrix(library_list, test_list, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_correction_coefficient=intensity_correction_coefficient, file_format=file_format, spectra_path_output=spectra_path_output, score_only=score_only)
+	score_correlation_matrix <- biotyper_like_score_correlation_matrix(library_list, test_list, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_correction_coefficient=intensity_correction_coefficient, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only)
 }
 #################### RETURN THE OUTPUTS
 return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlation_matrix=score_correlation_matrix))
@@ -5481,7 +5491,7 @@ return(list(score_hca=score_hca, score_intensity=score_intensity, score_correlat
 
 ######################################## BIOTYPER-LIKE SCORE: CORRELATION MATRIX
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity simmetry via the correlation matrix.
-biotyper_like_score_correlation_matrix <- function(library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, file_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
+biotyper_like_score_correlation_matrix <- function(library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_correction_coefficient=1, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE) {
 install_and_load_required_packages(c("MALDIquant","corrplot","weights","stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
@@ -5512,30 +5522,30 @@ peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peak
 peaks_library <- peaks_all [1:library_size]
 peaks_test <- peaks_all [(library_size+1):length(peaks_all)]
 #### Replace the sample name, both in the library and in the test set
-peaks_test <- replace_sample_name(peaks_test, file_format=file_format)
-peaks_library <- replace_sample_name(peaks_library, file_format=file_format)
+peaks_test <- replace_sample_name(peaks_test, spectra_format=spectra_format)
+peaks_library <- replace_sample_name(peaks_library, spectra_format=spectra_format)
 ####### Create the sample vector
 sample_vector <- character()
-if (file_format == "brukerflex") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:number_of_samples) {
 		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
 	}
 }
-if (file_format == "imzml" | file_format == "imzML") {
+if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:number_of_samples) {
 		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
 	}
 }
 ####### Create the library vector
 library_vector <- character()
-if (file_format == "brukerflex") {
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:library_size) {
 		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
 	}
 }
-if (file_format == "imzml" | file_format == "imzML") {
+if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:library_size) {
 		library_vector <- append(library_vector, peaks_library[[s]]@metaData$file[1])
 	}
