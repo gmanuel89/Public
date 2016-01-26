@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.25
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.26
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/")
@@ -419,7 +419,7 @@ return (peaks_filtered)
 ########################################################### SPECTRA FILES READER
 # This function reads all the files from a folder and returns only the imzML files or the fid files.
 read_spectra_files <- function (folder, spectra_format="imzml", full_path=FALSE) {
-if (spectra_format=="imzml") {
+if (spectra_format == "imzml" || spectra_format == "imzML") {
 	# Read all the files
 	folder_all_files <- list.files(folder, full.names=full_path)
 	# Create the empty vector in which only the imzML files will be listed
@@ -1413,31 +1413,46 @@ return (spectra_binned)
 # The input can be both spectra or peaks (MALDIquant)
 replace_sample_name <- function (spectra, spectra_format="imzml") {
 #### imzML
-if (spectra_format == "imzml" || spectra_format=="imzML") {
+if (spectra_format == "imzml" || spectra_format == "imzML") {
     # Scroll the spectra...
-    for (i in 1:length(spectra)) {
-        # Split the filepath at / (universal for different OSs)
-        sample_name <- unlist(strsplit(spectra[[i]]@metaData$file[1],"/"))
-        # The sample name is the last part of the path
-        sample_name <- sample_name[length(sample_name)]
-        # Detach the file extension
-        sample_name <- unlist(strsplit(sample_name, ".imzML"))
-        sample_name <- sample_name[1]
-        # Put the name back into the spectra
-        spectra[[i]]@metaData$file <- sample_name
-    }
+	if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+	    for (i in 1:length(spectra)) {
+	        # Split the filepath at / (universal for different OSs)
+	        sample_name <- unlist(strsplit(spectra[[i]]@metaData$file[1],"/"))
+	        # The sample name is the last part of the path
+	        sample_name <- sample_name[length(sample_name)]
+	        # Detach the file extension
+	        sample_name <- unlist(strsplit(sample_name, ".imzML"))
+	        sample_name <- sample_name[1]
+	        # Put the name back into the spectra
+	        spectra[[i]]@metaData$file <- sample_name
+	    }
+	} else {
+		# Split the filepath at / (universal for different OSs)
+		sample_name <- unlist(strsplit(spectra@metaData$file[1],"/"))
+		# The sample name is the last part of the path
+		sample_name <- sample_name[length(sample_name)]
+		# Detach the file extension
+		sample_name <- unlist(strsplit(sample_name, ".imzML"))
+		sample_name <- sample_name[1]
+		# Put the name back into the spectra
+		spectra@metaData$file <- sample_name
+	}
 }
 #### Xmass
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # Scroll the spectra...
-    for (i in 1:length(spectra)) {
-        # Split the filepath at / (universal for different OSs)
-        sample_name <- unlist(strsplit(spectra[[i]]@metaData$file[1],"/"))
-        # The sample name is the last part of the path
-        sample_name <- sample_name[length(sample_name)-4]
-        # Put the name back into the spectra
-        spectra[[i]]@metaData$file <- sample_name
-    }
+	if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+    	for (i in 1:length(spectra)) {
+        	sample_name <- spectra[[i]]@metaData$sampleName[1]
+        	# Put the name back into the spectra
+        	spectra[[i]]@metaData$file <- sample_name
+    	}
+	} else {
+		sample_name <- spectra@metaData$sampleName[1]
+		# Put the name back into the spectra
+		spectra@metaData$file <- sample_name
+	}
 }
 return (spectra)
 }
@@ -1758,6 +1773,13 @@ group_spectra <- function (spectra, spectra_per_patient=1, spectra_format="imzml
 install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
+# Output variables
+patient_spectra_final <- list()
+msi_plots <- list()
+discarded_spectra <- list()
+discarded_spectra_average <- list()
+plots <- list()
+spectra_hca_grouped <- list()
 # Check if it is not a single spectrum
 ### Create the file Vector
 if (spectra_format == "imzml" | spectra_format == "imzML") {
@@ -2135,25 +2157,39 @@ if (spectra_format == "imzml" || spectra_format == "imzML") {
 	# Create the empty vector
 	class_vector <- character()
 	# Add the file names recursively, scrolling the whole spectral dataset
-	for (i in 1:length(spectra)) {
-		class_vector <- append(class_vector, spectra[[i]]@metaData$file[1])
+	if (isMassSpectrumList(spectra)) {
+		for (i in 1:length(spectra)) {
+			class_vector <- append(class_vector, spectra[[i]]@metaData$file[1])
+		}
+	} else {
+		class_vector <- spectra@metaData$file[1]
 	}
 }
 ####### XMASS
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	# Replace the names in the spectra with the class
-	for (class in class_list) {
-		for (s in 1:length(spectra)) {
-			if (length(grep(class, spectra[[s]]@metaData$file[1], fixed=TRUE)) > 0) {
-				spectra[[s]]@metaData$file <- class
+	for (cl in 1:length(class_list)) {
+		if (isMassSpectrumList(spectra)) {
+			for (s in 1:length(spectra)) {
+				if (length(grep(class_list[cl], spectra[[s]]@metaData$file[1], fixed=TRUE)) > 0) {
+					spectra[[s]]@metaData$file <- class_list[cl]
+				}
+			}
+		} else {
+			if (length(grep(class_list[cl], spectra@metaData$file[1], fixed=TRUE)) > 0) {
+				spectra@metaData$file <- class_list[cl]
 			}
 		}
 	}
 	# Create the empty vector
 	class_vector <- character()
 	# Add the file names recursively, scrolling the whole spectral dataset
-	for (i in 1:length(spectra)) {
-		class_vector <- append(class_vector, spectra[[i]]@metaData$file[1])
+	if (isMassSpectrumList(spectra)) {
+		for (i in 1:length(spectra)) {
+			class_vector <- append(class_vector, spectra[[i]]@metaData$file[1])
+		}
+	} else {
+		class_vector <- spectra@metaData$file[1]
 	}
 }
 # Average
@@ -2326,6 +2362,11 @@ average_replicates_by_folder <- function (spectra, folder, spectra_format="bruke
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
+# Generate a list of sample names
+#sample_names <- character()
+#for (s in 1:length(spectra)) {
+	#sample_names <- append(sample_names, spectra[[s]]@metaData$sampleName[1])
+#}
 # List the spectra files
 folder_files <- read_spectra_files(folder, spectra_format=spectra_format, full_path=TRUE)
 # Split the path into individual folders (list, each element is a vector with the path splitted for that spectrum)
@@ -2452,7 +2493,7 @@ if (isMassPeaksList(peaks)) {
 
 ################################################ LIBRARY CREATION
 # This function reads the files contained in a provided folder (no memory efficient importing), it can average them according to the class they belong to or according to the folder they are into (average replicate/patient). It also computes the peak picking and can replace the SNR field in the peaklist with the standard deviation of the peaks or the coefficient of variation.
-# It returns a list containing: the spectra and the peaks (already aligned but not filtered).
+# It returns a list containing: the spectra and the peaks (NOT aligned).
 # It is used to create the library/database.
 library_creation <- function (filepath_library, class_grouping=TRUE, mass_range=c(3000,15000), spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=length(spectra)), average_replicates=FALSE, average_patients=FALSE, SNR=5, most_intense_peaks=FALSE, signals_to_take=20, reference_peaklist_for_alignment=NULL, tof_mode="linear", spectra_format="brukerflex") {
 # Load the required libraries
@@ -2486,22 +2527,20 @@ if (average_replicates == TRUE) {
 if (average_patients == TRUE) {
 	spectra <- group_spectra(spectra, spectra_per_patient=1, spectra_format=spectra_format, tof_mode=tof_mode)
 }
-### Preprocessing
-spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=spectra_preprocessing$smoothing_strength, process_in_packages_of=spectra_preprocessing$preprocess_in_packages_of, sampling_method="sequential")
-### Peak picking on the individual spectra
+### Class grouping
 if (class_grouping == TRUE) {
 	### Spectra grouping (class)
-	spectra <- group_spectra_class(spectra, class_list, spectra_format=spectra_format, class_in_file_name=TRUE)
-	### Baseline correction
-	spectra <- removeBaseline(spectra, method="TopHat")
+	spectra <- group_spectra_class(spectra, class_list=class_list, spectra_format=spectra_format, class_in_file_name=TRUE)
 } else {spectra <- spectra}
+### Preprocessing
+spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=spectra_preprocessing$smoothing_strength, process_in_packages_of=spectra_preprocessing$preprocess_in_packages_of, sampling_method="sequential")
 ##########################
-### Peak picking
+### Peak picking on the individual spectra
 if (most_intense_peaks == TRUE) {
 	peaks_library <- most_intense_signals(spectra, signals_to_take=signals_to_take)
 } else {
 	peaks_library <- detectPeaks(spectra, method="MAD", SNR=SNR)
-	peaks_library <- align_and_filter_peaks(peaks_library, tolerance_ppm=tolerance_ppm, peaks_filtering=FALSE, low_intensity_peaks_removal=FALSE, reference_peaklist=reference_peaklist_for_alignment)
+	#peaks_library <- align_and_filter_peaks(peaks_library, tolerance_ppm=tolerance_ppm, peaks_filtering=FALSE, low_intensity_peaks_removal=FALSE, reference_peaklist=reference_peaklist_for_alignment)
 }
 ####
 library_list <- list(spectra = spectra, peaks = peaks_library)
@@ -5552,8 +5591,8 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 }
 # Generate the path vector
 spectra_path_vector <- character()
-for (spectrum in spectra_test) {
-	spectra_path_vector <- append(spectra_path_vector, spectrum@metaData$file[1])
+for (sp in 1:length(spectra_test)) {
+	spectra_path_vector <- append(spectra_path_vector, spectra_test[[sp]]@metaData$file[1])
 }
 ############################################################ SCORE (FRI)
 # Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
@@ -5612,10 +5651,10 @@ if (intensity_correction_coefficient != 0 && intensity_correction_coefficient !=
 	# Compute the vector of weights
 	weights_vector <- c(rep(1, length(library_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
 	correlation_matrix <- wtd.cors(x=t(intensity_matrix_global), weight=weights_vector)
-	counter3 <- correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size]
+	counter3 <- as.matrix(correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size])
 } else if (intensity_correction_coefficient == 1) {
 		correlation_matrix <- cor(t(intensity_matrix_global))
-		counter3 <- correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size]
+		counter3 <- as.matrix(correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size])
 } else if (intensity_correction_coefficient == 0) {counter3 <- matrix(1, nrow=number_of_samples, ncol=library_size)}
 # Extract the absolute values
 for (s in 1:number_of_samples) {
@@ -5623,6 +5662,10 @@ for (s in 1:number_of_samples) {
 		counter3[s,l] <- abs(counter3[s,l])
 	}
 }
+# COUNTER 4 - P-VALUE OF CORRELATION
+number_of_signals <- ncol(intensity_matrix_global)
+pvalue_matrix <- counter3
+pvalue_matrix <- apply(counter3, MARGIN=c(1,2), FUN=function(x) correlation_pvalue(x, number_of_signals))
 # Generate the image
 #corrplot(counter3, method="circle")
 #correlation_plot <- recordPlot()
@@ -5669,13 +5712,13 @@ if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
 		for (w in 1:library_size) {
 			if (score[r,w]>=2) {
-				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), ")")
+				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", round(pvalue_matrix[r,w], digits=6), ")")
 			}
 			if (score[r,w]<1.5) {
-				output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), ")")
+				output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", round(pvalue_matrix[r,w], digits=6), ")")
 			}
 			if (score[r,w]>=1.5 && score[r,w]<2) {
-				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), ")")
+				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", round(pvalue_matrix[r,w], digits=6), ")")
 			}
 		}
 	}
