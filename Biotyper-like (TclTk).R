@@ -1,8 +1,8 @@
-################ BIOTYPER-LIKE PROGRAM 2016.01.25
+################ BIOTYPER-LIKE PROGRAM 2016.01.26
 
 # Update packages and load the required packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/")
-install_and_load_required_packages(c("tcltk", "WriteXLS"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
+install_and_load_required_packages(c("tcltk", "xlsx"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
 
 
 
@@ -11,7 +11,7 @@ install_and_load_required_packages(c("tcltk", "WriteXLS"), repository="http://cr
 ###################################### Initialise the variables (default values)
 average_replicates_in_database <- FALSE
 average_replicates_in_test <- FALSE
-peaks_filtering <- TRUE
+peaks_filtering <- FALSE
 low_intensity_peaks_removal <- FALSE
 tof_mode <- "linear"
 spectra_format <- "xmass"
@@ -29,7 +29,7 @@ file_type_export <- "xlsx"
 ################## Values of the variables (for displaying and dumping purposes)
 average_replicates_in_database_value <- "NO"
 average_replicates_in_test_value <- "NO"
-peaks_filtering_value <- "YES"
+peaks_filtering_value <- "NO"
 low_intensity_peaks_removal_value <- "NO"
 score_only_value <- "NO"
 spectra_path_output_value <- "YES"
@@ -269,36 +269,40 @@ run_biotyper_like_function <- function() {
 	if (file_type_export == "xlsx" || file_type_export == "xls") {
 		filename <- set_file_name()
 		# Check if PERL is installed by using the built in function, for WriteXLS package
-		perl_installed <- testPerl(verbose=FALSE)
-		if (perl_installed == FALSE) {
-			tkmessageBox(title = "Perl", message = "The software PERL has not been found on the computer. Please install the Perl software from\nhttps://www.perl.org/get.html\nand restart the R session", icon = "warning")
-		}
-		if (!is.null(score_intensity_matrix) && perl_installed == TRUE) {
+		#perl_installed <- testPerl(verbose=FALSE)
+		#if (perl_installed == FALSE) {
+			#tkmessageBox(title = "Perl", message = "The software PERL has not been found on the computer. Please install the Perl software from\nhttps://www.perl.org/get.html\nand restart the R session", icon = "warning")
+		#}
+		if (!is.null(score_intensity_matrix)) {
 			# Convert it to a data frame
 			score_intensity_matrix_results <- as.data.frame(score_intensity_matrix_results)
 			# Generate unique row names
 			unique_row_names <- make.names(rownames(score_intensity_matrix_results), unique=TRUE)
 			rownames(score_intensity_matrix_results) <- unique_row_names
 			# Export
-		    WriteXLS(x=score_intensity_matrix_results, ExcelFileName=paste("int_", filename, sep=""), SheetNames="Scores - Intensity", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
+		    #WriteXLS(x=score_intensity_matrix_results, ExcelFileName=paste("int_", filename, sep=""), SheetNames="Scores - Intensity", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
+			write.xlsx(x=score_intensity_matrix_results, file=paste("int_", filename, sep=""), sheetName="Scores - Intensity", row.names=TRUE)
+
 		}
-		if (!is.null(score_hca_matrix) && perl_installed == TRUE) {
+		if (!is.null(score_hca_matrix)) {
 			# Convert it to a data frame
 			score_hca_matrix_results <- as.data.frame(score_hca_matrix_results)
 			# Generate unique row names
 			unique_row_names <- make.names(rownames(score_hca_matrix_results), unique=TRUE)
 			rownames(score_hca_matrix_results) <- unique_row_names
 			# Export
-		    WriteXLS(x=score_hca_matrix_results, ExcelFileName=paste("hca_", filename, sep=""), SheetNames="Scores - HCA", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
+		    #WriteXLS(x=score_hca_matrix_results, ExcelFileName=paste("hca_", filename, sep=""), SheetNames="Scores - HCA", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
+			write.xlsx(x=score_hca_matrix_results, file=paste("hca_", filename, sep=""), sheetName="Scores - HCA", row.names=TRUE)
 		}
-		if (!is.null(score_correlation_matrix) && perl_installed == TRUE) {
+		if (!is.null(score_correlation_matrix)) {
 			# Convert it to a data frame
 			score_correlation_matrix_results <- as.data.frame(score_correlation_matrix_results)
 			# Generate unique row names
 			unique_row_names <- make.names(rownames(score_correlation_matrix_results), unique=TRUE)
 			rownames(score_correlation_matrix_results) <- unique_row_names
 			# Export
-		    WriteXLS(x=score_correlation_matrix_results, ExcelFileName=paste("corr_", filename, sep=""), SheetNames="Scores - Correlation", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
+		    #WriteXLS(x=score_correlation_matrix_results, ExcelFileName=paste("corr_", filename, sep=""), SheetNames="Scores - Correlation", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
+			write.xlsx(x=score_correlation_matrix_results, file=paste("corr_", filename, sep=""), sheetName="Scores - Correlation", row.names=TRUE)
 		}
 	}
 	### Messagebox
@@ -355,10 +359,10 @@ peaks_filtering_choice <- function() {
 	# Catch the value from the menu
 	peaks_filtering <- select.list(c("YES","NO"), title="Choose")
 	# Default
-	if (peaks_filtering == "" || peaks_filtering == "YES") {
+	if (peaks_filtering == "YES") {
 		peaks_filtering <- TRUE
 	}
-	if (peaks_filtering == "NO") {
+	if (peaks_filtering == "NO" || peaks_filtering == "") {
 		peaks_filtering <- FALSE
 	}
 	# Set the value of the displaying label
@@ -697,8 +701,8 @@ tkgrid(peak_picking_mode_entry, row=5, column=2)
 tkgrid(peak_picking_mode_value_label, row=5, column=3)
 tkgrid(signals_to_take_label, row=5, column=4)
 tkgrid(signals_to_take_entry, row=5, column=5)
-tkgrid(SNR_label, row=6, column=3)
-tkgrid(SNR_entry, row=6, column=4)
+tkgrid(SNR_label, row=6, column=2)
+tkgrid(SNR_entry, row=6, column=3)
 tkgrid(peaks_filtering_label, row=7, column=1)
 tkgrid(peaks_filtering_entry, row=7, column=2)
 tkgrid(peaks_filtering_value_label, row=7, column=3)
@@ -727,8 +731,8 @@ tkgrid(tof_mode_value_label, row=11, column=3)
 tkgrid(spectra_format_label, row=11, column=4)
 tkgrid(spectra_format_entry, row=11, column=5)
 tkgrid(spectra_format_value_label, row=11, column=6)
-tkgrid(intensity_tolerance_percent_label, row=6, column=5)
-tkgrid(intensity_tolerance_percent_entry, row=6, column=6)
+tkgrid(intensity_tolerance_percent_label, row=6, column=4)
+tkgrid(intensity_tolerance_percent_entry, row=6, column=5)
 tkgrid(preprocess_spectra_in_packages_of_label, row=12, column=3)
 tkgrid(preprocess_spectra_in_packages_of_entry, row=12, column=4)
 tkgrid(file_type_export_label, row=13, column=2)
