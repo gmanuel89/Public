@@ -1,7 +1,7 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.26
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.28
 
 # Update the packages
-update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/")
+update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
 
 ########################################################################## MISC
 
@@ -2311,6 +2311,10 @@ trim_spectra <- get(x="trim", pos="package:MALDIquant")
 picking_function <- function (peaks, signals_to_take) {
 	# Create a dataframe with mass and intensity
 	peaks_data_frame <- data.frame (mass = peaks@mass, intensity = peaks@intensity, SNR = peaks@snr)
+	# Check if the provided number does not exceed the number of available signals
+	if (signals_to_take > nrow(peaks_data_frame) || signals_to_take <= 0) {
+		signals_to_take <- nrow(peaks_data_frame)
+	}
 	# Sort the dataframe according to the SNR
 	peaks_data_frame <- peaks_data_frame [order(-peaks_data_frame$SNR),]
 	# Select only the first most intense signals
@@ -2422,7 +2426,7 @@ return (spectra_replicates_averaged)
 
 ################################################################# PEAK ALIGNMENT
 # This function takes a list of peaks (MALDIquant) and computes the peak alignment, along with the false positive removal and the removal of low-intensity peaks.
-align_and_filter_peaks <- function (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, reference_peaklist=NULL) {
+align_and_filter_peaks <- function (peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, reference_peaklist=NULL, spectra=NULL) {
 # Align only if there are many peaklists
 if (isMassPeaksList(peaks)) {
 	# Load the required libraries
@@ -2443,7 +2447,17 @@ if (isMassPeaksList(peaks)) {
 	if (low_intensity_peaks_removal == TRUE) {
 		peaks_aligned <- remove_low_intensity_peaks(peaks_aligned, intensity_threshold_percent=intensity_threshold_percent)
 	}
-	# Align to a reference peaklist
+	# Align to a reference peaklist: AVERAGE SPECTRUM (if a spectra list is provided)
+	if (is.character(reference_peaklist) && reference_peaklist == "average" && !is.null(spectra)) {
+		# Average the spectra
+		average_spectrum <- averageMassSpectra(spectra, method="mean")
+		# Peak picking
+		average_spectrum_peaks <- detectPeaks(average_spectrum, method="MAD", SNR=5)
+		reference_peaklist <- average_spectrum_peaks@mass
+	} else if (is.character(reference_peaklist) && reference_peaklist == "average" && is.null(spectra)) {
+		reference_peaklist <- NULL
+	}
+	# Align to the reference peaklist
 	if (!is.null(reference_peaklist)) {
 		############ Function for lapply
 		align_peaks <- function (peaks, reference_peaklist, tolerance_ppm) {
@@ -5126,7 +5140,7 @@ return (list(original_peaklist=peaklist, peaklist_rounded=peaklist2))
 ########################################## BIOTYPER-LIKE SCORE: SIGNAL INTENSITY
 # The function calculates the score for the biotyper like program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity comparison.
 # The function takes spectra and (aligned and filtered) peaks from the library_creation function.
-biotyper_like_score_signal_intensity <- function(test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE,  low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
+biotyper_like_score_signal_intensity <- function(test_list, library_list, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
@@ -5249,7 +5263,7 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 						# Count the number of closely matching signals with the reference in the sample peaklist
 						if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
 							# Evaluate the difference in intensity
-							if ((abs(peaks_test[[s]]@intensity[i] - peaks_library[[l]]@intensity[j])*100/peaks_library[[l]]@intensity[j]) < intensity_tolerance_percent_threshold) {
+							if ((abs(peaks_test[[s]]@intensity[i] - peaks_library[[l]]@intensity[j])*100/peaks_library[[l]]@intensity[j]) <= intensity_tolerance_percent_threshold) {
 								counter3[s,l] <- counter3[s,l] + 1
 							}
 						}
@@ -5500,10 +5514,10 @@ if (tof_mode == "reflectron" || tof_mode == "reflector") {
 if ("signal intensity" %in% similarity_criteria) {
 	# Standard deviation
 	if ("standard deviation" %in% signal_intensity_evaluation) {
-	score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="standard deviation", spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_tolerance_percent_threshold=intensity_tolerance_percent, comparison="standard deviation", spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	} else if ("intensity percentage" %in% signal_intensity_evaluation) {
 		# Intensiry percentage
-	    score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, comparison="intensity percentage", spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+	    score_intensity <- biotyper_like_score_signal_intensity(test_list, library_list, tolerance_ppm=tolerance_ppm, low_intensity_peaks_removal=low_intensity_peaks_removal, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_percentage_threshold=low_intensity_percentage_threshold, intensity_tolerance_percent_threshold=intensity_tolerance_percent, comparison="intensity percentage", spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 	}
 }
 ####### Hierarchical clustering
@@ -5666,6 +5680,15 @@ for (s in 1:number_of_samples) {
 number_of_signals <- ncol(intensity_matrix_global)
 pvalue_matrix <- counter3
 pvalue_matrix <- apply(counter3, MARGIN=c(1,2), FUN=function(x) correlation_pvalue(x, number_of_signals))
+pvalue_replacement_function <- function(x, number_of_digits) {
+	if (x < 0.00001) {
+		x <- "< 0.00001"
+	} else {
+		x <- round(x, digits=number_of_digits)
+	}
+	return (x)
+}
+pvalue_matrix <- apply(pvalue_matrix, MARGIN=c(1,2), FUN=function(x) pvalue_replacement_function(x, number_of_digits=6))
 # Generate the image
 #corrplot(counter3, method="circle")
 #correlation_plot <- recordPlot()
@@ -5712,13 +5735,13 @@ if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
 		for (w in 1:library_size) {
 			if (score[r,w]>=2) {
-				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", round(pvalue_matrix[r,w], digits=6), ")")
+				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", pvalue_matrix[r,w], ")")
 			}
 			if (score[r,w]<1.5) {
-				output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", round(pvalue_matrix[r,w], digits=6), ")")
+				output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", pvalue_matrix[r,w], ")")
 			}
 			if (score[r,w]>=1.5 && score[r,w]<2) {
-				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", round(pvalue_matrix[r,w], digits=6), ")")
+				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", pvalue_matrix[r,w], ")")
 			}
 		}
 	}
