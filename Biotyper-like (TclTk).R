@@ -1,7 +1,8 @@
-################ BIOTYPER-LIKE PROGRAM 2016.01.26
+################ BIOTYPER-LIKE PROGRAM 2016.01.28
 
 # Update packages and load the required packages
-update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/")
+update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
+
 install_and_load_required_packages(c("tcltk", "xlsx"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
 
 
@@ -33,6 +34,9 @@ peaks_filtering_value <- "NO"
 low_intensity_peaks_removal_value <- "NO"
 score_only_value <- "NO"
 spectra_path_output_value <- "YES"
+similarity_criteria_value <- "correlation"
+peak_picking_mode_value <- "all"
+tof_mode_value <- "linear"
 
 
 
@@ -317,11 +321,18 @@ similarity_criteria_choice <- function() {
 	if (similarity_criteria == "") {
 		similarity_criteria <- "correlation"
 	}
+	# Set the value of the displaying label
+	similarity_criteria_value <- similarity_criteria
+	if (similarity_criteria_value == "hca") {
+		similarity_criteria_value <- "         hca         "
+	} else if (similarity_criteria_value == "correlation") {
+		similarity_criteria_value <- "   correlation   "
+	}
+	similarity_criteria_value_label <- tklabel(window, text=similarity_criteria_value)
+	tkgrid(similarity_criteria_value_label, row=3, column=6)
 	# Escape the function
 	.GlobalEnv$similarity_criteria <- similarity_criteria
-	# Set the value of the displaying label
-	similarity_criteria_value_label <- tklabel(window, text=similarity_criteria)
-	tkgrid(similarity_criteria_value_label, row=3, column=6)
+	.GlobalEnv$similarity_criteria_value <- similarity_criteria_value
 }
 
 ##### Signal intensity evaluation
@@ -347,11 +358,16 @@ peak_picking_mode_choice <- function() {
 	if (peak_picking_mode == "") {
 		peak_picking_mode <- "all"
 	}
+	# Set the value of the displaying label
+	peak_picking_mode_value <- peak_picking_mode
+	if (peak_picking_mode_value == "all") {
+		peak_picking_mode_value <- "        all        "
+	}
+	peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value)
+	tkgrid(peak_picking_mode_value_label, row=5, column=3)
 	# Escape the function
 	.GlobalEnv$peak_picking_mode <- peak_picking_mode
-	# Set the value of the displaying label
-	peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode)
-	tkgrid(peak_picking_mode_value_label, row=5, column=3)
+	.GlobalEnv$peak_picking_mode_value <- peak_picking_mode_value
 }
 
 ##### Peaks filtering
@@ -509,11 +525,16 @@ tof_mode_choice <- function() {
 	if (tof_mode == "Reflector") {
 		tof_mode <- "reflector"
 	}
+	# Set the value of the displaying label
+	tof_mode_value <- tof_mode
+	if (tof_mode_value == "linear") {
+		tof_mode_value <- "   linear   "
+	}
+	tof_mode_value_label <- tklabel(window, text=tof_mode_value)
+	tkgrid(tof_mode_value_label, row=11, column=3)
 	# Escape the function
 	.GlobalEnv$tof_mode <- tof_mode
-	# Set the value of the displaying label
-	tof_mode_value_label <- tklabel(window, text=tof_mode)
-	tkgrid(tof_mode_value_label, row=11, column=3)
+	.GlobalEnv$tof_mode_value <- tof_mode_value
 }
 
 ##### File format
@@ -662,16 +683,16 @@ tkinsert(set_file_name_entry, "end", "Score")
 
 #### Displaying labels
 file_type_export_value_label <- tklabel(window, text=file_type_export)
-similarity_criteria_value_label <- tklabel(window, text=similarity_criteria)
+similarity_criteria_value_label <- tklabel(window, text=similarity_criteria_value)
 signal_intensity_evaluation_value_label <- tklabel(window, text=signal_intensity_evaluation)
-peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode)
+peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value)
 peaks_filtering_value_label <- tklabel(window, text=peaks_filtering_value)
 low_intensity_peaks_removal_value_label <- tklabel(window, text=low_intensity_peaks_removal_value)
 average_replicates_in_database_value_label <- tklabel(window, text=average_replicates_in_database_value)
 average_replicates_in_test_value_label <- tklabel(window, text=average_replicates_in_test_value)
 score_only_value_label <- tklabel(window, text=score_only_value)
 spectra_path_output_value_label <- tklabel(window, text=spectra_path_output_value)
-tof_mode_value_label <- tklabel(window, text=tof_mode)
+tof_mode_value_label <- tklabel(window, text=tof_mode_value)
 spectra_format_value_label <- tklabel(window, text=spectra_format)
 
 #### Geometry manager
