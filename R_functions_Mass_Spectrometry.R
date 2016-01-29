@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.28
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.01.29
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -5227,30 +5227,30 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 		}
 	}
 	# COUNTER 1 - FIT
-	counter1 <- matrix (0, nrow=number_of_samples, ncol=library_size)
-	colnames(counter1) <- library_vector
-	rownames(counter1) <- sample_vector
+	fit_matrix <- matrix (0, nrow=number_of_samples, ncol=library_size)
+	colnames(fit_matrix) <- library_vector
+	rownames(fit_matrix) <- sample_vector
 	for (s in 1:number_of_samples) {
 		for (l in 1:library_size) {
-			counter1[s,l] <- counter[s,l] / length(peaks_test[[s]]@mass)
+			fit_matrix[s,l] <- counter[s,l] / length(peaks_test[[s]]@mass)
 		}
 	}
 	# Compare the peaks in the library peaklists with the peaks in each sample
 	# COUNTER 2 - RETRO FIT
-	counter2 <- matrix (0, nrow=number_of_samples, ncol=library_size)
-	colnames(counter2) <- library_vector
-	rownames(counter2) <- sample_vector
+	retrofit_matrix <- matrix (0, nrow=number_of_samples, ncol=library_size)
+	colnames(retrofit_matrix) <- library_vector
+	rownames(retrofit_matrix) <- sample_vector
 	for (l in 1:library_size) {
 		for (s in 1:number_of_samples) {
-			counter2[s,l] <- counter[s,l] / length(peaks_library[[l]]@mass)
+			retrofit_matrix[s,l] <- counter[s,l] / length(peaks_library[[l]]@mass)
 		}
 	}
 	# COUNTER 3
 	# Symmetry -> comparison between intensities
 	# Create a counter, symmetrical to the database Peaklist
-	counter3 <- matrix (0, nrow=number_of_samples, ncol=library_size)
-    colnames(counter3) <- library_vector
-    rownames(counter3) <- sample_vector
+	intensity_symmetry_matrix <- matrix (0, nrow=number_of_samples, ncol=library_size)
+    colnames(intensity_symmetry_matrix) <- library_vector
+    rownames(intensity_symmetry_matrix) <- sample_vector
 	# For each sample
 	for (s in 1:number_of_samples) {
 		# For each peaklist in the Library
@@ -5264,17 +5264,17 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 						if (peaks_test[[s]]@mass[i] == peaks_library[[l]]@mass[j]) {
 							# Evaluate the difference in intensity
 							if ((abs(peaks_test[[s]]@intensity[i] - peaks_library[[l]]@intensity[j])*100/peaks_library[[l]]@intensity[j]) <= intensity_tolerance_percent_threshold) {
-								counter3[s,l] <- counter3[s,l] + 1
+								intensity_symmetry_matrix[s,l] <- intensity_symmetry_matrix[s,l] + 1
 							}
 						}
 					}
 				}
-			} else {counter3[s,l] <- 0}
+			} else {intensity_symmetry_matrix[s,l] <- 0}
 		}
 	}
 	for (s in 1:number_of_samples) {
 		for (l in 1:library_size) {
-			counter3[s,l] <- counter3[s,l] / length(peaks_test[[s]]@mass)
+			intensity_symmetry_matrix[s,l] <- intensity_symmetry_matrix[s,l] / length(peaks_test[[s]]@mass)
 		}
 	}
 	### Score calculation
@@ -5283,7 +5283,7 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
     rownames(score) <- sample_vector
 	for (i in 1:number_of_samples) {
 		for (j in 1:length(peaks_library)) {
-			score[i,j] <- log10(counter1[i,j]*counter2[i,j]*counter3[i,j]*1000)
+			score[i,j] <- log10(fit_matrix[i,j]*retrofit_matrix[i,j]*intensity_symmetry_matrix[i,j]*1000)
 		}
 	}
 	#### Output the classification
@@ -5312,13 +5312,13 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 		for (r in 1:number_of_samples) {
 			for (w in 1:library_size) {
 				if (score[r,w]>=2) {
-					output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+					output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ", "(F:", round(fit_matrix[r,w], digits=3), ",", "RF:", round(retrofit_matrix[r,w], digits=3), ",", "Symm:", round(intensity_symmetry_matrix[r,w], digits=3), ")")
 				}
 				if (score[r,w]<1.5) {
-					output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+					output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ", "(F:", round(fit_matrix[r,w], digits=3), ",", "RF:", round(retrofit_matrix[r,w], digits=3), ",", "Symm:", round(intensity_symmetry_matrix[r,w], digits=3), ")")
 				}
 				if (score[r,w]>=1.5 && score[r,w]<2) {
-					output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity:", round(counter3[r,w], digits=3), ")")
+					output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ", "(F:", round(fit_matrix[r,w], digits=3), ",", "RF:", round(retrofit_matrix[r,w], digits=3), ",", "Symm:", round(intensity_symmetry_matrix[r,w], digits=3), ")")
 				}
 			}
 		}
@@ -5347,7 +5347,7 @@ return (list(output=output, library_list=list(spectra=spectra_library, peaks=pea
 # The function takes spectra and (aligned and filtered) peaks from the library_creation function.
 biotyper_like_score_hierarchical_distance <- function (library_list, test_list, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, tolerance_ppm=2000, spectra_path_output=TRUE, score_only=TRUE, spectra_format="brukerflex", normalise_distances=TRUE, normalisation_method="sum") {
 # Load the required libraries
-install_and_load_required_packages(c("MALDIquant", "stats"))
+install_and_load_required_packages(c("MALDIquant", "stats", "ggplot2", "ggdendro"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Isolate the spectra and the peaks
@@ -5417,8 +5417,9 @@ rownames(peaklist_matrix) <- make.names(peaklist_matrix[,"Sample"], unique=TRUE)
 # Compute the hca
 distance_matrix <- dist(peaklist_matrix[,1:(ncol(peaklist_matrix)-1)], method="euclidean")
 hierarchical_clustering <- hclust(distance_matrix)
-plot(hierarchical_clustering, main="Hierarchical clustering analysis - Biotyper-like", xlab="Samples", ylab="Tree height")
-hca_dendrogram <- recordPlot()
+#plot(hierarchical_clustering, main="Hierarchical clustering analysis - Biotyper-like", xlab="Samples", ylab="Tree height")
+hca_dendrogram <- ggdendrogram(hierarchical_clustering)#, main="Hierarchical clustering analysis - Biotyper-like", xlab="Samples", ylab="Tree height")
+#hca_dendrogram <- recordPlot()
 #
 distance_matrix <- as.matrix(distance_matrix)
 # The distance matrix displays the distance between the spectra
@@ -5634,22 +5635,22 @@ for (s in 1:number_of_samples) {
 	}
 }
 # COUNTER 1 - FIT
-counter1 <- matrix (0, nrow=number_of_samples, ncol=library_size)
-colnames(counter1) <- library_vector
-rownames(counter1) <- sample_vector
+fit_matrix <- matrix (0, nrow=number_of_samples, ncol=library_size)
+colnames(fit_matrix) <- library_vector
+rownames(fit_matrix) <- sample_vector
 for (s in 1:number_of_samples) {
 	for (l in 1:library_size) {
-		counter1[s,l] <- counter[s,l] / length(peaks_test[[s]]@mass)
+		fit_matrix[s,l] <- counter[s,l] / length(peaks_test[[s]]@mass)
 	}
 }
 # Compare the peaks in the library peaklists with the peaks in each sample
 # COUNTER 2 - RETRO FIT
-counter2 <- matrix (0, nrow=number_of_samples, ncol=library_size)
-colnames(counter2) <- library_vector
-rownames(counter2) <- sample_vector
+retrofit_matrix <- matrix (0, nrow=number_of_samples, ncol=library_size)
+colnames(retrofit_matrix) <- library_vector
+rownames(retrofit_matrix) <- sample_vector
 for (l in 1:library_size) {
 	for (s in 1:number_of_samples) {
-		counter2[s,l] <- counter[s,l] / length(peaks_library[[l]]@mass)
+		retrofit_matrix[s,l] <- counter[s,l] / length(peaks_library[[l]]@mass)
 	}
 }
 # COUNTER 3
@@ -5665,21 +5666,24 @@ if (intensity_correction_coefficient != 0 && intensity_correction_coefficient !=
 	# Compute the vector of weights
 	weights_vector <- c(rep(1, length(library_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
 	correlation_matrix <- wtd.cors(x=t(intensity_matrix_global), weight=weights_vector)
-	counter3 <- as.matrix(correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size])
+	intensity_correlation_matrix <- as.matrix(correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size])
 } else if (intensity_correction_coefficient == 1) {
 		correlation_matrix <- cor(t(intensity_matrix_global))
-		counter3 <- as.matrix(correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size])
-} else if (intensity_correction_coefficient == 0) {counter3 <- matrix(1, nrow=number_of_samples, ncol=library_size)}
+		intensity_correlation_matrix <- as.matrix(correlation_matrix [(library_size+1):nrow(correlation_matrix), 1:library_size])
+} else if (intensity_correction_coefficient == 0) {intensity_correlation_matrix <- matrix(1, nrow=number_of_samples, ncol=library_size)}
 # Extract the absolute values
 for (s in 1:number_of_samples) {
 	for (l in 1:library_size) {
-		counter3[s,l] <- abs(counter3[s,l])
+		intensity_correlation_matrix[s,l] <- abs(intensity_correlation_matrix[s,l])
 	}
 }
+# Generate the image
+#corrplot(intensity_correlation_matrix, method="circle")
+#correlation_plot <- recordPlot()
 # COUNTER 4 - P-VALUE OF CORRELATION
 number_of_signals <- ncol(intensity_matrix_global)
-pvalue_matrix <- counter3
-pvalue_matrix <- apply(counter3, MARGIN=c(1,2), FUN=function(x) correlation_pvalue(x, number_of_signals))
+pvalue_matrix <- intensity_correlation_matrix
+pvalue_matrix <- apply(intensity_correlation_matrix, MARGIN=c(1,2), FUN=function(x) correlation_pvalue(x, number_of_signals))
 pvalue_replacement_function <- function(x, number_of_digits) {
 	if (x < 0.00001) {
 		x <- "< 0.00001"
@@ -5689,9 +5693,21 @@ pvalue_replacement_function <- function(x, number_of_digits) {
 	return (x)
 }
 pvalue_matrix <- apply(pvalue_matrix, MARGIN=c(1,2), FUN=function(x) pvalue_replacement_function(x, number_of_digits=6))
-# Generate the image
-#corrplot(counter3, method="circle")
-#correlation_plot <- recordPlot()
+# COUNTER 5 - REGRESSION CURVE
+slope_matrix <- matrix (0, nrow=number_of_samples, ncol=library_size)
+colnames(slope_matrix) <- library_vector
+rownames(slope_matrix) <- sample_vector
+t_intensity_matrix_global <- t(intensity_matrix_global)
+t_intensity_matrix_database <- t_intensity_matrix_global[,1:library_size]
+t_intensity_matrix_test <- t_intensity_matrix_global[,(library_size+1):ncol(t_intensity_matrix_global)]
+for (s in 1:number_of_samples) {
+	for (l in 1:library_size) {
+		linear_regression <- lm(t_intensity_matrix_database[,l] ~ t_intensity_matrix_test[,s])
+		regression_slope <- linear_regression$coefficients[2]
+		regression_intercept <- linear_regression$coefficients[1]
+		slope_matrix[s,l] <- round(regression_slope, digits=3)
+	}
+}
 ### Score calculation
 score <- matrix (0, nrow=number_of_samples, ncol=library_size)
 colnames(score) <- library_vector
@@ -5699,13 +5715,13 @@ rownames(score) <- sample_vector
 if (intensity_correction_coefficient != 0) {
 	for (i in 1:number_of_samples) {
 		for (j in 1:length(peaks_library)) {
-			score[i,j] <- log10(counter1[i,j]*counter2[i,j]*counter3[i,j]*1000)
+			score[i,j] <- log10(fit_matrix[i,j]*retrofit_matrix[i,j]*intensity_correlation_matrix[i,j]*1000)
 		}
 	}
 } else {
 	for (i in 1:number_of_samples) {
 		for (j in 1:length(peaks_library)) {
-			score[i,j] <- log10(counter1[i,j]*counter2[i,j]*counter3[i,j]*100)
+			score[i,j] <- log10(fit_matrix[i,j]*retrofit_matrix[i,j]*intensity_correlation_matrix[i,j]*100)
 		}
 	}
 }
@@ -5735,13 +5751,13 @@ if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
 		for (w in 1:library_size) {
 			if (score[r,w]>=2) {
-				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", pvalue_matrix[r,w], ")")
+				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(F:", round(fit_matrix[r,w], digits=3), ",", "RF:", round(retrofit_matrix[r,w], digits=3), ",", "Corr:", round(intensity_correlation_matrix[r,w], digits=3), ",", "p:", pvalue_matrix[r,w], "sl:", slope_matrix[r,w], ")")
 			}
 			if (score[r,w]<1.5) {
-				output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", pvalue_matrix[r,w], ")")
+				output[r,w] <- paste("NO", "(Score:", round(score[r,w], digits=3), "), ","(F:", round(fit_matrix[r,w], digits=3), ",", "RF:", round(retrofit_matrix[r,w], digits=3), ",","Corr:", round(intensity_correlation_matrix[r,w], digits=3), ",", "p:", pvalue_matrix[r,w], "sl:", slope_matrix[r,w], ")")
 			}
 			if (score[r,w]>=1.5 && score[r,w]<2) {
-				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(Fit:", round(counter1[r,w], digits=3), "), ","(Retrofit:", round(counter2[r,w], digits=3), "), ","(Intensity correlation:", round(counter3[r,w], digits=3), "),", "(Correlation p-value: ", pvalue_matrix[r,w], ")")
+				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(F:", round(fit_matrix[r,w], digits=3), ",", "RF:", round(retrofit_matrix[r,w], digits=3), ",","Corr:", round(intensity_correlation_matrix[r,w], digits=3), ",", "(p:", pvalue_matrix[r,w], "sl:", slope_matrix[r,w], ")")
 			}
 		}
 	}
