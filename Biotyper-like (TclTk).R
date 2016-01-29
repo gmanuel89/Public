@@ -1,9 +1,9 @@
-################ BIOTYPER-LIKE PROGRAM 2016.01.28
+################ BIOTYPER-LIKE PROGRAM 2016.01.29
 
 # Update packages and load the required packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
 
-install_and_load_required_packages(c("tcltk", "xlsx"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
+install_and_load_required_packages(c("tcltk", "xlsx", "ggplot2"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
 
 
 
@@ -123,6 +123,8 @@ browse_output_function <- function() {
 	    tkmessageBox(message = paste("Every file will be saved in", output_folder))
 	}
 	setwd(output_folder)
+	# Exit the function and put the variable into the R workspace
+	.GlobalEnv$output_folder <- output_folder
 }
 
 ##### Close
@@ -247,9 +249,6 @@ run_biotyper_like_function <- function() {
 	# Results matrices (score + parameters)
 	if (!is.null(score_hca_matrix)) {
 		.GlobalEnv$score_hca_matrix_results <- rbind(score_hca_matrix, parameters_matrix_hca)
-		png(filename="hca.png", width=1280, height=1024)
-		score$score_hca$plots
-		dev.off()
 	}
 	if (!is.null(score_intensity_matrix)) {
 		.GlobalEnv$score_intensity_matrix_results <- rbind(score_intensity_matrix, parameters_matrix_intensity)
@@ -264,12 +263,20 @@ run_biotyper_like_function <- function() {
 		    write.csv(score_intensity_matrix_results, file=paste("int_", filename, sep=""))
 		}
 		if (!is.null(score_hca_matrix)) {
+			# Dump the hca plot
+			#png(filename="hca.png", width=1900, height=1280)
+			#score$score_hca$plots
+			ggsave(plot=score$score_hca$plots, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
+			#savePlot(filename="hca.png", type="png")
+			#dev.print(X11, file="hca.png", width=1900, height=1280)
+			#dev.off()
 		    write.csv(score_hca_matrix_results, file=paste("hca_", filename, sep=""))
 		}
 		if (!is.null(score_correlation_matrix)) {
 		    write.csv(score_correlation_matrix_results, file=paste("corr_", filename, sep=""))
 		}
 	}
+	# Save the files (Excel)
 	if (file_type_export == "xlsx" || file_type_export == "xls") {
 		filename <- set_file_name()
 		# Check if PERL is installed by using the built in function, for WriteXLS package
@@ -289,6 +296,13 @@ run_biotyper_like_function <- function() {
 
 		}
 		if (!is.null(score_hca_matrix)) {
+			# Dump the hca plot
+			#png(filename="hca.png", width=1900, height=1280)
+			#score$score_hca$plots
+			ggsave(plot=score$score_hca$plots, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
+			#savePlot(filename="hca.png", type="png")
+			#dev.print(X11, file="hca.png", width=1900, height=1280)
+			#dev.off()
 			# Convert it to a data frame
 			score_hca_matrix_results <- as.data.frame(score_hca_matrix_results)
 			# Generate unique row names
@@ -310,7 +324,7 @@ run_biotyper_like_function <- function() {
 		}
 	}
 	### Messagebox
-	tkmessageBox(title = "Done!", message = "The file(s) have been dumped", icon = "info")
+	tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity Pearson's correlation coefficient\nSymm: intensity simmetry\nsl: slope of the regression curve", icon = "info")
 }
 
 ##### Similarity criteria
