@@ -14,6 +14,7 @@ average_replicates_in_database <- FALSE
 average_replicates_in_test <- FALSE
 peaks_filtering <- FALSE
 low_intensity_peaks_removal <- FALSE
+intensity_threshold_method <- "whole"
 tof_mode <- "linear"
 spectra_format <- "xmass"
 score_only <- FALSE
@@ -37,6 +38,7 @@ spectra_path_output_value <- "YES"
 similarity_criteria_value <- "correlation"
 peak_picking_mode_value <- "all"
 tof_mode_value <- "linear"
+intensity_threshold_method_value <- "whole"
 
 
 
@@ -55,7 +57,7 @@ file_type_export_choice <- function() {
 	.GlobalEnv$file_type_export <- file_type_export
 	# Set the value of the displaying label
 	file_type_export_value_label <- tklabel(window, text=file_type_export)
-	tkgrid(file_type_export_value_label, row=13, column=4)
+	tkgrid(file_type_export_value_label, row=14, column=4)
 }
 
 ##### File name (export)
@@ -219,7 +221,7 @@ run_biotyper_like_function <- function() {
 	intensity_percentage_threshold <- as.numeric(intensity_percentage_threshold)
 	intensity_percentage_threshold_value <- as.character(intensity_percentage_threshold)
 	#### Run the function
-	score <- biotyper_like(library_list, test_list, similarity_criteria=similarity_criteria, intensity_correction_coefficient=intensity_correction_coefficient, signal_intensity_evaluation=signal_intensity_evaluation, intensity_tolerance_percent=intensity_tolerance_percent, peaks_filtering=peaks_filtering, peaks_filtering_threshold_percent=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, tof_mode=tof_mode, spectra_format=spectra_format, score_only=score_only, spectra_path_output=spectra_path_output)
+	score <- biotyper_like(library_list, test_list, similarity_criteria=similarity_criteria, intensity_correction_coefficient=intensity_correction_coefficient, signal_intensity_evaluation=signal_intensity_evaluation, intensity_tolerance_percent=intensity_tolerance_percent, peaks_filtering=peaks_filtering, peaks_filtering_threshold_percent=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tof_mode=tof_mode, spectra_format=spectra_format, score_only=score_only, spectra_path_output=spectra_path_output)
 	# Matrices
 	score_hca_matrix <- score$score_hca$result_matrix
 	score_intensity_matrix <- score$score_intensity$output
@@ -432,6 +434,23 @@ low_intensity_peaks_removal_choice <- function() {
 	.GlobalEnv$low_intensity_peaks_removal_value <- low_intensity_peaks_removal_value
 }
 
+##### Low intensity peaks removal Method
+intensity_threshold_method_choice <- function() {
+	# Catch the value from the menu
+	intensity_threshold_method <- select.list(c("whole","element-wise"), title="Choose")
+	# Default
+	if (intensity_threshold_method == "") {
+		intensity_threshold_method <- "whole"
+	}
+	# Set the value of the displaying label
+	intensity_threshold_method_value <- intensity_threshold_method
+	intensity_threshold_method_value_label <- tklabel(window, text=intensity_threshold_method_value)
+	tkgrid(intensity_threshold_method_value_label, row=9, column=4)
+	# Escape the function
+	.GlobalEnv$intensity_threshold_method <- intensity_threshold_method
+	.GlobalEnv$intensity_threshold_method_value <- intensity_threshold_method_value
+}
+
 ##### Average replicates in database
 average_replicates_in_database_choice <- function() {
 	# Catch the value from the menu
@@ -450,7 +469,7 @@ average_replicates_in_database_choice <- function() {
 		average_replicates_in_database_value <- "NO"
 	}
 	average_replicates_in_database_value_label <- tklabel(window, text=average_replicates_in_database_value)
-	tkgrid(average_replicates_in_database_value_label, row=9, column=3)
+	tkgrid(average_replicates_in_database_value_label, row=10, column=3)
 	# Escape the function
 	.GlobalEnv$average_replicates_in_database <- average_replicates_in_database
 	.GlobalEnv$average_replicates_in_database_value <- average_replicates_in_database_value
@@ -474,7 +493,7 @@ average_replicates_in_test_choice <- function() {
 		average_replicates_in_test_value <- "NO"
 	}
 	average_replicates_in_test_value_label <- tklabel(window, text=average_replicates_in_test_value)
-	tkgrid(average_replicates_in_test_value_label, row=9, column=6)
+	tkgrid(average_replicates_in_test_value_label, row=10, column=6)
 	# Escape the function
 	.GlobalEnv$average_replicates_in_test <- average_replicates_in_test
 	.GlobalEnv$average_replicates_in_test_value <- average_replicates_in_test_value
@@ -498,7 +517,7 @@ score_only_choice <- function() {
 		score_only_value <- "NO"
 	}
 	score_only_value_label <- tklabel(window, text=score_only_value)
-	tkgrid(score_only_value_label, row=10, column=3)
+	tkgrid(score_only_value_label, row=11, column=3)
 	# Escape the function
 	.GlobalEnv$score_only <- score_only
 	.GlobalEnv$score_only_value <- score_only_value
@@ -522,7 +541,7 @@ spectra_path_output_choice <- function() {
 		spectra_path_output_value <- "NO"
 	}
 	spectra_path_output_value_label <- tklabel(window, text=spectra_path_output_value)
-	tkgrid(spectra_path_output_value_label, row=10, column=6)
+	tkgrid(spectra_path_output_value_label, row=11, column=6)
 	# Escape the function
 	.GlobalEnv$spectra_path_output <- spectra_path_output
 	.GlobalEnv$spectra_path_output_value <- spectra_path_output_value
@@ -545,7 +564,7 @@ tof_mode_choice <- function() {
 		tof_mode_value <- "   linear   "
 	}
 	tof_mode_value_label <- tklabel(window, text=tof_mode_value)
-	tkgrid(tof_mode_value_label, row=11, column=3)
+	tkgrid(tof_mode_value_label, row=12, column=3)
 	# Escape the function
 	.GlobalEnv$tof_mode <- tof_mode
 	.GlobalEnv$tof_mode_value <- tof_mode_value
@@ -566,7 +585,7 @@ spectra_format_choice <- function() {
 	.GlobalEnv$spectra_format <- spectra_format
 	# Set the value of the displaying label
 	spectra_format_value_label <- tklabel(window, text=spectra_format)
-	tkgrid(spectra_format_value_label, row=11, column=6)
+	tkgrid(spectra_format_value_label, row=12, column=6)
 }
 
 
@@ -659,6 +678,9 @@ low_intensity_peaks_removal_entry <- tkbutton(window, text="Choose low intensity
 intensity_percentage_threshold_label <- tklabel(window, text="Intensity percentage threshold")
 intensity_percentage_threshold_entry <- tkentry(window, width=10, textvariable=intensity_percentage_threshold)
 tkinsert(intensity_percentage_threshold_entry, "end", "0.1")
+# Intensiry percentage theshold method
+intensity_threshold_method_label <- tklabel(window, text="Intensity threshold method")
+intensity_threshold_method_entry <- tkbutton(window, text="Choose the method for\nthe intensity threshold", command=intensity_threshold_method_choice)
 # Average replicates in database
 average_replicates_in_database_label <- tklabel(window, text="Average replicates in the database")
 average_replicates_in_database_entry <- tkbutton(window, text="Choose average replicates\nin the database", command=average_replicates_in_database_choice)
@@ -702,6 +724,7 @@ signal_intensity_evaluation_value_label <- tklabel(window, text=signal_intensity
 peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value)
 peaks_filtering_value_label <- tklabel(window, text=peaks_filtering_value)
 low_intensity_peaks_removal_value_label <- tklabel(window, text=low_intensity_peaks_removal_value)
+intensity_threshold_method_value_label <- tklabel(window, text=intensity_threshold_method_value)
 average_replicates_in_database_value_label <- tklabel(window, text=average_replicates_in_database_value)
 average_replicates_in_test_value_label <- tklabel(window, text=average_replicates_in_test_value)
 score_only_value_label <- tklabel(window, text=score_only_value)
@@ -746,37 +769,40 @@ tkgrid(peaks_filtering_threshold_percent_entry, row=7, column=5)
 tkgrid(low_intensity_peaks_removal_label, row=8, column=1)
 tkgrid(low_intensity_peaks_removal_entry, row=8, column=2)
 tkgrid(low_intensity_peaks_removal_value_label, row=8, column=3)
+tkgrid(intensity_threshold_method_label, row=9, column=2)
+tkgrid(intensity_threshold_method_entry, row=9, column=3)
+tkgrid(intensity_threshold_method_value_label, row=9, column=4)
 tkgrid(intensity_percentage_threshold_label, row=8, column=4)
 tkgrid(intensity_percentage_threshold_entry, row=8, column=5)
-tkgrid(average_replicates_in_database_label, row=9, column=1)
-tkgrid(average_replicates_in_database_entry, row=9, column=2)
-tkgrid(average_replicates_in_database_value_label, row=9, column=3)
-tkgrid(average_replicates_in_test_label, row=9, column=4)
-tkgrid(average_replicates_in_test_entry, row=9, column=5)
-tkgrid(average_replicates_in_test_value_label, row=9, column=6)
-tkgrid(score_only_label, row=10, column=1)
-tkgrid(score_only_entry, row=10, column=2)
-tkgrid(score_only_value_label, row=10, column=3)
-tkgrid(spectra_path_output_label, row=10, column=4)
-tkgrid(spectra_path_output_entry, row=10, column=5)
-tkgrid(spectra_path_output_value_label, row=10, column=6)
-tkgrid(tof_mode_label, row=11, column=1)
-tkgrid(tof_mode_entry, row=11, column=2)
-tkgrid(tof_mode_value_label, row=11, column=3)
-tkgrid(spectra_format_label, row=11, column=4)
-tkgrid(spectra_format_entry, row=11, column=5)
-tkgrid(spectra_format_value_label, row=11, column=6)
+tkgrid(average_replicates_in_database_label, row=10, column=1)
+tkgrid(average_replicates_in_database_entry, row=10, column=2)
+tkgrid(average_replicates_in_database_value_label, row=10, column=3)
+tkgrid(average_replicates_in_test_label, row=10, column=4)
+tkgrid(average_replicates_in_test_entry, row=10, column=5)
+tkgrid(average_replicates_in_test_value_label, row=10, column=6)
+tkgrid(score_only_label, row=11, column=1)
+tkgrid(score_only_entry, row=11, column=2)
+tkgrid(score_only_value_label, row=11, column=3)
+tkgrid(spectra_path_output_label, row=11, column=4)
+tkgrid(spectra_path_output_entry, row=11, column=5)
+tkgrid(spectra_path_output_value_label, row=11, column=6)
+tkgrid(tof_mode_label, row=12, column=1)
+tkgrid(tof_mode_entry, row=12, column=2)
+tkgrid(tof_mode_value_label, row=12, column=3)
+tkgrid(spectra_format_label, row=12, column=4)
+tkgrid(spectra_format_entry, row=12, column=5)
+tkgrid(spectra_format_value_label, row=12, column=6)
 tkgrid(intensity_tolerance_percent_label, row=6, column=4)
 tkgrid(intensity_tolerance_percent_entry, row=6, column=5)
-tkgrid(preprocess_spectra_in_packages_of_label, row=12, column=3)
-tkgrid(preprocess_spectra_in_packages_of_entry, row=12, column=4)
-tkgrid(file_type_export_label, row=13, column=2)
-tkgrid(file_type_export_entry, row=13, column=3)
-tkgrid(file_type_export_value_label, row=13, column=4)
-tkgrid(import_spectra_button, row=12, column=2)
-tkgrid(run_biotyper_like_button, row=13, column=5)
-tkgrid(exit_label, row=14, column=1)
-tkgrid(quit_button, row=14, column=2)
-tkgrid(end_session_button, row=14, column=4)
+tkgrid(preprocess_spectra_in_packages_of_label, row=13, column=3)
+tkgrid(preprocess_spectra_in_packages_of_entry, row=13, column=4)
+tkgrid(file_type_export_label, row=14, column=2)
+tkgrid(file_type_export_entry, row=14, column=3)
+tkgrid(file_type_export_value_label, row=14, column=4)
+tkgrid(import_spectra_button, row=13, column=2)
+tkgrid(run_biotyper_like_button, row=14, column=5)
+tkgrid(exit_label, row=15, column=1)
+tkgrid(quit_button, row=15, column=2)
+tkgrid(end_session_button, row=15, column=4)
 #window_scrollbar
 spectra_format
