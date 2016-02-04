@@ -1,4 +1,4 @@
-################ BIOTYPER-LIKE PROGRAM 2016.01.29
+################ SPECTRAL TYPER PROGRAM 2016.02.04
 
 # Update packages and load the required packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -16,13 +16,17 @@ peaks_filtering <- FALSE
 low_intensity_peaks_removal <- FALSE
 intensity_threshold_method <- "whole"
 tof_mode <- "linear"
-spectra_format <- "xmass"
+spectra_format <- "brukerflex"
 score_only <- FALSE
 spectra_path_output <- TRUE
 peak_picking_mode <- "all"
 similarity_criteria <- "correlation"
 signal_intensity_evaluation <- "intensity percentage"
 file_type_export <- "xlsx"
+spectra_database <- NULL
+spectra_test <- NULL
+peaks_database <- NULL
+peaks_test <- NULL
 
 
 
@@ -39,6 +43,7 @@ similarity_criteria_value <- "correlation"
 peak_picking_mode_value <- "all"
 tof_mode_value <- "linear"
 intensity_threshold_method_value <- "whole"
+spectra_format_value <- "Xmass"
 
 
 
@@ -88,27 +93,27 @@ set_file_name <- function() {
 
 ##### Library
 select_library_function <- function() {
-	filepath_library_select <- tkmessageBox(title = "Library", message = "Select the folder for the spectra for the library.\nThe library should be structured like this: Database folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
-	filepath_library <- tclvalue(tkchooseDirectory())
-	if (!nchar(filepath_library)) {
+	filepath_database_select <- tkmessageBox(title = "Library", message = "Select the folder for the spectra for the database.\nThe database should be structured like this: Database folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
+	filepath_database <- tclvalue(tkchooseDirectory())
+	if (!nchar(filepath_database)) {
 	    tkmessageBox(message = "No folder selected")
 	}	else {
-	    tkmessageBox(message = paste("The directory selected is", filepath_library))
+	    tkmessageBox(message = paste("The directory selected for the database is", filepath_database))
 	}
 	# Set the value for displaying purposes
-	filepath_library_value <- filepath_library
+	filepath_database_value <- filepath_database
 	# Exit the function and put the variable into the R workspace
-	.GlobalEnv$filepath_library <- filepath_library
+	.GlobalEnv$filepath_database <- filepath_database
 }
 
 ##### Samples
 select_samples_function <-function() {
-	filepath_test_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\nThe library should be structured like this: Sample folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
+	filepath_test_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\nThe files should be organised like this: Sample folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
 	filepath_test <- tclvalue(tkchooseDirectory())
 	if (!nchar(filepath_test)) {
 	    tkmessageBox(message = "No folder selected")
 	}	else {
-	    tkmessageBox(message = paste("The directory selected is", filepath_test))
+	    tkmessageBox(message = paste("The sample spectra will be read from:", filepath_test))
 	}
 	# Set the value for displaying purposes
 	filepath_test_value <- filepath_test
@@ -141,11 +146,11 @@ end_session_function <- function () {
 
 ##### Import the spectra
 import_spectra_function <- function() {
+	# Load the required libraries
+	install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
+	# Rename the trim function
+	trim_spectra <- get(x="trim", pos="package:MALDIquant")
 	###### Get the values
-	## Signals to take in most intense peaks
-	signals_to_take <- tclvalue(signals_to_take)
-	signals_to_take <- as.integer(signals_to_take)
-	signals_to_take_value <- as.character(signals_to_take)
 	## Mass range
 	mass_range <- tclvalue(mass_range)
 	mass_range_value <- as.character(mass_range)
@@ -154,179 +159,221 @@ import_spectra_function <- function() {
 	preprocess_spectra_in_packages_of <- tclvalue(preprocess_spectra_in_packages_of)
 	preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)
 	preprocess_spectra_in_packages_of_value <- as.character(preprocess_spectra_in_packages_of)
-	## SNR
-	SNR <- tclvalue(SNR)
-	SNR <- as.numeric(SNR)
-	SNR_value <- as.character(SNR)
-	# Peak picking mode
-	if ("most intense" %in% peak_picking_mode) {
-		########## DATABASE
-		# Generate the library
-		library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=preprocess_spectra_in_packages_of), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=signals_to_take, tof_mode=tof_mode, spectra_format=spectra_format, average_patients=FALSE)
-		# Isolate the peaks and the spectra
-		peaks_library <- library_list$peaks
-		spectra_library <- library_list$spectra
-		########## SAMPLES
-		# Generate the library
-		test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=TRUE, signals_to_take=signals_to_take, tof_mode=tof_mode, spectra_format=spectra_format, average_patients=FALSE)
-		# Isolate the peaks and the spectra
-		peaks_test <- test_list$peaks
-		spectra_test <- test_list$spectra
-	} else {
-		########## DATABASE
-		# Generate the library
-		library_list <- library_creation(filepath_library, class_grouping=TRUE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_database, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=25, tof_mode=tof_mode, spectra_format=spectra_format, average_patients=FALSE)
-		# Isolate the peaks and the spectra
-		peaks_library <- library_list$peaks
-		spectra_library <- library_list$spectra
-		########## SAMPLES
-		# Generate the library
-		test_list <- library_creation(filepath_test, class_grouping=FALSE, spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=200), mass_range=mass_range, average_replicates=average_replicates_in_test, SNR=SNR, most_intense_peaks=FALSE, signals_to_take=25, tof_mode=tof_mode, spectra_format=spectra_format, average_patients=FALSE)
-		# Isolate the peaks and the spectra
-		peaks_test <- test_list$peaks
-		spectra_test <- test_list$spectra
+	# Generate the list of spectra (library and test)
+	if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+		### Load the spectra
+		spectra_database <- importBrukerFlex(filepath_database)
+		spectra_test <- importBrukerFlex(filepath_test)
 	}
+	if (spectra_format == "imzml" | spectra_format == "imzML") {
+		### Load the spectra
+		spectra_database <- importImzMl(filepath_database)
+		spectra_test <- importImzMl(filepath_test)
+	}
+	### Truncation
+	spectra_database <- trim_spectra(spectra_database, range = mass_range)
+	spectra_test <- trim_spectra(spectra_test, range = mass_range)
+	### Average the replicates
+	if (average_replicates_in_database == TRUE) {
+		spectra_database <- average_replicates_by_folder(spectra_database, filepath_database, spectra_format=spectra_format)
+	}
+	if (average_replicates_in_test == TRUE) {
+		spectra_test <- average_replicates_by_folder(spectra_test, filepath_test, spectra_format=spectra_format)
+	}
+	### Folder lists
+	database_folder_list <- dir(filepath_database, ignore.case=TRUE, full.names=FALSE, recursive=FALSE, include.dirs=TRUE)
+	test_folder_list <- dir(filepath_test, ignore.case=TRUE, full.names=FALSE, recursive=FALSE, include.dirs=TRUE)
+	### Spectra grouping (class for database)
+	spectra_database <- group_spectra_class(spectra_database, class_list=database_folder_list, spectra_format=spectra_format, class_in_file_name=TRUE)
+	### Preprocessing
+	spectra_database <- preprocess_spectra(spectra_database, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, sampling_method="sequential")
+	spectra_test <- preprocess_spectra(spectra_test, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, sampling_method="sequential")
 	# Exit the function and put the variable into the R workspace
-	.GlobalEnv$library_list <- library_list
-	.GlobalEnv$peaks_library <- peaks_library
-	.GlobalEnv$spectra_library <- spectra_library
-	.GlobalEnv$test_list <- test_list
-	.GlobalEnv$peaks_test <- peaks_test
+	.GlobalEnv$spectra_database <- spectra_database
 	.GlobalEnv$spectra_test <- spectra_test
-	.GlobalEnv$signals_to_take_value <- signals_to_take_value
 	.GlobalEnv$mass_range_value <- mass_range_value
 	.GlobalEnv$preprocess_spectra_in_packages_of_value <- preprocess_spectra_in_packages_of_value
-	.GlobalEnv$SNR_value <- SNR_value
+	.GlobalEnv$database_folder_list <- database_folder_list
+	.GlobalEnv$test_folder_list <- test_folder_list
 	### Messagebox
-	tkmessageBox(title = "Import successful", message = "The spectra have been successfully imported", icon = "info")
+	tkmessageBox(title = "Import successful", message = "The spectra have been successfully imported and preprocessed", icon = "info")
 }
 
-##### Run the biotyper_like
-run_biotyper_like_function <- function() {
-	#### Get the values
-	## Intensity correction coefficient
-	intensity_correction_coefficient <- tclvalue(intensity_correction_coefficient)
-	intensity_correction_coefficient <- as.numeric(intensity_correction_coefficient)
-	intensity_correction_coefficient_value <- as.character(intensity_correction_coefficient)
-	## Intensity tolerance percent
-	intensity_tolerance_percent <- tclvalue(intensity_tolerance_percent)
-	intensity_tolerance_percent <- as.numeric(intensity_tolerance_percent)
-	intensity_tolerance_percent_value <- as.character(intensity_tolerance_percent)
-	## Peaks filtering threshold
-	peaks_filtering_threshold_percent <- tclvalue(peaks_filtering_threshold_percent)
-	peaks_filtering_threshold_percent <- as.numeric(peaks_filtering_threshold_percent)
-	peaks_filtering_threshold_percent_value <- as.character(peaks_filtering_threshold_percent)
-	## Low intensity threshold
-	intensity_percentage_threshold <- tclvalue(intensity_percentage_threshold)
-	intensity_percentage_threshold <- as.numeric(intensity_percentage_threshold)
-	intensity_percentage_threshold_value <- as.character(intensity_percentage_threshold)
-	#### Run the function
-	score <- biotyper_like(library_list, test_list, similarity_criteria=similarity_criteria, intensity_correction_coefficient=intensity_correction_coefficient, signal_intensity_evaluation=signal_intensity_evaluation, intensity_tolerance_percent=intensity_tolerance_percent, peaks_filtering=peaks_filtering, peaks_filtering_threshold_percent=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tof_mode=tof_mode, spectra_format=spectra_format, score_only=score_only, spectra_path_output=spectra_path_output)
-	# Matrices
-	score_hca_matrix <- score$score_hca$result_matrix
-	score_intensity_matrix <- score$score_intensity$output
-	score_correlation_matrix <- score$score_correlation_matrix$output
-	### Parameters matrices
-	# Parameters vector
-	parameters_vector <- c(file_type_export, filepath_library, filepath_test, mass_range_value, tof_mode, spectra_format, preprocess_spectra_in_packages_of_value, peak_picking_mode, signals_to_take_value, intensity_tolerance_percent_value, similarity_criteria, intensity_correction_coefficient_value, SNR_value, peaks_filtering_value, peaks_filtering_threshold_percent_value, low_intensity_peaks_removal_value, intensity_percentage_threshold_value, average_replicates_in_database_value, average_replicates_in_test_value, score_only_value, spectra_path_output_value)
-	names(parameters_vector) <- c("File type", "Database folder", "Samples folder", "Mass range", "TOF mode", "Spectra format", "Preprocess spectra in packages of", "Peak picking mode", "Most intense signals taken", "Intensity tolerance percent", "Similarity criteria", "Intensity correction coefficient", "Signal-to-noise ratio", "Peaks filtering", "Filtering threshold percentage", "Low intensity peaks removal", "Intensity threshold percent", "Average replicates in the database", "Average replicates in the samples", "Score only", "Spectra path in the output")
-	# Fill in the matrices (the number of columns must be the same for rbind)
-	if (!is.null(score_correlation_matrix)) {
-		parameters_matrix_correlation <- matrix("", nrow=length(parameters_vector), ncol=ncol(score_correlation_matrix))
-		parameters_matrix_correlation[,1] <- cbind(parameters_vector)
-		rownames(parameters_matrix_correlation) <- names(parameters_vector)
-	}
-	if (!is.null(score_hca_matrix)) {
-		parameters_matrix_hca <- matrix("", nrow=length(parameters_vector), ncol=ncol(score_hca_matrix))
-		parameters_matrix_hca[,1] <- cbind(parameters_vector)
-		rownames(parameters_matrix_hca) <- names(parameters_vector)
-	}
-	if (!is.null(score_intensity_matrix)) {
-		parameters_matrix_intensity <- matrix("", nrow=length(parameters_vector), ncol=ncol(score_intensity_matrix))
-		parameters_matrix_intensity[,1] <- cbind(parameters_vector)
-		rownames(parameters_matrix_intensity) <- names(parameters_vector)
-	}
-	#### Exit the function and put the variable into the R workspace
-	.GlobalEnv$score <- score
-	# Results matrices (score + parameters)
-	if (!is.null(score_hca_matrix)) {
-		.GlobalEnv$score_hca_matrix_results <- rbind(score_hca_matrix, parameters_matrix_hca)
-	}
-	if (!is.null(score_intensity_matrix)) {
-		.GlobalEnv$score_intensity_matrix_results <- rbind(score_intensity_matrix, parameters_matrix_intensity)
-	}
-	if (!is.null(score_correlation_matrix)) {
-		.GlobalEnv$score_correlation_matrix_results <- rbind(score_correlation_matrix, parameters_matrix_correlation)
-	}
-	# Save the files (CSV)
-	if (file_type_export == "csv") {
-		filename <- set_file_name()
-		if (!is.null(score_intensity_matrix)) {
-		    write.csv(score_intensity_matrix_results, file=paste("int_", filename, sep=""))
+##### Peak picking function
+peak_picking_function <- function() {
+	############ Do not run if the spectra have not been imported
+	if (!is.null(spectra_database) && !is.null(spectra_test)) {
+		###### Get the values
+		## Signals to take in most intense peaks
+		signals_to_take <- tclvalue(signals_to_take)
+		signals_to_take <- as.integer(signals_to_take)
+		signals_to_take_value <- as.character(signals_to_take)
+		## SNR
+		SNR <- tclvalue(SNR)
+		SNR <- as.numeric(SNR)
+		SNR_value <- as.character(SNR)
+		if (peak_picking_mode == "most intense") {
+			peaks_database <- most_intense_signals(spectra_database, signals_to_take=signals_to_take)
+			peaks_test <- most_intense_signals(spectra_test, signals_to_take=signals_to_take)
+		} else if (peak_picking_mode == "all"){
+			peaks_database <- detectPeaks(spectra_database, method="MAD", SNR=SNR)
+			peaks_test <- detectPeaks(spectra_test, method="MAD", SNR=SNR)
 		}
-		if (!is.null(score_hca_matrix)) {
-			# Dump the hca plot
-			#png(filename="hca.png", width=1900, height=1280)
-			#score$score_hca$plots
-			ggsave(plot=score$score_hca$plots, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
-			#savePlot(filename="hca.png", type="png")
-			#dev.print(X11, file="hca.png", width=1900, height=1280)
-			#dev.off()
-		    write.csv(score_hca_matrix_results, file=paste("hca_", filename, sep=""))
-		}
-		if (!is.null(score_correlation_matrix)) {
-		    write.csv(score_correlation_matrix_results, file=paste("corr_", filename, sep=""))
-		}
+		# Exit the function and put the variable into the R workspace
+		.GlobalEnv$peaks_database <- peaks_database
+		.GlobalEnv$peaks_test <- peaks_test
+		.GlobalEnv$signals_to_take_value <- signals_to_take_value
+		.GlobalEnv$SNR_value <- SNR_value
+		### Messagebox
+		tkmessageBox(title = "Peak picking successful", message = "The peak picking process has been successfully performed", icon = "info")
+	} else if (is.null(spectra_database) || is.null(spectra_test)) {
+		### Messagebox
+		tkmessageBox(title = "Spectra not imported", message = "The spectra have not been imported yet.\nImport them before performing the peak picking", icon = "warning")
 	}
-	# Save the files (Excel)
-	if (file_type_export == "xlsx" || file_type_export == "xls") {
-		filename <- set_file_name()
-		# Check if PERL is installed by using the built in function, for WriteXLS package
-		#perl_installed <- testPerl(verbose=FALSE)
-		#if (perl_installed == FALSE) {
-			#tkmessageBox(title = "Perl", message = "The software PERL has not been found on the computer. Please install the Perl software from\nhttps://www.perl.org/get.html\nand restart the R session", icon = "warning")
-		#}
-		if (!is.null(score_intensity_matrix)) {
-			# Convert it to a data frame
-			score_intensity_matrix_results <- as.data.frame(score_intensity_matrix_results)
-			# Generate unique row names
-			unique_row_names <- make.names(rownames(score_intensity_matrix_results), unique=TRUE)
-			rownames(score_intensity_matrix_results) <- unique_row_names
-			# Export
-		    #WriteXLS(x=score_intensity_matrix_results, ExcelFileName=paste("int_", filename, sep=""), SheetNames="Scores - Intensity", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
-			write.xlsx(x=score_intensity_matrix_results, file=paste("int_", filename, sep=""), sheetName="Scores - Intensity", row.names=TRUE)
+}
 
+##### Run the Spectral Typer
+run_spectral_typer_function <- function() {
+	############ Do not run if the spectra have not been imported or the peaks have not been picked
+	if (!is.null(spectra_database) && !is.null(spectra_test) && !is.null(peaks_database) && !is.null(peaks_test)) {
+		#### Get the values
+		## Intensity correction coefficient
+		intensity_correction_coefficient <- tclvalue(intensity_correction_coefficient)
+		intensity_correction_coefficient <- as.numeric(intensity_correction_coefficient)
+		intensity_correction_coefficient_value <- as.character(intensity_correction_coefficient)
+		## Intensity tolerance percent
+		intensity_tolerance_percent <- tclvalue(intensity_tolerance_percent)
+		intensity_tolerance_percent <- as.numeric(intensity_tolerance_percent)
+		intensity_tolerance_percent_value <- as.character(intensity_tolerance_percent)
+		## Peaks filtering threshold
+		peaks_filtering_threshold_percent <- tclvalue(peaks_filtering_threshold_percent)
+		peaks_filtering_threshold_percent <- as.numeric(peaks_filtering_threshold_percent)
+		peaks_filtering_threshold_percent_value <- as.character(peaks_filtering_threshold_percent)
+		## Low intensity threshold
+		intensity_percentage_threshold <- tclvalue(intensity_percentage_threshold)
+		intensity_percentage_threshold <- as.numeric(intensity_percentage_threshold)
+		intensity_percentage_threshold_value <- as.character(intensity_percentage_threshold)
+		### Tolerance (PPM)
+		if (tof_mode == "linear") {
+			tolerance_ppm <- 2000
+		} else if (tof_mode == "reflectron" || tof_mode == "reflector") {
+			tolerance_ppm <- 200
+		}
+		#### Run the function Spectral Typer score calculation
+		score_correlation_matrix <- NULL
+		score_hca_matrix <- NULL
+		score_intensity_matrix <- NULL
+		############### CORRELATION
+		if (similarity_criteria == "correlation") {
+			score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_correction_coefficient=intensity_correction_coefficient, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only)
+		} else if (similarity_criteria == "hca") {
+			score_hca_matrix <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, spectra_path_output=spectra_path_output, score_only=score_only, spectra_format=spectra_format, normalise_distances=TRUE, normalisation_method="sum")
+		} else if (similarity_criteria == "signal intensity") {
+			score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, comparison=signal_intensity_evaluation, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_tolerance_percent_threshold=intensity_tolerance_percent, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+		}
+		### Parameters matrices
+		# Parameters vector
+		parameters_vector <- c(file_type_export, filepath_database, filepath_test, mass_range_value, tof_mode, spectra_format, preprocess_spectra_in_packages_of_value, peak_picking_mode, signals_to_take_value, intensity_tolerance_percent_value, similarity_criteria, intensity_correction_coefficient_value, SNR_value, peaks_filtering_value, peaks_filtering_threshold_percent_value, low_intensity_peaks_removal_value, intensity_percentage_threshold_value, average_replicates_in_database_value, average_replicates_in_test_value, score_only_value, spectra_path_output_value)
+		names(parameters_vector) <- c("File type", "Database folder", "Samples folder", "Mass range", "TOF mode", "Spectra format", "Preprocess spectra in packages of", "Peak picking mode", "Most intense signals taken", "Intensity tolerance percent", "Similarity criteria", "Intensity correction coefficient", "Signal-to-noise ratio", "Peaks filtering", "Filtering threshold percentage", "Low intensity peaks removal", "Intensity threshold percent", "Average replicates in the database", "Average replicates in the samples", "Score only", "Spectra path in the output")
+		# Fill in the matrices (the number of columns must be the same for rbind)
+		if (!is.null(score_correlation_matrix)) {
+			parameters_matrix_correlation <- matrix("", nrow=length(parameters_vector), ncol=ncol(score_correlation_matrix))
+			parameters_matrix_correlation[,1] <- cbind(parameters_vector)
+			rownames(parameters_matrix_correlation) <- names(parameters_vector)
 		}
 		if (!is.null(score_hca_matrix)) {
-			# Dump the hca plot
-			#png(filename="hca.png", width=1900, height=1280)
-			#score$score_hca$plots
-			ggsave(plot=score$score_hca$plots, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
-			#savePlot(filename="hca.png", type="png")
-			#dev.print(X11, file="hca.png", width=1900, height=1280)
-			#dev.off()
-			# Convert it to a data frame
-			score_hca_matrix_results <- as.data.frame(score_hca_matrix_results)
-			# Generate unique row names
-			unique_row_names <- make.names(rownames(score_hca_matrix_results), unique=TRUE)
-			rownames(score_hca_matrix_results) <- unique_row_names
-			# Export
-		    #WriteXLS(x=score_hca_matrix_results, ExcelFileName=paste("hca_", filename, sep=""), SheetNames="Scores - HCA", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
-			write.xlsx(x=score_hca_matrix_results, file=paste("hca_", filename, sep=""), sheetName="Scores - HCA", row.names=TRUE)
+			parameters_matrix_hca <- matrix("", nrow=length(parameters_vector), ncol=ncol(score_hca_matrix))
+			parameters_matrix_hca[,1] <- cbind(parameters_vector)
+			rownames(parameters_matrix_hca) <- names(parameters_vector)
+		}
+		if (!is.null(score_intensity_matrix)) {
+			parameters_matrix_intensity <- matrix("", nrow=length(parameters_vector), ncol=ncol(score_intensity_matrix))
+			parameters_matrix_intensity[,1] <- cbind(parameters_vector)
+			rownames(parameters_matrix_intensity) <- names(parameters_vector)
+		}
+		#### Exit the function and put the variable into the R workspace
+		if (!is.null(score_hca_matrix)) {
+			.GlobalEnv$score_hca_matrix_results <- rbind(score_hca_matrix, parameters_matrix_hca)
+		}
+		if (!is.null(score_intensity_matrix)) {
+			.GlobalEnv$score_intensity_matrix_results <- rbind(score_intensity_matrix, parameters_matrix_intensity)
 		}
 		if (!is.null(score_correlation_matrix)) {
-			# Convert it to a data frame
-			score_correlation_matrix_results <- as.data.frame(score_correlation_matrix_results)
-			# Generate unique row names
-			unique_row_names <- make.names(rownames(score_correlation_matrix_results), unique=TRUE)
-			rownames(score_correlation_matrix_results) <- unique_row_names
-			# Export
-		    #WriteXLS(x=score_correlation_matrix_results, ExcelFileName=paste("corr_", filename, sep=""), SheetNames="Scores - Correlation", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
-			write.xlsx(x=score_correlation_matrix_results, file=paste("corr_", filename, sep=""), sheetName="Scores - Correlation", row.names=TRUE)
+			.GlobalEnv$score_correlation_matrix_results <- rbind(score_correlation_matrix, parameters_matrix_correlation)
 		}
+		# Save the files (CSV)
+		if (file_type_export == "csv") {
+			filename <- set_file_name()
+			if (!is.null(score_intensity_matrix)) {
+			    write.csv(score_intensity_matrix_results, file=paste("int_", filename, sep=""))
+			}
+			if (!is.null(score_hca_matrix)) {
+				# Dump the hca plot
+				#png(filename="hca.png", width=1900, height=1280)
+				#score$score_hca$plots
+				ggsave(plot=score$score_hca$plots, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
+				#savePlot(filename="hca.png", type="png")
+				#dev.print(X11, file="hca.png", width=1900, height=1280)
+				#dev.off()
+			    write.csv(score_hca_matrix_results, file=paste("hca_", filename, sep=""))
+			}
+			if (!is.null(score_correlation_matrix)) {
+			    write.csv(score_correlation_matrix_results, file=paste("corr_", filename, sep=""))
+			}
+		}
+		# Save the files (Excel)
+		if (file_type_export == "xlsx" || file_type_export == "xls") {
+			filename <- set_file_name()
+			# Check if PERL is installed by using the built in function, for WriteXLS package
+			#perl_installed <- testPerl(verbose=FALSE)
+			#if (perl_installed == FALSE) {
+				#tkmessageBox(title = "Perl", message = "The software PERL has not been found on the computer. Please install the Perl software from\nhttps://www.perl.org/get.html\nand restart the R session", icon = "warning")
+			#}
+			if (!is.null(score_intensity_matrix)) {
+				# Convert it to a data frame
+				score_intensity_matrix_results <- as.data.frame(score_intensity_matrix_results)
+				# Generate unique row names
+				unique_row_names <- make.names(rownames(score_intensity_matrix_results), unique=TRUE)
+				rownames(score_intensity_matrix_results) <- unique_row_names
+				# Export
+			    #WriteXLS(x=score_intensity_matrix_results, ExcelFileName=paste("int_", filename, sep=""), SheetNames="Scores - Intensity", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
+				write.xlsx(x=score_intensity_matrix_results, file=paste("int_", filename, sep=""), sheetName="Scores - Intensity", row.names=TRUE)
+
+			}
+			if (!is.null(score_hca_matrix)) {
+				# Dump the hca plot
+				#png(filename="hca.png", width=1900, height=1280)
+				#score$score_hca$plots
+				ggsave(plot=score$score_hca$plots, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
+				#savePlot(filename="hca.png", type="png")
+				#dev.print(X11, file="hca.png", width=1900, height=1280)
+				#dev.off()
+				# Convert it to a data frame
+				score_hca_matrix_results <- as.data.frame(score_hca_matrix_results)
+				# Generate unique row names
+				unique_row_names <- make.names(rownames(score_hca_matrix_results), unique=TRUE)
+				rownames(score_hca_matrix_results) <- unique_row_names
+				# Export
+			    #WriteXLS(x=score_hca_matrix_results, ExcelFileName=paste("hca_", filename, sep=""), SheetNames="Scores - HCA", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
+				write.xlsx(x=score_hca_matrix_results, file=paste("hca_", filename, sep=""), sheetName="Scores - HCA", row.names=TRUE)
+			}
+			if (!is.null(score_correlation_matrix)) {
+				# Convert it to a data frame
+				score_correlation_matrix_results <- as.data.frame(score_correlation_matrix_results)
+				# Generate unique row names
+				unique_row_names <- make.names(rownames(score_correlation_matrix_results), unique=TRUE)
+				rownames(score_correlation_matrix_results) <- unique_row_names
+				# Export
+			    #WriteXLS(x=score_correlation_matrix_results, ExcelFileName=paste("corr_", filename, sep=""), SheetNames="Scores - Correlation", row.names=TRUE, AdjWidth=TRUE, verbose=TRUE)
+				write.xlsx(x=score_correlation_matrix_results, file=paste("corr_", filename, sep=""), sheetName="Scores - Correlation", row.names=TRUE)
+			}
+		}
+		### Messagebox
+		tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity Pearson's correlation coefficient\nIntMtch: signal intensity matching\nsl: slope of the regression curve", icon = "info")
+	} else if (is.null(spectra_database) || is.null(spectra_test) || is.null(peaks_database) || is.null(peaks_test)) {
+		### Messagebox
+		tkmessageBox(title = "Something is wrong", message = "Some elements are needed to perform this operation: make sure that the spectra have been imported and the peak picking process has been performed", icon = "warning")
 	}
-	### Messagebox
-	tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity Pearson's correlation coefficient\nSymm: intensity simmetry\nsl: slope of the regression curve", icon = "info")
 }
 
 ##### Similarity criteria
@@ -577,14 +624,17 @@ spectra_format_choice <- function() {
 	# Default
 	if (spectra_format == "" || spectra_format == "Xmass") {
 		spectra_format <- "xmass"
+		spectra_format_value <- "Xmass"
 	}
 	if (spectra_format == "imzML") {
 		spectra_format <- "imzml"
+		spectra_format_value <- "imzML"
 	}
 	# Escape the function
 	.GlobalEnv$spectra_format <- spectra_format
+	.GlobalEnv$spectra_format_value <- spectra_format_value
 	# Set the value of the displaying label
-	spectra_format_value_label <- tklabel(window, text=spectra_format)
+	spectra_format_value_label <- tklabel(window, text=spectra_format_value)
 	tkgrid(spectra_format_value_label, row=12, column=6)
 }
 
@@ -619,7 +669,7 @@ intensity_tolerance_percent <- tclVar("")
 
 # The "area" where we will put our input lines
 window <- tktoplevel()
-tktitle(window) <- "Biotyper-like"
+tktitle(window) <- "Spectral Typer"
 #### Browse
 # Library
 select_library_label <- tklabel(window, text="The library should be structured like this:\nMain folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/Spectrum_data")
@@ -709,9 +759,11 @@ quit_button <- tkbutton(window, text="Quit", command=quit_function)
 #end_session_label <- tklabel(window, text="Quit")
 end_session_button <- tkbutton(window, text="End R session", command=end_session_function)
 # Import the spectra
-import_spectra_button <- tkbutton(window, text="Import spectra, preprocessing\nand peak picking", command=import_spectra_function)
-# Run the Biotyper-like!
-run_biotyper_like_button <- tkbutton(window, text="Run the Biotyper-like!", command=run_biotyper_like_function)
+import_spectra_button <- tkbutton(window, text="Import and preprocess\nspectra", command=import_spectra_function)
+# Peak picking
+peak_picking_button <- tkbutton(window, text="Peak picking", command=peak_picking_function)
+# Run the Spectral typer!
+run_spectral_typer_button <- tkbutton(window, text="Run the Spectral Typer!", command=run_spectral_typer_function)
 # Set the file name
 set_file_name_label <- tklabel(window, text="<-- Set the file name")
 set_file_name_entry <- tkentry(window, width=30, textvariable=file_name)
@@ -730,7 +782,7 @@ average_replicates_in_test_value_label <- tklabel(window, text=average_replicate
 score_only_value_label <- tklabel(window, text=score_only_value)
 spectra_path_output_value_label <- tklabel(window, text=spectra_path_output_value)
 tof_mode_value_label <- tklabel(window, text=tof_mode_value)
-spectra_format_value_label <- tklabel(window, text=spectra_format)
+spectra_format_value_label <- tklabel(window, text=spectra_format_value)
 
 #### Geometry manager
 # Scrollbar
@@ -794,13 +846,14 @@ tkgrid(spectra_format_entry, row=12, column=5)
 tkgrid(spectra_format_value_label, row=12, column=6)
 tkgrid(intensity_tolerance_percent_label, row=6, column=4)
 tkgrid(intensity_tolerance_percent_entry, row=6, column=5)
-tkgrid(preprocess_spectra_in_packages_of_label, row=13, column=3)
-tkgrid(preprocess_spectra_in_packages_of_entry, row=13, column=4)
+tkgrid(preprocess_spectra_in_packages_of_label, row=13, column=2)
+tkgrid(preprocess_spectra_in_packages_of_entry, row=13, column=3)
 tkgrid(file_type_export_label, row=14, column=2)
 tkgrid(file_type_export_entry, row=14, column=3)
 tkgrid(file_type_export_value_label, row=14, column=4)
-tkgrid(import_spectra_button, row=13, column=2)
-tkgrid(run_biotyper_like_button, row=14, column=5)
+tkgrid(import_spectra_button, row=13, column=4)
+tkgrid(peak_picking_button, row=13, column=5)
+tkgrid(run_spectral_typer_button, row=14, column=5)
 tkgrid(exit_label, row=15, column=1)
 tkgrid(quit_button, row=15, column=2)
 tkgrid(end_session_button, row=15, column=4)
