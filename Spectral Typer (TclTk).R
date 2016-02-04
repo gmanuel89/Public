@@ -14,7 +14,7 @@ average_replicates_in_database <- FALSE
 average_replicates_in_test <- FALSE
 peaks_filtering <- FALSE
 low_intensity_peaks_removal <- FALSE
-intensity_threshold_method <- "whole"
+intensity_threshold_method <- "element-wise"
 tof_mode <- "linear"
 spectra_format <- "brukerflex"
 score_only <- FALSE
@@ -42,7 +42,7 @@ spectra_path_output_value <- "YES"
 similarity_criteria_value <- "correlation"
 peak_picking_mode_value <- "all"
 tof_mode_value <- "linear"
-intensity_threshold_method_value <- "whole"
+intensity_threshold_method_value <- "element-wise"
 spectra_format_value <- "Xmass"
 
 
@@ -487,7 +487,7 @@ intensity_threshold_method_choice <- function() {
 	intensity_threshold_method <- select.list(c("whole","element-wise"), title="Choose")
 	# Default
 	if (intensity_threshold_method == "") {
-		intensity_threshold_method <- "whole"
+		intensity_threshold_method <- "element-wise"
 	}
 	# Set the value of the displaying label
 	intensity_threshold_method_value <- intensity_threshold_method
