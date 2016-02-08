@@ -1,4 +1,4 @@
-################ SPECTRAL TYPER PROGRAM 2016.02.04
+################ SPECTRAL TYPER PROGRAM 2016.02.08
 
 # Update packages and load the required packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -62,7 +62,7 @@ file_type_export_choice <- function() {
 	.GlobalEnv$file_type_export <- file_type_export
 	# Set the value of the displaying label
 	file_type_export_value_label <- tklabel(window, text=file_type_export)
-	tkgrid(file_type_export_value_label, row=14, column=4)
+	tkgrid(file_type_export_value_label, row=13, column=4)
 }
 
 ##### File name (export)
@@ -369,7 +369,7 @@ run_spectral_typer_function <- function() {
 			}
 		}
 		### Messagebox
-		tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity Pearson's correlation coefficient\nIntMtch: signal intensity matching\nsl: slope of the regression curve", icon = "info")
+		tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity Pearson's correlation coefficient\nIntMtch: signal intensity matching\nsl: slope of the regression curve\nns: number of signals", icon = "info")
 	} else if (is.null(spectra_database) || is.null(spectra_test) || is.null(peaks_database) || is.null(peaks_test)) {
 		### Messagebox
 		tkmessageBox(title = "Something is wrong", message = "Some elements are needed to perform this operation: make sure that the spectra have been imported and the peak picking process has been performed", icon = "warning")
@@ -491,8 +491,11 @@ intensity_threshold_method_choice <- function() {
 	}
 	# Set the value of the displaying label
 	intensity_threshold_method_value <- intensity_threshold_method
+	if (intensity_threshold_method_value == "whole") {
+		intensity_threshold_method_value <- "     whole     "
+	}
 	intensity_threshold_method_value_label <- tklabel(window, text=intensity_threshold_method_value)
-	tkgrid(intensity_threshold_method_value_label, row=9, column=4)
+	tkgrid(intensity_threshold_method_value_label, row=9, column=3)
 	# Escape the function
 	.GlobalEnv$intensity_threshold_method <- intensity_threshold_method
 	.GlobalEnv$intensity_threshold_method_value <- intensity_threshold_method_value
@@ -757,13 +760,13 @@ exit_label <- tklabel(window, text="Exit")
 quit_button <- tkbutton(window, text="Quit", command=quit_function)
 # End session
 #end_session_label <- tklabel(window, text="Quit")
-end_session_button <- tkbutton(window, text="End R session", command=end_session_function)
+end_session_button <- tkbutton(window, text="QUIT", command=end_session_function)
 # Import the spectra
-import_spectra_button <- tkbutton(window, text="Import and preprocess\nspectra", command=import_spectra_function)
+import_spectra_button <- tkbutton(window, text="SPECTRA IMPORT AND\nPREPROCESSING", command=import_spectra_function)
 # Peak picking
-peak_picking_button <- tkbutton(window, text="Peak picking", command=peak_picking_function)
+peak_picking_button <- tkbutton(window, text="PEAK PICKING", command=peak_picking_function)
 # Run the Spectral typer!
-run_spectral_typer_button <- tkbutton(window, text="Run the Spectral Typer!", command=run_spectral_typer_function)
+run_spectral_typer_button <- tkbutton(window, text="RUN THE SPECTRAL TYPER", command=run_spectral_typer_function)
 # Set the file name
 set_file_name_label <- tklabel(window, text="<-- Set the file name")
 set_file_name_entry <- tkentry(window, width=30, textvariable=file_name)
@@ -821,9 +824,9 @@ tkgrid(peaks_filtering_threshold_percent_entry, row=7, column=5)
 tkgrid(low_intensity_peaks_removal_label, row=8, column=1)
 tkgrid(low_intensity_peaks_removal_entry, row=8, column=2)
 tkgrid(low_intensity_peaks_removal_value_label, row=8, column=3)
-tkgrid(intensity_threshold_method_label, row=9, column=2)
-tkgrid(intensity_threshold_method_entry, row=9, column=3)
-tkgrid(intensity_threshold_method_value_label, row=9, column=4)
+tkgrid(intensity_threshold_method_label, row=9, column=1)
+tkgrid(intensity_threshold_method_entry, row=9, column=2)
+tkgrid(intensity_threshold_method_value_label, row=9, column=3)
 tkgrid(intensity_percentage_threshold_label, row=8, column=4)
 tkgrid(intensity_percentage_threshold_entry, row=8, column=5)
 tkgrid(average_replicates_in_database_label, row=10, column=1)
@@ -846,16 +849,15 @@ tkgrid(spectra_format_entry, row=12, column=5)
 tkgrid(spectra_format_value_label, row=12, column=6)
 tkgrid(intensity_tolerance_percent_label, row=6, column=4)
 tkgrid(intensity_tolerance_percent_entry, row=6, column=5)
-tkgrid(preprocess_spectra_in_packages_of_label, row=13, column=2)
-tkgrid(preprocess_spectra_in_packages_of_entry, row=13, column=3)
-tkgrid(file_type_export_label, row=14, column=2)
-tkgrid(file_type_export_entry, row=14, column=3)
-tkgrid(file_type_export_value_label, row=14, column=4)
-tkgrid(import_spectra_button, row=13, column=4)
-tkgrid(peak_picking_button, row=13, column=5)
-tkgrid(run_spectral_typer_button, row=14, column=5)
-tkgrid(exit_label, row=15, column=1)
-tkgrid(quit_button, row=15, column=2)
-tkgrid(end_session_button, row=15, column=4)
+tkgrid(preprocess_spectra_in_packages_of_label, row=9, column=4)
+tkgrid(preprocess_spectra_in_packages_of_entry, row=9, column=5)
+tkgrid(file_type_export_label, row=13, column=2)
+tkgrid(file_type_export_entry, row=13, column=3)
+tkgrid(file_type_export_value_label, row=13, column=4)
+tkgrid(import_spectra_button, row=14, column=2)
+tkgrid(peak_picking_button, row=14, column=3)
+tkgrid(run_spectral_typer_button, row=14, column=4)
+#tkgrid(exit_label, row=15, column=1)
+#tkgrid(quit_button, row=15, column=2)
+tkgrid(end_session_button, row=14, column=5)
 #window_scrollbar
-spectra_format
