@@ -351,6 +351,10 @@ return (result_matrix)
 remove_low_intensity_peaks <- function (peaks, intensity_threshold_percent=0.1, intensity_threshold_method="element-wise") {
 # Load the required libraries
 install_and_load_required_packages("parallel")
+# If there is only one peaklist, there is no point in doing the whole method, but only the element-wise.
+if (!isMassPeaksList(peaks)) {
+	intensity_threshold_method <- "element-wise"
+}
 ################################################################## ELEMENT-WISE
 if (intensity_threshold_method == "element-wise") {
 	############### INTENSITY FILTERING FUNCTION (ELEMENT-WISE)
@@ -392,15 +396,11 @@ if (intensity_threshold_method == "element-wise") {
 		cpu_thread_number <- detectCores(logical=TRUE)
 		cpu_core_number <- cpu_thread_number/2
 		# Make the CPU cluster for parallelisation
-		cl <- makeCluster(cpu_core_number)
+		#cl <- makeCluster(cpu_core_number)
 		# Apply the multicore function
 		#peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_function_element(peaks, intensity_threshold_percent))
-		peaks_filtered <- list()
-		for (p in 1:length(peaks)) {
-			temp_peaks <- intensity_filtering_function_element(peaks[[p]], intensity_threshold_percent)
-			peaks_filtered <- append(peaks_filtered, temp_peaks)
-		}
-		stopCluster(cl)
+		peaks_filtered <- mclapply(peaks, FUN = function (peaks) intensity_filtering_function_element(peaks, intensity_threshold_percent), mc.cores=cpu_core_number)
+		#stopCluster(cl)
 	} else {
 		######################################### Single peaks element
 		peaks_filtered <- intensity_filtering_function_element(peaks, intensity_threshold_percent)
@@ -459,15 +459,11 @@ if (intensity_threshold_method == "whole") {
 		cpu_thread_number <- detectCores(logical=TRUE)
 		cpu_core_number <- cpu_thread_number/2
 		# Make the CPU cluster for parallelisation
-		cl <- makeCluster(cpu_core_number)
+		#cl <- makeCluster(cpu_core_number)
 		# Apply the multicore function
 		#peaks_filtered <- parLapply(cl, peaks, fun = function(peaks) intensity_filtering_function_whole(peaks, intensity_threshold_percent, highest_intensity))
-		peaks_filtered <- list()
-		for (p in 1:length(peaks)) {
-			temp_peaks <- intensity_filtering_function_whole(peaks[[p]], intensity_threshold_percent, highest_intensity)
-			peaks_filtered <- append(peaks_filtered, temp_peaks)
-		}
-		stopCluster(cl)
+		peaks_filtered <- mclapply(peaks, FUN = function(peaks) intensity_filtering_function_whole(peaks, intensity_threshold_percent, highest_intensity), mc.cores=cpu_core_number)
+		#stopCluster(cl)
 	} else {
 		######################################### Single peaks element
 		peaks_filtered <- intensity_filtering_function_whole(peaks, intensity_threshold_percent, highest_intensity)
@@ -5934,10 +5930,6 @@ for (sp in 1:length(spectra_test)) {
 }
 ############################################################ SCORE (FRI)
 number_of_signals_samples <- numeric()
-number_of_signals_database<- numeric()
-for (d in 1:database_size) {
-	number_of_signals_database <- append(number_of_signals_database, length(peaks_database[[d]]@mass))
-}
 number_of_aligned_signals <- numeric()
 matching_signals_matrix_all <- NULL
 fit_matrix_all <- NULL
@@ -5953,9 +5945,6 @@ for (s in 1:number_of_samples) {
 	spectra_database_temp <- spectra_database
 	peaks_sample <- peaks_test[[s]]
 	spectrum_sample <- spectra_test[[s]]
-	#################### Number of signals
-	number_of_signals_samples <- append(number_of_signals_samples, length(peaks_sample@mass))
-	matching_signals <- numeric()
 	####### Peak alignment
 	# Merge the peaklists
 	peaks_all <- append(peaks_database_temp, peaks_sample)
@@ -5965,6 +5954,9 @@ for (s in 1:number_of_samples) {
 	# Restore the lists
 	peaks_database_temp <- peaks_all [1:database_size]
 	peaks_sample <- peaks_all [[length(peaks_all)]]
+	#################### Number of signals
+	number_of_signals_samples <- append(number_of_signals_samples, length(peaks_sample@mass))
+	matching_signals <- numeric()
 	###### COUNTER 0 - MATCHING SIGNALS
 	# Create a counter, symmetrical to the database Peaklist
 	matching_signals_matrix <- matrix (0, nrow=1, ncol=database_size)
@@ -6101,6 +6093,11 @@ for (s in 1:number_of_samples) {
 	} else {
 		slope_matrix_all <- rbind(slope_matrix_all, slope_matrix)
 	}
+}
+# Record the number of signals in the database
+number_of_signals_database<- numeric()
+for (d in 1:database_size) {
+	number_of_signals_database <- append(number_of_signals_database, length(peaks_database[[d]]@mass))
 }
 # Fix the rownames and colnames
 rownames(intensity_correlation_matrix_all) <- sample_vector
@@ -6299,7 +6296,7 @@ if (normalise_distances == TRUE) {
 if (spectra_path_output == TRUE) {
 	result_matrix <- cbind(result_matrix, sample_vector)
 }
-return (result_matrix)
+return (list(result_matrix=result_matrix, hca_dendrogram=hca_dendrogram))
 }
 
 
@@ -6370,10 +6367,6 @@ for (sp in 1:length(spectra_test)) {
 }
 ############################################################ SCORE (FRI)
 number_of_signals_samples <- numeric()
-number_of_signals_database<- numeric()
-for (d in 1:database_size) {
-	number_of_signals_database <- append(number_of_signals_database, length(peaks_database[[d]]@mass))
-}
 matching_signals_matrix_all <- NULL
 fit_matrix_all <- NULL
 retrofit_matrix_all <- NULL
@@ -6386,8 +6379,6 @@ for (s in 1:number_of_samples) {
 	spectra_database_temp <- spectra_database
 	peaks_sample <- peaks_test[[s]]
 	spectrum_sample <- spectra_test[[s]]
-	#################### Number of signals
-	number_of_signals_samples <- append(number_of_signals_samples, length(peaks_sample@mass))
 	####### Peak alignment
 	# Merge the peaklists
 	peaks_all <- append(peaks_database_temp, peaks_sample)
@@ -6397,6 +6388,8 @@ for (s in 1:number_of_samples) {
 	# Restore the lists
 	peaks_database_temp <- peaks_all [1:database_size]
 	peaks_sample <- peaks_all [[length(peaks_all)]]
+	#################### Number of signals
+	number_of_signals_samples <- append(number_of_signals_samples, length(peaks_sample@mass))
 	###### COUNTER 0 - MATCHING SIGNALS
 	# Create a counter, symmetrical to the database Peaklist
 	matching_signals_matrix <- matrix (0, nrow=1, ncol=database_size)
@@ -6493,6 +6486,11 @@ for (s in 1:number_of_samples) {
 	    ########### To be implemented
 		intensity_matching_matrix <- NULL
 	}
+}
+# Record the number of signals in the database
+number_of_signals_database<- numeric()
+for (d in 1:database_size) {
+	number_of_signals_database <- append(number_of_signals_database, length(peaks_database[[d]]@mass))
 }
 # Fix the rownames and colnames
 colnames(intensity_matching_matrix_all) <- library_vector
@@ -6611,10 +6609,7 @@ for (sp in 1:length(spectra_test)) {
 }
 ############################################################ SCORE (FRI)
 number_of_signals_samples <- numeric(length=number_of_samples)
-number_of_signals_database <- numeric()
-for (d in 1:database_size) {
-	number_of_signals_database <- append(number_of_signals_database, length(peaks_database[[d]]@mass))
-}
+number_of_signals_database <- numeric(length=database_size)
 matching_signals_matrix_all <- matrix(0, ncol=database_size, nrow=number_of_samples)
 fit_matrix_all <- matrix(0, ncol=database_size, nrow=number_of_samples)
 retrofit_matrix_all <- matrix(0, ncol=database_size, nrow=number_of_samples)
@@ -6631,8 +6626,6 @@ for (spl in 1:number_of_samples) {
 		spectra_database_temp <- spectra_database[[db]]
 		peaks_sample <- peaks_test[[spl]]
 		spectrum_sample <- spectra_test[[spl]]
-		#################### Number of signals
-		number_of_signals_samples[spl] <- length(peaks_sample@mass)
 		####### Peak alignment
 		# Merge the peaklists
 		peaks_all <- append(peaks_database_temp, peaks_sample)
@@ -6642,6 +6635,9 @@ for (spl in 1:number_of_samples) {
 		# Restore the lists
 		peaks_database_temp <- peaks_all[[1]]
 		peaks_sample <- peaks_all[[2]]
+		#################### Number of signals
+		number_of_signals_samples[spl] <- length(peaks_sample@mass)
+		number_of_signals_database[db] <- length(peaks_database_temp@mass)
 		###### COUNTER 0 - MATCHING SIGNALS
 		# Create a counter, symmetrical to the database Peaklist
 		matching_signals_number <- 0
@@ -6854,10 +6850,7 @@ for (sp in 1:length(spectra_test)) {
 }
 ############################################################ SCORE (FRI)
 number_of_signals_samples <- numeric(length=number_of_samples)
-number_of_signals_database <- numeric()
-for (d in 1:database_size) {
-	number_of_signals_database <- append(number_of_signals_database, length(peaks_database[[d]]@mass))
-}
+number_of_signals_database <- numeric(length=database_size)
 matching_signals_matrix_all <- matrix(0, nrow=number_of_samples, ncol=database_size)
 fit_matrix_all <- matrix(0, nrow=number_of_samples, ncol=database_size)
 retrofit_matrix_all <- matrix(0, nrow=number_of_samples, ncol=database_size)
@@ -6872,8 +6865,6 @@ for (spl in 1:number_of_samples) {
 		spectra_database_temp <- spectra_database[[db]]
 		peaks_sample <- peaks_test[[spl]]
 		spectrum_sample <- spectra_test[[spl]]
-		#################### Number of signals
-		number_of_signals_samples[spl] <- length(peaks_sample@mass)
 		####### Peak alignment
 		# Merge the peaklists
 		peaks_all <- append(peaks_database_temp, peaks_sample)
@@ -6883,6 +6874,9 @@ for (spl in 1:number_of_samples) {
 		# Restore the lists
 		peaks_database_temp <- peaks_all[[1]]
 		peaks_sample <- peaks_all[[2]]
+		#################### Number of signals
+		number_of_signals_samples[spl] <- length(peaks_sample@mass)
+		number_of_signals_database[db] <- length(peaks_database_temp@mass)
 		###### COUNTER 0 - MATCHING SIGNALS
 		# Create a counter, symmetrical to the database Peaklist
 		matching_signals_sample <- 0
@@ -6940,7 +6934,10 @@ for (spl in 1:number_of_samples) {
 				intensity_matching_sample <- 0
 			}
 			if (length(peaks_sample@mass) > 0 && length(peaks_database_temp@mass) > 0) {
-				intensity_matching_sample <- intensity_matching_sample / length(peaks_sample@mass)
+				intensity_matching_sample <- intensity_matching_sample / matching_signals_sample
+				if (is.na(intensity_matching_sample)) {
+					intensity_matching_sample <- 0
+				}
 			}
 			# Append this row to the global matrix
 			intensity_matching_matrix_all[spl,db] <- intensity_matching_sample
@@ -7066,10 +7063,7 @@ for (sp in 1:length(spectra_test)) {
 	spectra_path_vector <- append(spectra_path_vector, spectra_test[[sp]]@metaData$file[1])
 }
 ############################################################ SCORE (FRI)
-number_of_signals_database <- numeric()
-for (d in 1:database_size) {
-	number_of_signals_database <- append(number_of_signals_database, length(peaks_database[[d]]@mass))
-}
+number_of_signals_database <- numeric(length=database_size)
 ################### Each sample gets compared with the database (create a copy of the original database each time, otherwise it gets modified when processed together with the sample)
 # Create a list to be used for lapply
 global_list <- list()
@@ -7105,8 +7099,6 @@ comparison_sample_db_function_correlation <- function(x) {
 		spectra_database_temp_all <- x[(database_size+3):length(x)]
 		peaks_database_temp <- peaks_database_temp_all[[db]]
 		spectra_database_temp <- spectra_database_temp_all[[db]]
-		#################### Number of signals
-		number_of_signals_samples <- length(peaks_sample@mass)
 		####### Peak alignment
 		# Merge the peaklists
 		peaks_all <- append(peaks_database_temp, peaks_sample)
@@ -7116,6 +7108,9 @@ comparison_sample_db_function_correlation <- function(x) {
 		# Restore the lists
 		peaks_database_temp <- peaks_all[[1]]
 		peaks_sample <- peaks_all[[2]]
+		#################### Number of signals
+		number_of_signals_samples <- length(peaks_sample@mass)
+		number_of_signals_database[db] <- length(peaks_database_temp@mass)
 		###### COUNTER 0 - MATCHING SIGNALS
 		# Create a counter, symmetrical to the database Peaklist
 		matching_signals_number <- 0
@@ -7382,10 +7377,7 @@ for (sp in 1:length(spectra_test)) {
 	spectra_path_vector <- append(spectra_path_vector, spectra_test[[sp]]@metaData$file[1])
 }
 ############################################################ SCORE (FRI)
-number_of_signals_database <- numeric()
-for (d in 1:database_size) {
-	number_of_signals_database <- append(number_of_signals_database, length(peaks_database[[d]]@mass))
-}
+number_of_signals_database <- numeric(length=database_size)
 ################### Each sample gets compared with the database (create a copy of the original database each time, otherwise it gets modified when processed together with the sample)
 # Create a list to be used for lapply
 global_list <- list()
@@ -7419,8 +7411,6 @@ comparison_sample_db_function_intensity <- function(x) {
 		spectra_database_temp_all <- x[(database_size+3):length(x)]
 		peaks_database_temp <- peaks_database_temp_all[[db]]
 		spectra_database_temp <- spectra_database_temp_all[[db]]
-		#################### Number of signals
-		number_of_signals_samples <- length(peaks_sample@mass)
 		####### Peak alignment
 		# Merge the peaklists
 		peaks_all <- append(peaks_database_temp, peaks_sample)
@@ -7430,6 +7420,9 @@ comparison_sample_db_function_intensity <- function(x) {
 		# Restore the lists
 		peaks_database_temp <- peaks_all[[1]]
 		peaks_sample <- peaks_all[[2]]
+		#################### Number of signals
+		number_of_signals_samples <- length(peaks_sample@mass)
+		number_of_signals_database[db] <- length(peaks_database_temp@mass)
 		###### COUNTER 0 - MATCHING SIGNALS
 		# Create a counter, symmetrical to the database Peaklist
 		matching_signals_sample <- 0
@@ -7488,6 +7481,9 @@ comparison_sample_db_function_intensity <- function(x) {
 			}
 			if (length(peaks_sample@mass) > 0 && length(peaks_database_temp@mass) > 0) {
 				intensity_matching_sample <- intensity_matching_sample / matching_signals_sample
+				if (is.na(intensity_matching_sample)) {
+					intensity_matching_sample <- 0
+				}
 			}
 			# Append this row to the global matrix
 			intensity_matching_matrix[1,db] <- intensity_matching_sample
