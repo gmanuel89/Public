@@ -1,4 +1,4 @@
-################ SPECTRAL TYPER PROGRAM 2016.02.08
+################ SPECTRAL TYPER PROGRAM 2016.02.12
 
 # Update packages and load the required packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -212,12 +212,18 @@ peak_picking_function <- function() {
 		SNR <- tclvalue(SNR)
 		SNR <- as.numeric(SNR)
 		SNR_value <- as.character(SNR)
+		# Define the halfWindowSize for peak picking
+		if (tof_mode == "linear") {
+			halfWindowSize <- 20
+		} else if (tof_mode == "reflector") {
+			halfWindowSize <- 5
+		}
 		if (peak_picking_mode == "most intense") {
-			peaks_database <- most_intense_signals(spectra_database, signals_to_take=signals_to_take)
+			peaks_database <- most_intense_signals(spectra_database, signals_to_take=signals_to_take, tof_mode=tof_mode)
 			peaks_test <- most_intense_signals(spectra_test, signals_to_take=signals_to_take)
 		} else if (peak_picking_mode == "all"){
-			peaks_database <- detectPeaks(spectra_database, method="MAD", SNR=SNR)
-			peaks_test <- detectPeaks(spectra_test, method="MAD", SNR=SNR)
+			peaks_database <- detectPeaks(spectra_database, method="MAD", SNR=SNR, halfWindowSize=halfWindowSize)
+			peaks_test <- detectPeaks(spectra_test, method="MAD", SNR=SNR, halfWindowSize=halfWindowSize)
 		}
 		# Exit the function and put the variable into the R workspace
 		.GlobalEnv$peaks_database <- peaks_database
@@ -265,11 +271,11 @@ run_spectral_typer_function <- function() {
 		score_intensity_matrix <- NULL
 		############### CORRELATION
 		if (similarity_criteria == "correlation") {
-			score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_correction_coefficient=intensity_correction_coefficient, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only)
+			score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_correction_coefficient=intensity_correction_coefficient, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only)
 		} else if (similarity_criteria == "hca") {
-			score_hca_matrix <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, spectra_path_output=spectra_path_output, score_only=score_only, spectra_format=spectra_format, normalise_distances=TRUE, normalisation_method="sum")
+			score_hca_matrix <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, spectra_path_output=spectra_path_output, score_only=score_only, spectra_format=spectra_format, normalise_distances=TRUE, normalisation_method="sum")
 		} else if (similarity_criteria == "signal intensity") {
-			score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, comparison=signal_intensity_evaluation, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_tolerance_percent_threshold=intensity_tolerance_percent, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+			score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, comparison=signal_intensity_evaluation, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_tolerance_percent_threshold=intensity_tolerance_percent, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 		}
 		### Parameters matrices
 		# Parameters vector
