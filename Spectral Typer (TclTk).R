@@ -267,13 +267,13 @@ run_spectral_typer_function <- function() {
 		}
 		#### Run the function Spectral Typer score calculation
 		score_correlation_matrix <- NULL
-		score_hca_matrix <- NULL
+		score_hca <- NULL
 		score_intensity_matrix <- NULL
 		############### CORRELATION
 		if (similarity_criteria == "correlation") {
 			score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_correction_coefficient=intensity_correction_coefficient, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only)
 		} else if (similarity_criteria == "hca") {
-			score_hca_matrix <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, spectra_path_output=spectra_path_output, score_only=score_only, spectra_format=spectra_format, normalise_distances=TRUE, normalisation_method="sum")
+			score_hca <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, spectra_path_output=spectra_path_output, score_only=score_only, spectra_format=spectra_format, normalise_distances=TRUE, normalisation_method="sum")
 		} else if (similarity_criteria == "signal intensity") {
 			score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, comparison=signal_intensity_evaluation, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_tolerance_percent_threshold=intensity_tolerance_percent, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
 		}
@@ -287,7 +287,8 @@ run_spectral_typer_function <- function() {
 			parameters_matrix_correlation[,1] <- cbind(parameters_vector)
 			rownames(parameters_matrix_correlation) <- names(parameters_vector)
 		}
-		if (!is.null(score_hca_matrix)) {
+		if (!is.null(score_hca)) {
+			score_hca_matrix <- score_hca$result_matrix
 			parameters_matrix_hca <- matrix("", nrow=length(parameters_vector), ncol=ncol(score_hca_matrix))
 			parameters_matrix_hca[,1] <- cbind(parameters_vector)
 			rownames(parameters_matrix_hca) <- names(parameters_vector)
@@ -298,7 +299,8 @@ run_spectral_typer_function <- function() {
 			rownames(parameters_matrix_intensity) <- names(parameters_vector)
 		}
 		#### Exit the function and put the variable into the R workspace
-		if (!is.null(score_hca_matrix)) {
+		if (!is.null(score_hca)) {
+			score_hca_matrix <- score_hca$result_matrix
 			.GlobalEnv$score_hca_matrix_results <- rbind(score_hca_matrix, parameters_matrix_hca)
 		}
 		if (!is.null(score_intensity_matrix)) {
@@ -313,11 +315,11 @@ run_spectral_typer_function <- function() {
 			if (!is.null(score_intensity_matrix)) {
 			    write.csv(score_intensity_matrix_results, file=paste("int_", filename, sep=""))
 			}
-			if (!is.null(score_hca_matrix)) {
+			if (!is.null(score_hca)) {
 				# Dump the hca plot
 				#png(filename="hca.png", width=1900, height=1280)
 				#score$score_hca$plots
-				ggsave(plot=score$score_hca$plots, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
+				ggsave(plot=score_hca$hca_dendrogram, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
 				#savePlot(filename="hca.png", type="png")
 				#dev.print(X11, file="hca.png", width=1900, height=1280)
 				#dev.off()
@@ -346,11 +348,11 @@ run_spectral_typer_function <- function() {
 				write.xlsx(x=score_intensity_matrix_results, file=paste("int_", filename, sep=""), sheetName="Scores - Intensity", row.names=TRUE)
 
 			}
-			if (!is.null(score_hca_matrix)) {
+			if (!is.null(score_hca)) {
 				# Dump the hca plot
 				#png(filename="hca.png", width=1900, height=1280)
 				#score$score_hca$plots
-				ggsave(plot=score$score_hca$plots, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
+				ggsave(plot=score_hca$hca_dendrogram, device="png", filename="hca.png", width=6.33, height=4, dpi=300)
 				#savePlot(filename="hca.png", type="png")
 				#dev.print(X11, file="hca.png", width=1900, height=1280)
 				#dev.off()
