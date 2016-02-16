@@ -1,4 +1,4 @@
-################ SPECTRAL TYPER PROGRAM 2016.02.12
+################ SPECTRAL TYPER PROGRAM 2016.02.16
 
 # Update packages and load the required packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -93,7 +93,7 @@ set_file_name <- function() {
 
 ##### Library
 select_library_function <- function() {
-	filepath_database_select <- tkmessageBox(title = "Library", message = "Select the folder for the spectra for the database.\nThe database should be structured like this: Database folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
+	filepath_database_select <- tkmessageBox(title = "Library", message = "Select the folder for the spectra for the database.\nThe database should be structured like this: Database folder/Samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
 	filepath_database <- tclvalue(tkchooseDirectory())
 	if (!nchar(filepath_database)) {
 	    tkmessageBox(message = "No folder selected")
@@ -108,7 +108,7 @@ select_library_function <- function() {
 
 ##### Samples
 select_samples_function <-function() {
-	filepath_test_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\nThe files should be organised like this: Sample folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
+	filepath_test_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\nThe files should be organised like this: Sample folder/Samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
 	filepath_test <- tclvalue(tkchooseDirectory())
 	if (!nchar(filepath_test)) {
 	    tkmessageBox(message = "No folder selected")
@@ -186,8 +186,8 @@ import_spectra_function <- function() {
 	### Spectra grouping (class for database)
 	spectra_database <- group_spectra_class(spectra_database, class_list=database_folder_list, spectra_format=spectra_format, class_in_file_name=TRUE)
 	### Preprocessing
-	spectra_database <- preprocess_spectra(spectra_database, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, sampling_method="sequential")
-	spectra_test <- preprocess_spectra(spectra_test, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, sampling_method="sequential")
+	spectra_database <- preprocess_spectra(spectra_database, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of)
+	spectra_test <- preprocess_spectra(spectra_test, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of)
 	# Exit the function and put the variable into the R workspace
 	.GlobalEnv$spectra_database <- spectra_database
 	.GlobalEnv$spectra_test <- spectra_test
@@ -377,7 +377,7 @@ run_spectral_typer_function <- function() {
 			}
 		}
 		### Messagebox
-		tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity Pearson's correlation coefficient\nIntMtch: signal intensity matching\nsl: slope of the regression curve\nns: number of signals", icon = "info")
+		tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity Pearson's correlation coefficient\nIntMtch: signal intensity matching\nsl: slope of the regression curve\nns: number of signals\n\n\nFit = number of sample-database matching signals / number of signals in the sample\nRetrofit = number of database-sample matching signals / number of signals in the database entry", icon = "info")
 	} else if (is.null(spectra_database) || is.null(spectra_test) || is.null(peaks_database) || is.null(peaks_test)) {
 		### Messagebox
 		tkmessageBox(title = "Something is wrong", message = "Some elements are needed to perform this operation: make sure that the spectra have been imported and the peak picking process has been performed", icon = "warning")
