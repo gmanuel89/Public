@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.02.12
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.02.16
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -358,7 +358,7 @@ if (!isMassPeaksList(peaks)) {
 ################################################################## ELEMENT-WISE
 if (intensity_threshold_method == "element-wise") {
 	############### INTENSITY FILTERING FUNCTION (ELEMENT-WISE)
-	intensity_filtering_function_element <- function (peaks, intensity_threshold_percent) {
+	intensity_filtering_subfunction_element <- function (peaks, intensity_threshold_percent) {
 		# Filter out the peaks whose intensity is below a certain threshold
 		# Store mass and intensity into vectors
 		intensity_values <- peaks@intensity
@@ -394,22 +394,28 @@ if (intensity_threshold_method == "element-wise") {
 	if (isMassPeaksList(peaks)) {
 		# Detect the number of cores
 		cpu_thread_number <- detectCores(logical=TRUE)
-		cpu_core_number <- cpu_thread_number/2
-		# Make the CPU cluster for parallelisation
-		#cl <- makeCluster(cpu_core_number)
-		# Apply the multicore function
-		#peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_function_element(peaks, intensity_threshold_percent))
-		peaks_filtered <- mclapply(peaks, FUN = function (peaks) intensity_filtering_function_element(peaks, intensity_threshold_percent), mc.cores=cpu_core_number)
-		#stopCluster(cl)
+		#cpu_core_number <- cpu_thread_number/2
+		if (Sys.info()[1] == "Linux") {
+			peaks_filtered <- mclapply(peaks, FUN = function (peaks) intensity_filtering_subfunction_element(peaks, intensity_threshold_percent), mc.cores=cpu_thread_number)
+		} else if (Sys.info()[1] == "Windows") {
+			# Make the CPU cluster for parallelisation
+			cl <- makeCluster(cpu_thread_number)
+			# Make the cluster use the custom functions and the package functions along with their parameters
+			clusterEvalQ(cl, {library(MALDIquant)})
+			clusterExport(cl=cl, varlist=c("peaks", "intensity_threshold_percent", "intensity_filtering_subfunction_element"), envir=environment())
+			# Apply the multicore function
+			peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_subfunction_element(peaks, intensity_threshold_percent))
+			stopCluster(cl)
+		}
 	} else {
 		######################################### Single peaks element
-		peaks_filtered <- intensity_filtering_function_element(peaks, intensity_threshold_percent)
+		peaks_filtered <- intensity_filtering_subfunction_element(peaks, intensity_threshold_percent)
 	}
 }
 ################################################################# WHOLE DATASET
 if (intensity_threshold_method == "whole") {
 	############### INTENSITY FILTERING FUNCTION (ELEMENT-WISE)
-	intensity_filtering_function_whole <- function (peaks, intensity_threshold_percent, highest_intensity) {
+	intensity_filtering_subfunction_whole <- function (peaks, intensity_threshold_percent, highest_intensity) {
 		# Filter out the peaks whose intensity is below a certain threshold
 		# Store mass and intensity into vectors
 		intensity_values <- peaks@intensity
@@ -457,16 +463,22 @@ if (intensity_threshold_method == "whole") {
 	if (isMassPeaksList(peaks)) {
 		# Detect the number of cores
 		cpu_thread_number <- detectCores(logical=TRUE)
-		cpu_core_number <- cpu_thread_number/2
-		# Make the CPU cluster for parallelisation
-		#cl <- makeCluster(cpu_core_number)
-		# Apply the multicore function
-		#peaks_filtered <- parLapply(cl, peaks, fun = function(peaks) intensity_filtering_function_whole(peaks, intensity_threshold_percent, highest_intensity))
-		peaks_filtered <- mclapply(peaks, FUN = function(peaks) intensity_filtering_function_whole(peaks, intensity_threshold_percent, highest_intensity), mc.cores=cpu_core_number)
-		#stopCluster(cl)
+		#cpu_core_number <- cpu_thread_number/2
+		if (Sys.info()[1] == "Linux") {
+			peaks_filtered <- mclapply(peaks, FUN = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity), mc.cores=cpu_core_number)
+		} else if (Sys.info()[1] == "Windows") {
+			# Make the CPU cluster for parallelisation
+			cl <- makeCluster(cpu_thread_number)
+			# Make the cluster use the custom functions and the package functions along with their parameters
+			clusterEvalQ(cl, {library(MALDIquant)})
+			clusterExport(cl=cl, varlist=c("peaks", "intensity_threshold_percent", "intensity_filtering_subfunction_whole", "highest_intensity"), envir=environment())
+			# Apply the multicore function
+			peaks_filtered <- parLapply(cl, peaks, fun = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity))
+			stopCluster(cl)
+		}
 	} else {
 		######################################### Single peaks element
-		peaks_filtered <- intensity_filtering_function_whole(peaks, intensity_threshold_percent, highest_intensity)
+		peaks_filtered <- intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity)
 	}
 }
 return (peaks_filtered)
@@ -1360,7 +1372,7 @@ return (list(spectra=spectra_dataset, spectra_dataset_grouped=spectra_dataset_gr
 # The function performs the binning onto a selected spectra dataset (list of MALDIquant spectra objects)
 resample_spectra <- function (spectra, final_data_points=lowest_data_points, binning_method="sum") {
 ####################################################### BINNING FUNCTION
-binning_function <- function (spectra, final_data_points, binning_method) {
+binning_subfunction <- function (spectra, final_data_points, binning_method) {
 	# Create the new spectra_binned list
 	spectra_binned <- spectra
 	# Empty the mass and intensity values
@@ -1413,7 +1425,7 @@ if (isMassSpectrumList(spectra)) {
 	install_and_load_required_packages("parallel")
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	cpu_core_number <- cpu_thread_number/2
+	#cpu_core_number <- cpu_thread_number/2
 	########################
 	# Calculate the lowest amount of data points, that corresponds to the maximum
 	# number of data points that can be used for the binning
@@ -1430,7 +1442,7 @@ if (isMassSpectrumList(spectra)) {
 	datapoints_dataset <- as.numeric(names(data_points_table))
 	equality_data_points <- length(data_points_table)
 	######## Do not bin if all the spectra are of the same lengthand have the same number of datapoints as defined
-	cl <- makeCluster(cpu_core_number)
+	cl <- makeCluster(cpu_thread_number)
 	if ((equality_data_points == 1) && (datapoints_dataset == final_data_points)) {
 		spectra_binned <- spectra
 	}
@@ -1443,10 +1455,18 @@ if (isMassSpectrumList(spectra)) {
 		if (final_data_points > lowest_data_points) {
 			finalDatapoints <- lowest_data_points
 			print("Binning at this sample rate is not possible, the highest number of data points possible will be used")
-			spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_function (spectra, final_data_points, binning_method))
+			if (Sys.info()[1] == "Linux") {
+				spectra_binned <- mclapply(spectra, FUN=function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores=cpu_thread_number)
+			} else {
+				spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
+			}
 		}
 		if (final_data_points <= lowest_data_points) {
-			spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_function (spectra, final_data_points, binning_method))
+			if (Sys.info()[1] == "Linux") {
+				spectra_binned <- mclapply(spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores=cpu_thread_number)
+			} else {
+				spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
+			}
 		}
 	}
 	# Close the processes
@@ -1458,7 +1478,7 @@ if (isMassSpectrumList(spectra)) {
 	lowest_data_points <- length(spectra@mass)
 	# Perform the binning only if necessary
 	if (final_data_points < lowest_data_points) {
-		spectra_binned <- binning_function(spectra, final_data_points, binning_method)
+		spectra_binned <- binning_subfunction(spectra, final_data_points, binning_method)
 	} else {spectra_binned <- spectra}
 }
 return (spectra_binned)
@@ -1610,7 +1630,7 @@ return (spectra)
 
 ######################################################## SPECTRA PRE-PROCESSING
 # The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalisation)
-preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra), sampling_method="sequential") {
+preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra)) {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "parallel"))
 # Rename the trim function
@@ -1618,22 +1638,21 @@ trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Check if it is not a single spectrum
 ######################################### Multiple spectra
 if (isMassSpectrumList(spectra)) {
-# Detect the number of cores
-cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
-# Packages of preprocessing
-if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
-	process_in_packages_of <- length(spectra)
-}
-# Create the list containing the processed spectra
-preprocessed_spectra <- list()
-if (sampling_method == "sequential") {
+	# Detect the number of cores
+	cpu_thread_number <- detectCores(logical=TRUE)
+	#cpu_core_number <- cpu_thread_number/2
+	# Packages of preprocessing
+	if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
+		process_in_packages_of <- length(spectra)
+	}
+	# Create the list containing the processed spectra
+	preprocessed_spectra <- list()
 	index1 <- 1
 	index2 <- process_in_packages_of
 	spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
 	for (p in 1:spectra_packages) {
 		# Make the cluster (one for each core/thread)
-		cl <- makeCluster(cpu_core_number)
+		cl <- makeCluster(cpu_thread_number)
 		clusterEvalQ(cl, {library(MALDIquant)})
 		# If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
 		if (index2 < length(spectra)) {
@@ -1648,121 +1667,102 @@ if (sampling_method == "sequential") {
 			#spectra <- removeEmptyMassObjects (spectra)
 			if (smoothing_strength == "small") {
 				## Smoothing (Savitzky-Golay filter, with window size 5, 11 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5))
+				if (Sys.info()[1] == "Linux") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5), mc.cores=cpu_thread_number)
+				} else {
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5))
+				}
 			}
 			if (smoothing_strength == "medium") {
 				## Smoothing (Savitzky-Golay filter, with window size 10, 21 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10))
+				if (Sys.info()[1] == "Linux") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10), mc.cores=cpu_thread_number)
+				} else {
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10))
+				}
 			}
 			if (smoothing_strength == "strong") {
 				## Smoothing (Savitzky-Golay filter, with window size 20, 41 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20))
+				if (Sys.info()[1] == "Linux") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20), mc.cores=cpu_thread_number)
+				} else {
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20))
+				}
 			}
 			if (smoothing_strength == "veryStrong") {
 				## Smoothing (Savitzky-Golay filter, with window size 30, 61 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30))
+				if (Sys.info()[1] == "Linux") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30), mc.cores=cpu_thread_number)
+				} else {
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30))
+				}
 			}
 			## Baseline correction
-			spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline(spectra, method="TopHat"))
+			if (Sys.info()[1] == "Linux") {
+				spectra_temp <- mclapply(spectra_temp, FUN = function (spectra) removeBaseline(spectra, method="TopHat"), mc.cores=cpu_thread_number)
+			} else {
+				spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline(spectra, method="TopHat"))
+			}
 			## Normalisation (TIC)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity(spectra, method="TIC"))
+			if (Sys.info()[1] == "Linux") {
+				spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) calibrateIntensity(spectra, method="TIC"), mc.cores=cpu_thread_number)
+			} else {
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity(spectra, method="TIC"))
+			}
 		}
 		if (tof_mode == "reflectron" || tof_mode == "reflector") {
 			## Remove flat spectra
 			#spectra <- removeEmptyMassObjects (spectra)
 			if (smoothing_strength == "small") {
 				## Smoothing (Savitzky-Golay filter, with window size 2, 5 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1))
+				if (Sys.info()[1] == "Linux") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1), mc.cores=cpu_thread_number)
+				} else {
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1))
+				}
 			}
 			if (smoothing_strength == "medium") {
 				## Smoothing (Savitzky-Golay filter, with window size 6, 13 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3))
+				if (Sys.info()[1] == "Linux") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3), mc.cores=cpu_thread_number)
+				} else {
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3))
+				}
 			}
 			if (smoothing_strength == "strong") {
 				## Smoothing (Savitzky-Golay filter, with window size 12, 25 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6))
+				if (Sys.info()[1] == "Linux") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6), mc.cores=cpu_thread_number)
+				} else {
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6))
+				}
 			}
 			if (smoothing_strength == "veryStrong") {
 				## Smoothing (Savitzky-Golay filter, with window size 18, 37 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9))
+				if (Sys.info()[1] == "Linux") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9), mc.cores=cpu_thread_number)
+				} else {
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9))
+				}
 			}
 			## Baseline correction
-			spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline (spectra, method="TopHat"))
+			if (Sys.info()[1] == "Linux") {
+				spectra_temp <- mclapply(spectra_temp, FUN = function (spectra) removeBaseline (spectra, method="TopHat"), mc.cores=cpu_thread_number)
+			} else {
+				spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline (spectra, method="TopHat"))
+			}
 			## Normalisation (TIC)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity (spectra, method="TIC"))
+			if (Sys.info()[1] == "Linux") {
+				spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) calibrateIntensity (spectra, method="TIC"), mc.cores=cpu_thread_number)
+			} else {
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity (spectra, method="TIC"))
+			}
 		}
 		# Close the processes
 		stopCluster(cl)
 		# Append these preprocessed spectra to the final list
 		preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
 	}
-}
-if (sampling_method == "kfold") {
-	install_and_load_required_packages("caret")
-	# Calculate the k_fold
-	k_fold <- floor(length(spectra) / process_in_packages_of)
-	# Determine the spectra to be randomly allocated into processing folds
-	index <- createFolds(y=seq(1:length(spectra)), k=k_fold)
-	for (i in 1:length(index)) {
-		# Make the cluster (one for each core/thread)
-		cl <- makeCluster(cpu_core_number)
-		clusterEvalQ(cl, {library(MALDIquant)})
-		# Allocate the spectra (in the package) to be processed temporarily
-		spectra_temp <- spectra [index[[i]]]
-		if (tof_mode == "linear") {
-			## Remove flat spectra
-			#spectra <- removeEmptyMassObjects (spectra)
-			if (smoothing_strength == "small") {
-				## Smoothing (Savitzky-Golay filter, with window size 5, 11 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5))
-			}
-			if (smoothing_strength == "medium") {
-				## Smoothing (Savitzky-Golay filter, with window size 10, 21 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10))
-			}
-			if (smoothing_strength == "strong") {
-				## Smoothing (Savitzky-Golay filter, with window size 20, 41 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20))
-			}
-			if (smoothing_strength == "veryStrong") {
-				## Smoothing (Savitzky-Golay filter, with window size 30, 61 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30))
-			}
-			## Baseline correction
-			spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline(spectra, method="TopHat"))
-			## Normalisation (TIC)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity(spectra, method="TIC"))
-		}
-		if (tof_mode == "reflectron" || tof_mode == "reflector") {
-			## Remove flat spectra
-			#spectra <- removeEmptyMassObjects (spectra)
-			if (smoothing_strength == "small") {
-				## Smoothing (Savitzky-Golay filter, with window size 2, 5 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1))
-			}
-			if (smoothing_strength == "medium") {
-				## Smoothing (Savitzky-Golay filter, with window size 6, 13 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3))
-			}
-			if (smoothing_strength == "strong") {
-				## Smoothing (Savitzky-Golay filter, with window size 12, 25 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6))
-			}
-			if (smoothing_strength == "veryStrong") {
-				## Smoothing (Savitzky-Golay filter, with window size 18, 37 points)
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9))
-			}
-			## Baseline correction
-			spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline (spectra, method="TopHat"))
-			## Normalisation (TIC)
-			spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity (spectra, method="TIC"))
-		}
-		# Close the processes
-		stopCluster(cl)
-		# Append the processed spectra package to the global list
-		preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
-	}
-}
 }
 ######################################### Single spectra
 if (!isMassSpectrumList(spectra)) {
@@ -2374,7 +2374,7 @@ install_and_load_required_packages(c("parallel", "MALDIquant"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 ####################################################### PICKING FUNCTION
-picking_function <- function (peaks, signals_to_take) {
+picking_subfunction <- function (peaks, signals_to_take) {
 	# Create a dataframe with mass and intensity
 	peaks_data_frame <- data.frame (mass = peaks@mass, intensity = peaks@intensity, SNR = peaks@snr)
 	# Check if the provided number does not exceed the number of available signals
@@ -2410,15 +2410,114 @@ if (isMassSpectrumList(spectra)) {
 if (isMassPeaksList(peaks)) {
     # Detect the number of cores
     cpu_thread_number <- detectCores(logical=TRUE)
-    cpu_core_number <- cpu_thread_number/2
-    # Make the CPU cluster for parallelisation
-    cl <- makeCluster(cpu_core_number)
-    most_intense_peaks <- parLapply(cl, peaks, fun = function(peaks) picking_function(peaks, signals_to_take=signals_to_take))
-	stopCluster(cl)
+    #cpu_core_number <- cpu_thread_number/2
+	if (Sys.info()[1] == "Linux") {
+		most_intense_peaks <- mclapply(peaks, fun = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take), mc.cores=cpu_thread_number)
+	} else {
+		# Make the CPU cluster for parallelisation
+	    cl <- makeCluster(cpu_thread_number)
+		most_intense_peaks <- parLapply(cl, peaks, fun = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take))
+		stopCluster(cl)
+	}
 } else if (isMassPeaks(peaks)) {
-    most_intense_peaks <- picking_function(peaks, signals_to_take)
+    most_intense_peaks <- picking_subfunction(peaks, signals_to_take)
 }
 return (most_intense_peaks)
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+############################################# AVERAGE THE REPLICATES (BY FOLDER)
+# This function averages the spectra contained in the same folder (more suitable for brukerflex format)
+average_replicates_by_folder_OLD <- function (spectra, folder, spectra_format="brukerflex") {
+# Load the required libraries
+install_and_load_required_packages("MALDIquant")
+# Rename the trim function
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
+# Count the number of spectra
+if (isMassSpectrumList(spectra)) {
+	number_of_spectra <- length(spectra)
+} else {
+	number_of_spectra <- 1
+}
+# Generate a list of sample names
+#sample_names <- character()
+#for (s in 1:length(spectra)) {
+	#sample_names <- append(sample_names, spectra[[s]]@metaData$sampleName[1])
+#}
+# List the spectra files
+folder_files <- read_spectra_files(folder, spectra_format=spectra_format, full_path=TRUE)
+if (spectra_format == "brukerflex") {
+	# Split the path into individual folders (list, each element is a vector with the path splitted for that spectrum)
+	folder_files_splitted <- list()
+	# Split the paths into folders
+	for (f in 1:number_of_spectra) {
+		folder_files_splitted[f] <- strsplit(folder_files[f], "/")
+	}
+	#### The n-5 folder (where n is the length of the folder_splitted) is not unique, since it can represent the treatment folder; the n-4 folder is not unique, since one can call the replicates all in the same way (e.g. rep1, rep2), because they are placed in the sample folder; the combination n-5/n-4 should be almost unique, but to guarantee the uniqueness it is better to use the n-6/n-5/n-4 combination, so that it can be folder/sample/replicate or sample/treatment/replicate.
+	# The folder in which the samples are should be the same, there shouldn't be a more complicate folder structure, in that case this method should be revised.
+	# n-6 = sample name
+	sample_name <- character()
+	for (f in 1:number_of_spectra) {
+		sample_name <- append(sample_name, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-6])
+	}
+	# n-5 = treatment / class
+	treatment_name <- character()
+	for (f in 1:number_of_spectra) {
+		treatment_name <- append(treatment_name, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-5])
+	}
+	# n-4 = replicate_name
+	replicate_name <- character()
+	for (f in 1:number_of_spectra) {
+		replicate_name <- append(replicate_name, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-4])
+	}
+	# n-3 = coordinates
+	coordinate_name <- character()
+	for (f in 1:number_of_spectra) {
+		coordinate_name <- append(coordinate_name, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-3])
+	}
+	# n-2 = replicate_coordinates
+	replicate_coordinates <- character()
+	for (f in 1:number_of_spectra) {
+		replicate_coordinates <- append(replicate_coordinates, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-2])
+	}
+	# Generate a file_vector with only the folder to identify the replicates
+	file_vector_folders <- character()
+	for (f in 1:number_of_spectra) {
+		unique_sample_name <- paste(sample_name[f], treatment_name[f], replicate_name[f], sep="/")
+		file_vector_folders <- append(file_vector_folders, unique_sample_name)
+	}
+	# Split again the path into individual folders (list, each element is a vector with the path splitted for that spectrum)
+	for (f in 1:number_of_spectra) {
+		folder_files_splitted[f] <- strsplit(file_vector_folders[f], "/")
+	}
+	# Check for replicates in the same folder
+	for (f in 1:(number_of_spectra-1)) {
+		# If the spectrum folder name is different between two samples but the folder above is the same, they are replicates (based on the brukerflex folder structure)
+		if ((replicate_name[f] != replicate_name[f+1]) && (treatment_name[f] == treatment_name[f+1])) {
+			# The name of the replicate becomes the name of the first replicate
+			replicate_name[f+1] <- replicate_name[f]
+		}
+	}
+	# Recreate the sample Vector (for averaging)
+	sample_vector <- character()
+	# Rejoin the path fragments (for each element of the list)
+	for (f in 1:number_of_spectra) {
+		rejoined_filepath <- paste(sample_name[f], treatment_name[f], replicate_name[f], sep="/")
+		sample_vector <- append(sample_vector, rejoined_filepath)
+	}
+	# Average the mass spectra, grouping them according to the sample_vector
+	spectra_replicates_averaged <- averageMassSpectra(spectra, labels=sample_vector)
+}
+return (spectra_replicates_averaged)
 }
 
 
@@ -2438,51 +2537,80 @@ average_replicates_by_folder <- function (spectra, folder, spectra_format="bruke
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
-# Generate a list of sample names
-#sample_names <- character()
-#for (s in 1:length(spectra)) {
-	#sample_names <- append(sample_names, spectra[[s]]@metaData$sampleName[1])
-#}
+# Count the number of spectra
+if (isMassSpectrumList(spectra)) {
+	number_of_spectra <- length(spectra)
+} else {
+	number_of_spectra <- 1
+}
 # List the spectra files
 folder_files <- read_spectra_files(folder, spectra_format=spectra_format, full_path=TRUE)
-# Split the path into individual folders (list, each element is a vector with the path splitted for that spectrum)
-folder_files_splitted <- list()
-# Split the paths into folders
-for (f in 1:length(folder_files)) {
-	folder_files_splitted[f] <- strsplit(folder_files[f], "/")
-}
-#### The n-5 folder (where n is the length of the folder_splitted) is not unique, since it can represent the treatment folder; the n-4 folder is not unique, since one can call the replicates all in the same way (e.g. rep1, rep2), because they are placed in the sample folder; the combination n-5/n-4 should be almost unique, but to guarantee the uniqueness it is better to use the n-6/n-5/n-4 combination, so that it can be folder/sample/replicate or sample/treatment/replicate.
-# The folder in which the samples are should be the same, there shouldn't be a more complicate folder structure, in that case this method should be revised.
-# Generate a file_vector with only the folder to identify the replicates
-file_vector_folders <- character()
-for (f in 1:(length(folder_files_splitted))) {
-	unique_sample_name <- paste(folder_files_splitted[[f]][length(folder_files_splitted[[f]])-6], folder_files_splitted[[f]][length(folder_files_splitted[[f]])-5], folder_files_splitted[[f]][length(folder_files_splitted[[f]])-4], sep="/")
-	file_vector_folders <- append(file_vector_folders, unique_sample_name)
-}
-# Split again the path into individual folders (list, each element is a vector with the path splitted for that spectrum)
-for (f in 1:length(folder_files_splitted)) {
-	folder_files_splitted[f] <- strsplit(file_vector_folders[f], "/")
-}
-# Check for replicates in the same folder
-for (f in 1:(length(folder_files_splitted)-1)) {
-	# If the spectrum folder name is different between two samples but the folder above is the same, they are replicates (based on the brukerflex folder structure)
-	if ((folder_files_splitted[[f]][length(folder_files_splitted[[f]])] != folder_files_splitted[[f+1]][length(folder_files_splitted[[f+1]])]) && (folder_files_splitted[[f]][length(folder_files_splitted[[f]])-1] == folder_files_splitted[[f+1]][length(folder_files_splitted[[f+1]])-1])) {
-		# The name of the replicate becomes the name of the first replicate
-		folder_files_splitted[[f+1]][length(folder_files_splitted[[f+1]])] <- folder_files_splitted[[f]][length(folder_files_splitted[[f]])]
+if (spectra_format == "brukerflex") {
+	# Split the path into individual folders (list, each element is a vector with the path splitted for that spectrum)
+	folder_files_splitted <- list()
+	# Split the paths into folders
+	for (f in 1:number_of_spectra) {
+		folder_files_splitted[f] <- strsplit(folder_files[f], "/")
 	}
-}
-# Recreate the sample Vector (for averaging)
-sample_vector <- character()
-# Rejoin the path fragments (for each element of the list)
-for (f in 1:length(folder_files_splitted)) {
-	rejoined_filepath <- ""
-	for (e in 1:length(folder_files_splitted[[f]])) {
-		rejoined_filepath <- paste(rejoined_filepath,folder_files_splitted[[f]][e], sep="/")
+	#### SITUATION #1
+	# The n-5 folder (where n is the length of the folder_splitted) is not unique, since it can represent the treatment folder; the n-4 folder is not unique, since one can call the replicates all in the same way (e.g. rep1, rep2), because they are placed in the sample folder; the combination n-5/n-4 should be almost unique, but to guarantee the uniqueness it is better to use the n-6/n-5/n-4 combination, so that it can be folder/sample/replicate or sample/treatment/replicate.
+	#### SITUATION #2
+	# The second case is when the sample folder is the same, but the coordinates change, so the replicates are the spectra under the same coordinate folder, while different coordinates mean different samples.
+	# The folder in which the samples are should be the same, there shouldn't be a more complicate folder structure, in that case this method should be revised.
+	# n-6 = sample name
+	sample_name <- character()
+	for (f in 1:number_of_spectra) {
+		sample_name <- append(sample_name, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-6])
 	}
-	sample_vector <- append(sample_vector, rejoined_filepath)
+	# n-5 = treatment / class
+	treatment_name <- character()
+	for (f in 1:number_of_spectra) {
+		treatment_name <- append(treatment_name, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-5])
+	}
+	# n-4 = replicate_name
+	#replicate_name <- character()
+	#for (f in 1:number_of_spectra) {
+		#replicate_name <- append(replicate_name, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-4])
+	#}
+	# n-3 = coordinates
+	#coordinate_name <- character()
+	#for (f in 1:number_of_spectra) {
+		#coordinate_name <- append(coordinate_name, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-3])
+	#}
+	# n-2 = replicate_coordinates
+	#replicate_coordinates <- character()
+	#for (f in 1:number_of_spectra) {
+		#replicate_coordinates <- append(replicate_coordinates, folder_files_splitted[[f]][length(folder_files_splitted[[f]])-2])
+	#}
+	# Generate a file_vector with only the folder to identify the replicates
+	unique_sample_name <- character(length=number_of_spectra)
+	# Check for replicates in the same folder
+	for (f in 1:(number_of_spectra-1)) {
+		### Situation #1 or Situation #2
+		if ((sample_name[f+1] == sample_name[f]) && (treatment_name[f+1] == treatment_name[f])) {
+			unique_sample_name[f] <- paste(sample_name[f], treatment_name[f], sep="/")
+			unique_sample_name[f+1] <- paste(sample_name[f], treatment_name[f], sep="/")
+		} else {
+			unique_sample_name[f] <- paste(sample_name[f], treatment_name[f], sep="/")
+			unique_sample_name[f+1] <- paste(sample_name[f+1], treatment_name[f+1], sep="/")
+		}
+		#if ((sample_name[f+1] == sample_name[f]) && (treatment_name[f+1] == treatment_name[f]) && (replicate_name[f+1] != replicate_name[f])) {
+			### Situation #1
+			#replicate_name[f+1] <- replicate_name[f]
+			#unique_sample_name[f] <- paste(sample_name[f], treatment_name[f], replicate_name[f], sep="/")
+			#unique_sample_name[f+1] <- paste(sample_name[f+1], treatment_name[f+1], replicate_name[f+1], sep="/")
+		#} else if ((sample_name[f+1] == sample_name[f]) && (treatment_name[f+1] != treatment_name[f]) && (replicate_name[f+1] != replicate_name[f])) {
+			#unique_sample_name[f] <- paste(sample_name[f], treatment_name[f], replicate_name[f], sep="/")
+			#unique_sample_name[f+1] <- paste(sample_name[f+1], treatment_name[f+1], replicate_name[f+1], sep="/")
+		#} else if ((treatment_name[f+1] == treatment_name[f]) && (replicate_name[f+1] != replicate_name[f])) {
+			# Situation #1 + Situation #2
+			#unique_sample_name[f] <- replicate_name[f]
+			#unique_sample_name[f+1] <- paste(sample_name[f+1], treatment_name[f+1], replicate_name[f+1], sep="/")
+		#}
+	}
+	# Average the mass spectra, grouping them according to the sample_vector
+	spectra_replicates_averaged <- averageMassSpectra(spectra, labels=unique_sample_name)
 }
-# Average the mass spectra, grouping them according to the sample_vector
-spectra_replicates_averaged <- averageMassSpectra(spectra, labels=sample_vector)
 return (spectra_replicates_averaged)
 }
 
@@ -2532,7 +2660,7 @@ if (isMassPeaksList(peaks)) {
 	# Align to the reference peaklist
 	if (!is.null(reference_peaklist)) {
 		############ Function for lapply
-		align_peaks <- function (peaks, reference_peaklist, tolerance_ppm) {
+		align_peaks_subfunction <- function (peaks, reference_peaklist, tolerance_ppm) {
 			mass_vector <- peaks@mass
 			# For each reference peak
 			for (ref in reference_peaklist) {
@@ -2547,14 +2675,18 @@ if (isMassPeaksList(peaks)) {
 		if (isMassPeaksList(peaks_aligned)) {
 			# Detect the number of cores
 			cpu_thread_number <- detectCores(logical=TRUE)
-			cpu_core_number <- cpu_thread_number/2
-			# Make the CPU cluster for parallelisation
-			cl <- makeCluster(cpu_core_number)
-			# Apply the multicore function
-			peaks_aligned <- parLapply(cl, peaks_aligned, fun=function(peaks_aligned) align_peaks(peaks_aligned, reference_peaklist, tolerance_ppm))
-			stopCluster(cl)
+			#cpu_core_number <- cpu_thread_number/2
+			if (Sys.info()[1] == "Linux") {
+				peaks_aligned <- mclapply(peaks_aligned, FUN=function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm), mc.cores=cpu_thread_number)
+			} else {
+				# Make the CPU cluster for parallelisation
+				cl <- makeCluster(cpu_thread_number)
+				# Apply the multicore function
+				peaks_aligned <- parLapply(cl, peaks_aligned, fun=function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm))
+				stopCluster(cl)
+			}
 		} else {
-			peaks_aligned <- align_peaks(peaks_aligned, reference_peaklist, tolerance_ppm)
+			peaks_aligned <- align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm)
 		}
 	}
 	return (peaks_aligned)
@@ -7064,6 +7196,9 @@ for (sp in 1:length(spectra_test)) {
 }
 ############################################################ SCORE (FRI)
 number_of_signals_database <- numeric(length=database_size)
+for (d in 1:database_size) {
+	number_of_signals_database[d] <- length(peaks_database[[d]]@mass)
+}
 ################### Each sample gets compared with the database (create a copy of the original database each time, otherwise it gets modified when processed together with the sample)
 # Create a list to be used for lapply
 global_list <- list()
@@ -7081,7 +7216,7 @@ for (spl in 1:number_of_samples) {
 }
 ############################################## Define the function for parLapply
 # x = each element of the global list
-comparison_sample_db_function_correlation <- function(x) {
+comparison_sample_db_subfunction_correlation <- function(x) {
 	# Generate the matrix rows for the output
 	matching_signals_matrix <- matrix(0, nrow=1, ncol=database_size)
 	fit_matrix <- matrix(0, ncol=database_size, nrow=1)
@@ -7110,7 +7245,6 @@ comparison_sample_db_function_correlation <- function(x) {
 		peaks_sample <- peaks_all[[2]]
 		#################### Number of signals
 		number_of_signals_samples <- length(peaks_sample@mass)
-		number_of_signals_database[db] <- length(peaks_database_temp@mass)
 		###### COUNTER 0 - MATCHING SIGNALS
 		# Create a counter, symmetrical to the database Peaklist
 		matching_signals_number <- 0
@@ -7207,11 +7341,20 @@ comparison_sample_db_function_correlation <- function(x) {
 }
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
-# Make the CPU cluster for parallelisation
-#cls <- makeCluster(cpu_core_number)
-output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_function_correlation(global_list), mc.cores=cpu_core_number)
-#stopCluster(cls)
+#cpu_core_number <- cpu_thread_number/2
+if (Sys.info()[1] == "Linux") {
+	output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_correlation(global_list), mc.cores=cpu_thread_number)
+} else if (Sys.info()[1] == "Windows") {
+	# Make the CPU cluster for parallelisation
+	cls <- makeCluster(cpu_thread_number)
+	# Make the cluster use the custom functions and the package functions along with their parameters
+	clusterEvalQ(cls, {library(MALDIquant)})
+	clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tolerance_ppm", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue"), envir=environment())
+	output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_correlation(global_list))
+	stopCluster(cls)
+} else {
+	output_list <- lapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_correlation(global_list))
+}
 ############################ Merge the matrix pieces together
 matching_signals_matrix_all <- NULL
 fit_matrix_all <- NULL
@@ -7378,6 +7521,9 @@ for (sp in 1:length(spectra_test)) {
 }
 ############################################################ SCORE (FRI)
 number_of_signals_database <- numeric(length=database_size)
+for (d in 1:database_size) {
+	number_of_signals_database[d] <- length(peaks_database[[d]]@mass)
+}
 ################### Each sample gets compared with the database (create a copy of the original database each time, otherwise it gets modified when processed together with the sample)
 # Create a list to be used for lapply
 global_list <- list()
@@ -7395,7 +7541,7 @@ for (spl in 1:number_of_samples) {
 }
 ############################################## Define the function for parLapply
 # x = each element of the global list
-comparison_sample_db_function_intensity <- function(x) {
+comparison_sample_db_subfunction_intensity <- function(x) {
 	# Generate the matrix rows for the output
 	matching_signals_matrix <- matrix(0, nrow=1, ncol=database_size)
 	fit_matrix <- matrix(0, ncol=database_size, nrow=1)
@@ -7422,7 +7568,6 @@ comparison_sample_db_function_intensity <- function(x) {
 		peaks_sample <- peaks_all[[2]]
 		#################### Number of signals
 		number_of_signals_samples <- length(peaks_sample@mass)
-		number_of_signals_database[db] <- length(peaks_database_temp@mass)
 		###### COUNTER 0 - MATCHING SIGNALS
 		# Create a counter, symmetrical to the database Peaklist
 		matching_signals_sample <- 0
@@ -7497,11 +7642,20 @@ comparison_sample_db_function_intensity <- function(x) {
 }
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
-# Make the CPU cluster for parallelisation
-#cls <- makeCluster(cpu_core_number)
-output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_function_intensity(global_list), mc.cores=cpu_core_number)
-#stopCluster(cls)
+#cpu_core_number <- cpu_thread_number/2
+if (Sys.info()[1] == "Linux") {
+	output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_intensity(global_list), mc.cores=cpu_thread_number)
+} else if (Sys.info()[1] == "Windows") {
+	# Make the CPU cluster for parallelisation
+	cls <- makeCluster(cpu_thread_number)
+	# Make the cluster use the custom functions and the package functions along with their parameters
+	clusterEvalQ(cls, {library(MALDIquant)})
+	clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_intensity", "database_size", "tolerance_ppm", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue", "intensity_tolerance_percent_threshold", "comparison"), envir=environment())
+	output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_intensity(global_list))
+	stopCluster(cls)
+} else {
+	output_list <- lapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_intensity(global_list))
+}
 ############################ Merge the matrix pieces together
 matching_signals_matrix_all <- NULL
 fit_matrix_all <- NULL
