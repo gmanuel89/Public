@@ -1,4 +1,4 @@
-################ SPECTRAL TYPER PROGRAM 2016.02.16
+################ SPECTRAL TYPER PROGRAM 2016.02.17
 
 # Update packages and load the required packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -92,8 +92,8 @@ set_file_name <- function() {
 }
 
 ##### Library
-select_library_function <- function() {
-	filepath_database_select <- tkmessageBox(title = "Library", message = "Select the folder for the spectra for the database.\nThe database should be structured like this: Database folder/Samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
+select_database_function <- function() {
+	filepath_database_select <- tkmessageBox(title = "Library", message = "Select the folder for the spectra for the database.\nThe database should be structured like this:\nDatabase folder/Database entry samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data\n\nor\n\nDatabase folder/Classes - Entries/Sample imzML files", icon = "info")
 	filepath_database <- tclvalue(tkchooseDirectory())
 	if (!nchar(filepath_database)) {
 	    tkmessageBox(message = "No folder selected")
@@ -108,7 +108,7 @@ select_library_function <- function() {
 
 ##### Samples
 select_samples_function <-function() {
-	filepath_test_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\nThe files should be organised like this: Sample folder/Samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data", icon = "info")
+	filepath_test_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\nThe files should be organised like this:\nSample folder/Samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data\n\nor\n\nSample folder/Sample imzML files", icon = "info")
 	filepath_test <- tclvalue(tkchooseDirectory())
 	if (!nchar(filepath_test)) {
 	    tkmessageBox(message = "No folder selected")
@@ -683,8 +683,8 @@ window <- tktoplevel()
 tktitle(window) <- "Spectral Typer"
 #### Browse
 # Library
-select_library_label <- tklabel(window, text="The library should be structured like this:\nMain folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/Spectrum_data")
-select_library_button <- tkbutton(window, text="Browse database folder", command=select_library_function)
+select_database_label <- tklabel(window, text="The library should be structured like this:\nMain folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/Spectrum_data")
+select_database_button <- tkbutton(window, text="Browse database folder", command=select_database_function)
 # Samples
 select_samples_label <- tklabel(window, text="The library should be structured like this:\nMain folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/Spectrum_data")
 select_samples_button <- tkbutton(window, text="Browse samples folder", command=select_samples_function)
@@ -801,8 +801,8 @@ spectra_format_value_label <- tklabel(window, text=spectra_format_value)
 # tkgrid
 tkgrid(set_file_name_label, row=1, column=5)
 tkgrid(set_file_name_entry, row=1, column=4)
-#tkgrid(select_library_label, row=1, column=1)
-tkgrid(select_library_button, row=1, column=1)
+#tkgrid(select_database_label, row=1, column=1)
+tkgrid(select_database_button, row=1, column=1)
 #tkgrid(select_samples_label, row=1, column=3)
 tkgrid(select_samples_button, row=1, column=2)
 #tkgrid(select_output_label, row=2, column=3)
