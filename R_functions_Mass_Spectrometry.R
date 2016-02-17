@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.02.16
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.02.17
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -449,12 +449,14 @@ if (intensity_threshold_method == "whole") {
 	}
 	############### Determine the highest peak in the dataset
 	highest_peak <- NULL
-	highest_intensity <- NULL
+	highest_intensity <- 0
 	for (p in 1:length(peaks)) {
-		for (m in 1:length(peaks[[p]]@mass)) {
-			if (is.null(highest_intensity) || peaks[[p]]@intensity[m]>highest_intensity) {
-				highest_intensity <- peaks[[p]]@intensity[m]
-				highest_peak <- peaks[[p]]@mass[m]
+		if (length(peaks[[p]]@mass) > 0) {
+			for (m in 1:length(peaks[[p]]@mass)) {
+				if (highest_intensity == 0 || peaks[[p]]@intensity[m]>highest_intensity) {
+					highest_intensity <- peaks[[p]]@intensity[m]
+					highest_peak <- peaks[[p]]@mass[m]
+				}
 			}
 		}
 	}
@@ -465,7 +467,7 @@ if (intensity_threshold_method == "whole") {
 		cpu_thread_number <- detectCores(logical=TRUE)
 		#cpu_core_number <- cpu_thread_number/2
 		if (Sys.info()[1] == "Linux") {
-			peaks_filtered <- mclapply(peaks, FUN = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity), mc.cores=cpu_core_number)
+			peaks_filtered <- mclapply(peaks, FUN = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity), mc.cores=cpu_thread_number)
 		} else if (Sys.info()[1] == "Windows") {
 			# Make the CPU cluster for parallelisation
 			cl <- makeCluster(cpu_thread_number)
@@ -732,27 +734,29 @@ return (list (vector=v, outliers_position=outliers_position))
 
 
 ######################################### PEAK STATISTICS (on processed Spectra)
-# This function computes the peak statistics onto a selected spectra dataset, both when the spectra belong to no (or one) class and more classes.
-peak_statistics <- function (spectra, SNR=3, class_list=list(), class_in_file_name=TRUE, tof_mode="linear", spectra_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE) {
+# This function computes the peak statistics onto a selected spectra dataset (or to the provided peaks), both when the spectra belong to no (or one) class and more classes.
+peak_statistics <- function (spectra, peaks=NULL, SNR=3, class_list=NULL, class_in_file_name=TRUE, tof_mode="linear", spectra_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element_wise") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Determine the number of classes
-if (length(class_list) == 0 | length(class_list) == 1) {
+if (length(class_list) == 0 | length(class_list) == 1 || is.null(class_list)) {
 number_of_classes <- 1
 }
 if (length(class_list) > 1) {
 	number_of_classes <- length(class_list)
 }
 # Detect and Align Peaks
-if (tof_mode == "linear") {
-	peaks <- detectPeaks(spectra, method="MAD", SNR=SNR, halfWindowSize=20)
+if (is.null(peaks)) {
+	if (tof_mode == "linear") {
+		peaks <- detectPeaks(spectra, method="MAD", SNR=SNR, halfWindowSize=20)
+	}
+	if (tof_mode == "reflector" | tof_mode == "reflectron") {
+		peaks <- detectPeaks(spectra, method="MAD", SNR=SNR, halfWindowSize=5)
+	}
 }
-if (tof_mode == "reflector" | tof_mode == "reflectron") {
-	peaks <- detectPeaks(spectra, method="MAD", SNR=SNR, halfWindowSize=5)
-}
-peaks <- align_and_filter_peaks(peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=frequency_threshold_percent)
+peaks <- align_and_filter_peaks(peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=frequency_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_threshold_percent, intensity_threshold_method=intensity_threshold_method, reference_peaklist=NULL, spectra=NULL)
 # Generate the matrix (and convert it into a data frame)
 signal_matrix <- intensityMatrix(peaks, spectra)
 # Peak vector
@@ -832,7 +836,7 @@ if (number_of_classes > 1) {
 	signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, class_list=class_list, spectra_format=spectra_format, sample_output=TRUE, class_output=TRUE)
 	# Output matrix
 	peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-2), ncol=14)
-	rownames(peak_stat_matrix) <- as.numeric(names(signal_matrix)[1:(ncol(signal_matrix)-2)])
+	rownames(peak_stat_matrix) <- as.numeric(colnames(signal_matrix)[1:(ncol(signal_matrix)-2)])
 	colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median", "Interquartile Range (IQR)", "Spectra counter", "Class", "Homoscedasticity (parametric)", "Homoscedasticity (non-parametric)", "t-Test", "ANOVA", "Wilcoxon - Mann-Whitney test", "Kruskal-Wallis test")
 	# For each peak
 	for (p in 1:(ncol(signal_matrix)-2)) {
@@ -919,51 +923,83 @@ if (number_of_classes > 1) {
 		}
 		######################################## Fill the matrix with the values
 		# Distribution Type
-		distribution_type_name <- character()
-		for (l in length(class_list)) {
-			distribution_type_name <- paste(distribution_type_name, " ", distribution_type[[l]], " - ", class_list[l], sep="")
+		distribution_type_name <- NULL
+		for (l in 1:length(class_list)) {
+			if (is.null(distribution_type_name)) {
+				distribution_type_name <- paste(distribution_type[[l]], " - ", class_list[l], sep="")
+			} else {
+				distribution_type_name <- paste(distribution_type_name, " , ", distribution_type[[l]], " - ", class_list[l], sep="")
+			}
 		}
 		peak_stat_matrix [p,1] <- paste(distribution_type_name)
 		# Mean
-		mean_intensity_name <- character()
-		for (l in length(class_list)) {
-			mean_intensity_name <- paste(mean_intensity_name, " ", mean_intensity[[l]], " - ", class_list[l], sep="")
+		mean_intensity_name <- NULL
+		for (l in 1:length(class_list)) {
+			if (is.null(mean_intensity_name)) {
+				mean_intensity_name <- paste(mean_intensity[[l]], " - ", class_list[l], sep="")
+			} else {
+				mean_intensity_name <- paste(mean_intensity_name, " , ", mean_intensity[[l]], " - ", class_list[l], sep="")
+			}
 		}
 		peak_stat_matrix [p,2] <- mean_intensity_name
 		# Standard Deviation
-		st_dev_name <- character()
-		for (l in length(class_list)) {
-			st_dev_name <- paste(st_dev_name, " ", st_dev_intensity[[l]], " - ", class_list[l], sep="")
+		st_dev_name <- NULL
+		for (l in 1:length(class_list)) {
+			if (is.null(st_dev_name)) {
+				st_dev_name <- paste(st_dev_intensity[[l]], " - ", class_list[l], sep="")
+			} else {
+				st_dev_name <- paste(st_dev_name, " , ", st_dev_intensity[[l]], " - ", class_list[l], sep="")
+			}
 		}
 		peak_stat_matrix [p,3] <- st_dev_name
 		# Coefficient of Variation
-		coeff_variation_name <- character()
-		for (l in length(class_list)) {
-			coeff_variation_name <- paste(coeff_variation_name, " ", coeff_variation[[l]], " - ", class_list[l], sep="")
+		coeff_variation_name <- NULL
+		for (l in 1:length(class_list)) {
+			if (is.null(coeff_variation_name)) {
+				coeff_variation_name <- paste(coeff_variation[[l]], " - ", class_list[l], sep="")
+			} else {
+				coeff_variation_name <- paste(coeff_variation_name, " , ", coeff_variation[[l]], " - ", class_list[l], sep="")
+			}
 		}
 		peak_stat_matrix [p,4] <- coeff_variation_name
 		# Median
-		median_intensityensity_name <- character()
-		for (l in length(class_list)) {
-			median_intensityensity_name <- paste(median_intensityensity_name, " ", median_intensityensity[[l]], " - ", class_list[l], sep="")
+		median_intensityensity_name <- NULL
+		for (l in 1:length(class_list)) {
+			if (is.null(median_intensityensity_name)) {
+				median_intensityensity_name <- paste(median_intensityensity[[l]], " - ", class_list[l], sep="")
+			} else {
+				median_intensityensity_name <- paste(median_intensityensity_name, " , ", median_intensityensity[[l]], " - ", class_list[l], sep="")
+			}
 		}
 		peak_stat_matrix [p,5] <- median_intensityensity_name
 		# Interquartile Range (IQR)
-		inter_quartile_range_name <- character()
-		for (l in length(class_list)) {
-			inter_quartile_range_name <- paste(inter_quartile_range_name, " ", inter_quartile_range[[l]], " - ", class_list[l], sep="")
+		inter_quartile_range_name <- NULL
+		for (l in 1:length(class_list)) {
+			if (is.null(inter_quartile_range_name)) {
+				inter_quartile_range_name <- paste(inter_quartile_range[[l]], " - ", class_list[l], sep="")
+			} else {
+				inter_quartile_range_name <- paste(inter_quartile_range_name, " , ", inter_quartile_range[[l]], " - ", class_list[l], sep="")
+			}
 		}
 		peak_stat_matrix [p,6] <- inter_quartile_range_name
 		# Spectra counter
-		spectra_counter_name <- character()
-		for (l in length(class_list)) {
-			spectra_counter_name <- paste(inter_quartile_range_name, " ", spectra_counter[[l]], " - ", class_list[l], sep="")
+		spectra_counter_name <- NULL
+		for (l in 1:length(class_list)) {
+			if (is.null(spectra_counter_name)) {
+				spectra_counter_name <- paste(spectra_counter[[l]], " - ", class_list[l], sep="")
+			} else {
+				spectra_counter_name <- paste(inter_quartile_range_name, " , ", spectra_counter[[l]], " - ", class_list[l], sep="")
+			}
 		}
 		peak_stat_matrix [p,7] <- spectra_counter_name
 		# Class
-		class_name <- character()
-		for (l in length(class_list)) {
-			class_name <- paste(class_name, " ", class_list[[l]], " - ", class_list[l], sep="")
+		class_name <- NULL
+		for (l in 1:length(class_list)) {
+			if (is.null(class_name)) {
+				class_name <- paste(class_list[[l]], " - ", class_list[l], sep="")
+			} else {
+				class_name <- paste(class_name, " , ", class_list[[l]], " - ", class_list[l], sep="")
+			}
 		}
 		peak_stat_matrix [p,8] <- class_name
 		# Homoscedasticity (Parametric)
@@ -2412,7 +2448,7 @@ if (isMassPeaksList(peaks)) {
     cpu_thread_number <- detectCores(logical=TRUE)
     #cpu_core_number <- cpu_thread_number/2
 	if (Sys.info()[1] == "Linux") {
-		most_intense_peaks <- mclapply(peaks, fun = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take), mc.cores=cpu_thread_number)
+		most_intense_peaks <- mclapply(peaks, FUN = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take), mc.cores=cpu_thread_number)
 	} else {
 		# Make the CPU cluster for parallelisation
 	    cl <- makeCluster(cpu_thread_number)
@@ -2608,9 +2644,14 @@ if (spectra_format == "brukerflex") {
 			#unique_sample_name[f+1] <- paste(sample_name[f+1], treatment_name[f+1], replicate_name[f+1], sep="/")
 		#}
 	}
-	# Average the mass spectra, grouping them according to the sample_vector
-	spectra_replicates_averaged <- averageMassSpectra(spectra, labels=unique_sample_name)
+} else if (spectra_format == "imzML" || spectra_format == "imzml") {
+	unique_sample_name <- character()
+	for (f in 1:number_of_spectra) {
+		unique_sample_name <- append(unique_sample_name, spectra[[f]]@metaData$file[1])
+	}
 }
+# Average the mass spectra, grouping them according to the sample_vector
+spectra_replicates_averaged <- averageMassSpectra(spectra, labels=unique_sample_name)
 return (spectra_replicates_averaged)
 }
 
