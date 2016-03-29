@@ -1,7 +1,9 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.02.17
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.03.29
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
+
+library(tcltk)
 
 ########################################################################## MISC
 
@@ -5432,16 +5434,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -5476,7 +5478,7 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 	}
 	# COUNTER 1 - FIT
 	fit_matrix <- matrix (0, nrow=number_of_samples, ncol=database_size)
-	colnames(fit_matrix) <- library_vector
+	colnames(fit_matrix) <- database_vector
 	rownames(fit_matrix) <- sample_vector
 	for (s in 1:number_of_samples) {
 		for (l in 1:database_size) {
@@ -5488,7 +5490,7 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 	# Compare the peaks in the library peaklists with the peaks in each sample
 	# COUNTER 2 - RETRO FIT
 	retrofit_matrix <- matrix (0, nrow=number_of_samples, ncol=database_size)
-	colnames(retrofit_matrix) <- library_vector
+	colnames(retrofit_matrix) <- database_vector
 	rownames(retrofit_matrix) <- sample_vector
 	for (l in 1:database_size) {
 		for (s in 1:number_of_samples) {
@@ -5501,7 +5503,7 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 	# Symmetry -> comparison between intensities
 	# Create a counter, symmetrical to the database Peaklist
 	intensity_symmetry_matrix <- matrix (0, nrow=number_of_samples, ncol=database_size)
-    colnames(intensity_symmetry_matrix) <- library_vector
+    colnames(intensity_symmetry_matrix) <- database_vector
     rownames(intensity_symmetry_matrix) <- sample_vector
 	# For each sample
 	for (s in 1:number_of_samples) {
@@ -5535,7 +5537,7 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 	}
 	### Score calculation
 	score <- matrix (0, nrow=number_of_samples, ncol=database_size)
-    colnames(score) <- library_vector
+    colnames(score) <- database_vector
     rownames(score) <- sample_vector
 	for (i in 1:number_of_samples) {
 		for (j in 1:database_size) {
@@ -5544,11 +5546,11 @@ if ("intensity percentage" %in% comparison && !("standard deviation" %in% compar
 	}
 	#### Output the classification
 	output <- matrix ("NO", nrow=number_of_samples, ncol=database_size)
-    colnames(output) <- library_vector
+    colnames(output) <- database_vector
     rownames(output) <- sample_vector
 	if (spectra_path_output == TRUE) {
 		output <- cbind(output, spectra_path_vector)
-        colnames(output) <- c(library_vector, "Spectrum path")
+        colnames(output) <- c(database_vector, "Spectrum path")
 	}
 	if (score_only == TRUE) {
 		for (r in 1:number_of_samples) {
@@ -5649,16 +5651,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	# If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -5850,16 +5852,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -5871,7 +5873,7 @@ for (sp in 1:length(spectra_test)) {
 # Compare the peaks in the single sample peaklists with the peaks in each peaklist in the library
 # Intensity matrix: the NAs indicate absence f the signal, the number the presence of it.
 #intensity_matrix <- intensityMatrix(peaks_all)
-#rownames(intensity_matrix) <- c(library_vector, sample_vector)
+#rownames(intensity_matrix) <- c(database_vector, sample_vector)
 # Create a counter, symmetrical to the database Peaklist
 counter <- matrix (0, nrow=number_of_samples, ncol=database_size)
 # For each sample
@@ -5896,7 +5898,7 @@ for (s in 1:number_of_samples) {
 }
 # COUNTER 1 - FIT
 fit_matrix <- matrix (0, nrow=number_of_samples, ncol=database_size)
-colnames(fit_matrix) <- library_vector
+colnames(fit_matrix) <- database_vector
 rownames(fit_matrix) <- sample_vector
 for (s in 1:number_of_samples) {
 	for (l in 1:database_size) {
@@ -5908,7 +5910,7 @@ for (s in 1:number_of_samples) {
 # Compare the peaks in the library peaklists with the peaks in each sample
 # COUNTER 2 - RETRO FIT
 retrofit_matrix <- matrix (0, nrow=number_of_samples, ncol=database_size)
-colnames(retrofit_matrix) <- library_vector
+colnames(retrofit_matrix) <- database_vector
 rownames(retrofit_matrix) <- sample_vector
 for (l in 1:database_size) {
 	for (s in 1:number_of_samples) {
@@ -5924,11 +5926,11 @@ for (l in 1:database_size) {
 spectra_all <- append(spectra_database, spectra_test)
 peaks_all <- append(peaks_database, peaks_test)
 intensity_matrix_global <- intensityMatrix(peaks_all, spectra_all)
-rownames(intensity_matrix_global) <- c(library_vector, sample_vector)
+rownames(intensity_matrix_global) <- c(database_vector, sample_vector)
 # Weighted correlation between samples (library + test samples) (samples must be as columns and features as test) - With weights
 if (intensity_correction_coefficient != 0 && intensity_correction_coefficient != 1) {
 	# Compute the vector of weights
-	weights_vector <- c(rep(1, length(library_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
+	weights_vector <- c(rep(1, length(database_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
 	correlation_matrix <- wtd.cors(x=t(intensity_matrix_global), weight=weights_vector)
 	intensity_correlation_matrix <- as.matrix(correlation_matrix [(database_size+1):nrow(correlation_matrix), 1:database_size])
 } else if (intensity_correction_coefficient == 1) {
@@ -5964,7 +5966,7 @@ pvalue_replacement_function <- function(x, number_of_digits) {
 pvalue_matrix <- apply(pvalue_matrix, MARGIN=c(1,2), FUN=function(x) pvalue_replacement_function(x, number_of_digits=6))
 # COUNTER 5 - REGRESSION CURVE
 slope_matrix <- matrix (0, nrow=number_of_samples, ncol=database_size)
-colnames(slope_matrix) <- library_vector
+colnames(slope_matrix) <- database_vector
 rownames(slope_matrix) <- sample_vector
 t_intensity_matrix_global <- t(intensity_matrix_global)
 t_intensity_matrix_database <- as.matrix(rbind(t_intensity_matrix_global[,1:database_size]))
@@ -5979,7 +5981,7 @@ for (s in 1:number_of_samples) {
 }
 ### Score calculation
 score <- matrix (0, nrow=number_of_samples, ncol=database_size)
-colnames(score) <- library_vector
+colnames(score) <- database_vector
 rownames(score) <- sample_vector
 if (intensity_correction_coefficient != 0) {
 	for (i in 1:number_of_samples) {
@@ -5996,11 +5998,11 @@ if (intensity_correction_coefficient != 0) {
 }
 #### Output the classification
 output <- matrix ("NO", nrow=number_of_samples, ncol=database_size)
-colnames(output) <- library_vector
+colnames(output) <- database_vector
 rownames(output) <- sample_vector
 if (spectra_path_output == TRUE) {
 	output <- cbind(output, spectra_path_vector)
-    colnames(output) <- c(library_vector, "Spectrum path")
+    colnames(output) <- c(database_vector, "Spectrum path")
 }
 if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
@@ -6084,16 +6086,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -6133,7 +6135,7 @@ for (s in 1:number_of_samples) {
 	###### COUNTER 0 - MATCHING SIGNALS
 	# Create a counter, symmetrical to the database Peaklist
 	matching_signals_matrix <- matrix (0, nrow=1, ncol=database_size)
-	colnames(matching_signals_matrix) <- library_vector
+	colnames(matching_signals_matrix) <- database_vector
 	rownames(matching_signals_matrix) <- sample_vector[s]
 	# For each peaklist in the Library
 	for (l in 1:database_size) {
@@ -6161,7 +6163,7 @@ for (s in 1:number_of_samples) {
 	}
 	###### COUNTER 1 - FIT
 	fit_matrix <- matrix (0, nrow=1, ncol=database_size)
-	colnames(fit_matrix) <- library_vector
+	colnames(fit_matrix) <- database_vector
 	rownames(fit_matrix) <- sample_vector[s]
 	for (l in 1:database_size) {
 		if (length(peaks_sample@mass) > 0 && length(peaks_database_temp[[l]]@mass) > 0) {
@@ -6176,7 +6178,7 @@ for (s in 1:number_of_samples) {
 	}
 	###### COUNTER 2 - RETRO FIT
 	retrofit_matrix <- matrix (0, nrow=1, ncol=database_size)
-	colnames(retrofit_matrix) <- library_vector
+	colnames(retrofit_matrix) <- database_vector
 	rownames(retrofit_matrix) <- sample_vector[s]
 	for (l in 1:database_size) {
 		if (length(peaks_sample@mass) > 0 && length(peaks_database_temp[[l]]@mass) > 0) {
@@ -6194,14 +6196,14 @@ for (s in 1:number_of_samples) {
 	# Compute the correlation matrix with the library
 	# Intensity matrix
 	intensity_matrix_global <- intensityMatrix(peaks_all, spectra_all)
-	rownames(intensity_matrix_global) <- c(library_vector, sample_vector[s])
+	rownames(intensity_matrix_global) <- c(database_vector, sample_vector[s])
 	# Keep only the matching signals
 	columns_to_keep <- as.character(matching_signals)
 	intensity_matrix_global <- intensity_matrix_global[,columns_to_keep]
 	# Weighted correlation between samples (library + test samples) (samples must be as columns and features as test) - With weights
 	if (intensity_correction_coefficient != 0 && intensity_correction_coefficient != 1) {
 		# Compute the vector of weights
-		weights_vector <- c(rep(1, length(library_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
+		weights_vector <- c(rep(1, length(database_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
 		correlation_matrix <- wtd.cors(x=t(intensity_matrix_global), weight=weights_vector)
 		intensity_correlation_matrix <- as.matrix(correlation_matrix [(database_size+1):nrow(correlation_matrix), 1:database_size])
 	} else if (intensity_correction_coefficient == 1) {
@@ -6249,7 +6251,7 @@ for (s in 1:number_of_samples) {
 	}
 	###### COUNTER 5 - REGRESSION CURVE
 	slope_matrix <- matrix (0, nrow=1, ncol=database_size)
-	colnames(slope_matrix) <- library_vector
+	colnames(slope_matrix) <- database_vector
 	rownames(slope_matrix) <- sample_vector[s]
 	t_intensity_matrix_global <- t(intensity_matrix_global)
 	t_intensity_matrix_database <- rbind(as.matrix(t_intensity_matrix_global[,1:database_size]))
@@ -6274,10 +6276,10 @@ for (d in 1:database_size) {
 }
 # Fix the rownames and colnames
 rownames(intensity_correlation_matrix_all) <- sample_vector
-colnames(intensity_correlation_matrix_all) <- library_vector
+colnames(intensity_correlation_matrix_all) <- database_vector
 ###### Score calculation
 score <- matrix (0, nrow=number_of_samples, ncol=database_size)
-colnames(score) <- library_vector
+colnames(score) <- database_vector
 rownames(score) <- sample_vector
 if (intensity_correction_coefficient != 0) {
 score <- log10(fit_matrix_all*retrofit_matrix_all*intensity_correlation_matrix_all*1000)
@@ -6286,11 +6288,11 @@ score <- log10(fit_matrix_all*retrofit_matrix_all*intensity_correlation_matrix_a
 }
 #### Output the classification
 output <- matrix ("NO", nrow=number_of_samples, ncol=database_size)
-colnames(output) <- library_vector
+colnames(output) <- database_vector
 rownames(output) <- sample_vector
 if (spectra_path_output == TRUE) {
 	output <- cbind(output, spectra_path_vector)
-    colnames(output) <- c(library_vector, "Spectrum path")
+    colnames(output) <- c(database_vector, "Spectrum path")
 }
 if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
@@ -6379,16 +6381,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	# If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -6405,7 +6407,7 @@ rownames(peaklist_matrix) <- make.names(peaklist_matrix[,"Sample"], unique=TRUE)
 distance_matrix <- dist(peaklist_matrix[,1:(ncol(peaklist_matrix)-1)], method="euclidean")
 hierarchical_clustering <- hclust(distance_matrix)
 #plot(hierarchical_clustering, main="Hierarchical clustering analysis - Spectral Typer, xlab="Samples", ylab="Tree height")
-hca_dendrogram <- ggdendrogram(hierarchical_clustering)#, main="Hierarchical clustering analysis - Spectral Typer", xlab="Samples", ylab="Tree height")
+hca_dendrogram <- ggdendrogram(hierarchical_clustering, segments=TRUE, labels=TRUE, leaf_labels=TRUE, rotate=TRUE, theme_dendro=TRUE)#, main="Hierarchical clustering analysis - Spectral Typer", xlab="Samples", ylab="Tree height")
 #hca_dendrogram <- recordPlot()
 #
 distance_matrix <- as.matrix(distance_matrix)
@@ -6521,16 +6523,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -6566,7 +6568,7 @@ for (s in 1:number_of_samples) {
 	###### COUNTER 0 - MATCHING SIGNALS
 	# Create a counter, symmetrical to the database Peaklist
 	matching_signals_matrix <- matrix (0, nrow=1, ncol=database_size)
-	colnames(matching_signals_matrix) <- library_vector
+	colnames(matching_signals_matrix) <- database_vector
 	rownames(matching_signals_matrix) <- sample_vector[s]
 	# For each peaklist in the Library
 	for (l in 1:database_size) {
@@ -6593,7 +6595,7 @@ for (s in 1:number_of_samples) {
 	}
 	###### COUNTER 1 - FIT
 	fit_matrix <- matrix (0, nrow=1, ncol=database_size)
-	colnames(fit_matrix) <- library_vector
+	colnames(fit_matrix) <- database_vector
 	rownames(fit_matrix) <- sample_vector[s]
 	for (l in 1:database_size) {
 		if (length(peaks_sample@mass) > 0 && length(peaks_database_temp[[l]]@mass) > 0) {
@@ -6608,7 +6610,7 @@ for (s in 1:number_of_samples) {
 	}
 	###### COUNTER 2 - RETRO FIT
 	retrofit_matrix <- matrix (0, nrow=1, ncol=database_size)
-	colnames(retrofit_matrix) <- library_vector
+	colnames(retrofit_matrix) <- database_vector
 	rownames(retrofit_matrix) <- sample_vector[s]
 	for (l in 1:database_size) {
 		if (length(peaks_sample@mass) > 0 && length(peaks_database_temp[[l]]@mass) > 0) {
@@ -6666,20 +6668,20 @@ for (d in 1:database_size) {
 	number_of_signals_database <- append(number_of_signals_database, length(peaks_database[[d]]@mass))
 }
 # Fix the rownames and colnames
-colnames(intensity_matching_matrix_all) <- library_vector
+colnames(intensity_matching_matrix_all) <- database_vector
 rownames(intensity_matching_matrix_all) <- sample_vector
 ### Score calculation
 score <- matrix (0, nrow=number_of_samples, ncol=database_size)
-colnames(score) <- library_vector
+colnames(score) <- database_vector
 rownames(score) <- sample_vector
 score <- log10(fit_matrix_all*retrofit_matrix_all*intensity_matching_matrix_all*1000)
 #### Output the classification
 output <- matrix ("NO", nrow=number_of_samples, ncol=database_size)
-colnames(output) <- library_vector
+colnames(output) <- database_vector
 rownames(output) <- sample_vector
 if (spectra_path_output == TRUE) {
 	output <- cbind(output, spectra_path_vector)
-    colnames(output) <- c(library_vector, "Spectrum path")
+    colnames(output) <- c(database_vector, "Spectrum path")
 }
 if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
@@ -6763,16 +6765,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -6853,14 +6855,14 @@ for (spl in 1:number_of_samples) {
 		# Compute the correlation matrix with the library
 		# Intensity matrix
 		intensity_matrix_global <- intensityMatrix(peaks_all, spectra_all)
-		rownames(intensity_matrix_global) <- c(library_vector[db], sample_vector[spl])
+		rownames(intensity_matrix_global) <- c(database_vector[db], sample_vector[spl])
 		# Keep only the matching signals
 		#columns_to_keep <- as.character(matching_signals)
 		#intensity_matrix_global <- intensity_matrix_global[,columns_to_keep]
 		# Weighted correlation between samples (library + test samples) (samples must be as columns and features as test) - With weights
 		if (intensity_correction_coefficient != 0 && intensity_correction_coefficient != 1) {
 			# Compute the vector of weights
-			weights_vector <- c(rep(1, length(library_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
+			weights_vector <- c(rep(1, length(database_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
 			correlation_sample <- wtd.cors(x=t(intensity_matrix_global), weight=weights_vector)
 			intensity_correlation_sample <- as.matrix(correlation_matrix [(database_size+1):nrow(correlation_matrix), 1:database_size])
 		} else if (intensity_correction_coefficient == 1) {
@@ -6906,22 +6908,22 @@ for (spl in 1:number_of_samples) {
 }
 # Fix the rownames and colnames
 rownames(intensity_correlation_matrix_all) <- sample_vector
-colnames(intensity_correlation_matrix_all) <- library_vector
+colnames(intensity_correlation_matrix_all) <- database_vector
 ###### Score calculation
 if (intensity_correction_coefficient != 0) {
 score <- log10(fit_matrix_all*retrofit_matrix_all*intensity_correlation_matrix_all*1000)
 } else {
 	score <- log10(fit_matrix_all*retrofit_matrix_all*intensity_correlation_matrix_all*100)
 }
-colnames(score) <- library_vector
+colnames(score) <- database_vector
 rownames(score) <- sample_vector
 #### Output the classification
 output <- matrix ("", nrow=number_of_samples, ncol=database_size)
-colnames(output) <- library_vector
+colnames(output) <- database_vector
 rownames(output) <- sample_vector
 if (spectra_path_output == TRUE) {
 	output <- cbind(output, spectra_path_vector)
-    colnames(output) <- c(library_vector, "Spectrum path")
+    colnames(output) <- c(database_vector, "Spectrum path")
 }
 if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
@@ -7004,16 +7006,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -7121,19 +7123,19 @@ for (spl in 1:number_of_samples) {
 	}
 }
 # Fix the rownames and colnames
-colnames(intensity_matching_matrix_all) <- library_vector
+colnames(intensity_matching_matrix_all) <- database_vector
 rownames(intensity_matching_matrix_all) <- sample_vector
 ### Score calculation
 score <- log10(fit_matrix_all*retrofit_matrix_all*intensity_matching_matrix_all*1000)
-colnames(score) <- library_vector
+colnames(score) <- database_vector
 rownames(score) <- sample_vector
 #### Output the classification
 output <- matrix ("NO", nrow=number_of_samples, ncol=database_size)
-colnames(output) <- library_vector
+colnames(output) <- database_vector
 rownames(output) <- sample_vector
 if (spectra_path_output == TRUE) {
 	output <- cbind(output, spectra_path_vector)
-    colnames(output) <- c(library_vector, "Spectrum path")
+    colnames(output) <- c(database_vector, "Spectrum path")
 }
 if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
@@ -7182,7 +7184,7 @@ return(output)
 # Each sample gets compared with each entry in the database, separately.
 # Parallel implemented.
 spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=NULL, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, low_intensity_threshold_method="element-wise", tolerance_ppm=2000, intensity_correction_coefficient=1, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=FALSE) {
-install_and_load_required_packages(c("MALDIquant","corrplot","weights","stats","parallel"))
+install_and_load_required_packages(c("MALDIquant", "corrplot", "weights", "stats", "parallel"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Rename the trim function to avoid conflicts
@@ -7218,16 +7220,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -7260,6 +7262,7 @@ for (spl in 1:number_of_samples) {
 comparison_sample_db_subfunction_correlation <- function(x) {
 	# Generate the matrix rows for the output
 	matching_signals_matrix <- matrix(0, nrow=1, ncol=database_size)
+	number_of_signals_database_matrix <- matrix(0, nrow=1, ncol=database_size)
 	fit_matrix <- matrix(0, ncol=database_size, nrow=1)
 	retrofit_matrix <- matrix(0, ncol=database_size, nrow=1)
 	intensity_correlation_matrix <- matrix(0, ncol=database_size, nrow=1)
@@ -7286,6 +7289,8 @@ comparison_sample_db_subfunction_correlation <- function(x) {
 		peaks_sample <- peaks_all[[2]]
 		#################### Number of signals
 		number_of_signals_samples <- length(peaks_sample@mass)
+		number_of_signals_database <- length(peaks_database_temp@mass)
+		number_of_signals_database_matrix[1,db] <- number_of_signals_database
 		###### COUNTER 0 - MATCHING SIGNALS
 		# Create a counter, symmetrical to the database Peaklist
 		matching_signals_number <- 0
@@ -7334,7 +7339,7 @@ comparison_sample_db_subfunction_correlation <- function(x) {
 		# Weighted correlation between samples (library + test samples) (samples must be as columns and features as test) - With weights
 		if (intensity_correction_coefficient != 0 && intensity_correction_coefficient != 1) {
 			# Compute the vector of weights
-			weights_vector <- c(rep(1, length(library_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
+			weights_vector <- c(rep(1, length(database_vector)), rep(intensity_correction_coefficient, nrow(t(intensity_matrix_global))))
 			correlation_sample <- wtd.cors(x=t(intensity_matrix_global), weight=weights_vector)
 			intensity_correlation_sample <- as.matrix(correlation_matrix [(database_size+1):nrow(correlation_matrix), 1:database_size])
 		} else if (intensity_correction_coefficient == 1) {
@@ -7378,7 +7383,7 @@ comparison_sample_db_subfunction_correlation <- function(x) {
 		slope_matrix[1,db] <- slope_sample
 	}
 	# Return a list, each element of which is a matrix row. Finally, all the matrix rows will be rbind together.
-	return(list(number_of_signals_samples=number_of_signals_samples, matching_signals_matrix=matching_signals_matrix, fit_matrix=fit_matrix, retrofit_matrix=retrofit_matrix, intensity_correlation_matrix=intensity_correlation_matrix, pvalue_matrix=pvalue_matrix, slope_matrix=slope_matrix))
+	return(list(number_of_signals_samples=number_of_signals_samples, number_of_signals_database_matrix=number_of_signals_database_matrix, matching_signals_matrix=matching_signals_matrix, fit_matrix=fit_matrix, retrofit_matrix=retrofit_matrix, intensity_correlation_matrix=intensity_correlation_matrix, pvalue_matrix=pvalue_matrix, slope_matrix=slope_matrix))
 }
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
@@ -7398,6 +7403,7 @@ if (Sys.info()[1] == "Linux") {
 }
 ############################ Merge the matrix pieces together
 matching_signals_matrix_all <- NULL
+number_of_signals_database_matrix_all <- NULL
 fit_matrix_all <- NULL
 retrofit_matrix_all <- NULL
 intensity_correlation_matrix_all <- NULL
@@ -7409,6 +7415,12 @@ for (ns in 1:number_of_samples) {
 		matching_signals_matrix_all <- output_list[[ns]]$matching_signals_matrix
 	} else {
 		matching_signals_matrix_all <- rbind(matching_signals_matrix_all, output_list[[ns]]$matching_signals_matrix)
+	}
+	# Number of signals database
+	if (is.null(number_of_signals_database_matrix_all)) {
+		number_of_signals_database_matrix_all <- output_list[[ns]]$number_of_signals_database_matrix
+	} else {
+		number_of_signals_database_matrix_all <- rbind(number_of_signals_database_matrix_all, output_list[[ns]]$number_of_signals_database_matrix)
 	}
 	# Fit
 	if (is.null(fit_matrix_all)) {
@@ -7444,22 +7456,22 @@ for (ns in 1:number_of_samples) {
 ######################################
 # Fix the rownames and colnames
 rownames(intensity_correlation_matrix_all) <- sample_vector
-colnames(intensity_correlation_matrix_all) <- library_vector
+colnames(intensity_correlation_matrix_all) <- database_vector
 ################### Score calculation
 if (intensity_correction_coefficient != 0) {
 score <- log10(fit_matrix_all*retrofit_matrix_all*intensity_correlation_matrix_all*1000)
 } else {
 	score <- log10(fit_matrix_all*retrofit_matrix_all*intensity_correlation_matrix_all*100)
 }
-colnames(score) <- library_vector
+colnames(score) <- database_vector
 rownames(score) <- sample_vector
 #### Output the classification
 output <- matrix ("", nrow=number_of_samples, ncol=database_size)
-colnames(output) <- library_vector
+colnames(output) <- database_vector
 rownames(output) <- sample_vector
 if (spectra_path_output == TRUE) {
 	output <- cbind(output, spectra_path_vector)
-    colnames(output) <- c(library_vector, "Spectrum path")
+    colnames(output) <- c(database_vector, "Spectrum path")
 }
 if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
@@ -7479,13 +7491,13 @@ if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
 		for (w in 1:database_size) {
 			if (score[r,w] >= 2) {
-				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database[w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "Corr:", round(intensity_correlation_matrix_all[r,w], digits=3), ",", "p:", pvalue_matrix_all[r,w], "sl:", slope_matrix_all[r,w], ",", "ns:", matching_signals_matrix_all[r,w], ")")
+				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database_matrix_all[r,w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "Corr:", round(intensity_correlation_matrix_all[r,w], digits=3), ",", "p:", pvalue_matrix_all[r,w], "sl:", slope_matrix_all[r,w], ",", "ns:", matching_signals_matrix_all[r,w], ")")
 			}
 			if (score[r,w] < 1.5) {
-				output[r,w] <- paste("NO","(Score:", round(score[r,w], digits=3), "), ","(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database[w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "Corr:", round(intensity_correlation_matrix_all[r,w], digits=3), ",", "p:", pvalue_matrix_all[r,w], "sl:", slope_matrix_all[r,w], ",", "ns:", matching_signals_matrix_all[r,w], ")")
+				output[r,w] <- paste("NO","(Score:", round(score[r,w], digits=3), "), ","(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database_matrix_all[r,w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "Corr:", round(intensity_correlation_matrix_all[r,w], digits=3), ",", "p:", pvalue_matrix_all[r,w], "sl:", slope_matrix_all[r,w], ",", "ns:", matching_signals_matrix_all[r,w], ")")
 			}
 			if (score[r,w] >= 1.5 && score[r,w] < 2) {
-				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database[w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "Corr:", round(intensity_correlation_matrix_all[r,w], digits=3), ",", "p:", pvalue_matrix_all[r,w], "sl:", slope_matrix_all[r,w], ",", "ns:", matching_signals_matrix_all[r,w], ")")
+				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database_matrix_all[r,w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "Corr:", round(intensity_correlation_matrix_all[r,w], digits=3), ",", "p:", pvalue_matrix_all[r,w], "sl:", slope_matrix_all[r,w], ",", "ns:", matching_signals_matrix_all[r,w], ")")
 			}
 		}
 	}
@@ -7543,16 +7555,16 @@ if (spectra_format == "imzml" | spectra_format == "imzML") {
 	}
 }
 ####### Create the library vector
-library_vector <- character()
+database_vector <- character()
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
     # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	for (s in 1:database_size) {
-		library_vector <- append(library_vector, peaks_database[[s]]@metaData$file[1])
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
 	}
 }
 # Generate the path vector
@@ -7585,6 +7597,7 @@ for (spl in 1:number_of_samples) {
 comparison_sample_db_subfunction_intensity <- function(x) {
 	# Generate the matrix rows for the output
 	matching_signals_matrix <- matrix(0, nrow=1, ncol=database_size)
+	number_of_signals_database_matrix <- matrix(0, nrow=1, ncol=database_size)
 	fit_matrix <- matrix(0, ncol=database_size, nrow=1)
 	retrofit_matrix <- matrix(0, ncol=database_size, nrow=1)
 	intensity_matching_matrix <- matrix(0, ncol=database_size, nrow=1)
@@ -7609,6 +7622,8 @@ comparison_sample_db_subfunction_intensity <- function(x) {
 		peaks_sample <- peaks_all[[2]]
 		#################### Number of signals
 		number_of_signals_samples <- length(peaks_sample@mass)
+		number_of_signals_database <- length(peaks_database_temp@mass)
+		number_of_signals_database_matrix[1,db] <- number_of_signals_database
 		###### COUNTER 0 - MATCHING SIGNALS
 		# Create a counter, symmetrical to the database Peaklist
 		matching_signals_sample <- 0
@@ -7679,7 +7694,7 @@ comparison_sample_db_subfunction_intensity <- function(x) {
 		}
 	}
 	# Return a list, each element of which is a matrix row. Finally, all the matrix rows will be rbind together.
-	return(list(number_of_signals_samples=number_of_signals_samples, matching_signals_matrix=matching_signals_matrix, fit_matrix=fit_matrix, retrofit_matrix=retrofit_matrix, intensity_matching_matrix=intensity_matching_matrix))
+	return(list(number_of_signals_samples=number_of_signals_samples, number_of_signals_database_matrix=number_of_signals_database_matrix, matching_signals_matrix=matching_signals_matrix, fit_matrix=fit_matrix, retrofit_matrix=retrofit_matrix, intensity_matching_matrix=intensity_matching_matrix))
 }
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
@@ -7699,6 +7714,7 @@ if (Sys.info()[1] == "Linux") {
 }
 ############################ Merge the matrix pieces together
 matching_signals_matrix_all <- NULL
+number_of_signals_database_matrix_all <- NULL
 fit_matrix_all <- NULL
 retrofit_matrix_all <- NULL
 intensity_matching_matrix_all <- NULL
@@ -7710,6 +7726,12 @@ for (ns in 1:number_of_samples) {
 		matching_signals_matrix_all <- output_list[[ns]]$matching_signals_matrix
 	} else {
 		matching_signals_matrix_all <- rbind(matching_signals_matrix_all, output_list[[ns]]$matching_signals_matrix)
+	}
+	# Number of signals database
+	if (is.null(number_of_signals_database_matrix_all)) {
+		number_of_signals_database_matrix_all <- output_list[[ns]]$number_of_signals_database_matrix
+	} else {
+		number_of_signals_database_matrix_all <- rbind(number_of_signals_database_matrix_all, output_list[[ns]]$number_of_signals_database_matrix)
 	}
 	# Fit
 	if (is.null(fit_matrix_all)) {
@@ -7732,19 +7754,19 @@ for (ns in 1:number_of_samples) {
 }
 ######################################
 # Fix the rownames and colnames
-colnames(intensity_matching_matrix_all) <- library_vector
+colnames(intensity_matching_matrix_all) <- database_vector
 rownames(intensity_matching_matrix_all) <- sample_vector
 ### Score calculation
 score <- log10(fit_matrix_all*retrofit_matrix_all*intensity_matching_matrix_all*1000)
-colnames(score) <- library_vector
+colnames(score) <- database_vector
 rownames(score) <- sample_vector
 #### Output the classification
 output <- matrix ("NO", nrow=number_of_samples, ncol=database_size)
-colnames(output) <- library_vector
+colnames(output) <- database_vector
 rownames(output) <- sample_vector
 if (spectra_path_output == TRUE) {
 	output <- cbind(output, spectra_path_vector)
-    colnames(output) <- c(library_vector, "Spectrum path")
+    colnames(output) <- c(database_vector, "Spectrum path")
 }
 if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
@@ -7764,16 +7786,320 @@ if (score_only == TRUE) {
 	for (r in 1:number_of_samples) {
 		for (w in 1:database_size) {
 			if (score[r,w]>=2) {
-				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ", "(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database[w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "IntMtch:", round(intensity_matching_matrix_all[r,w], digits=3), ",", "ns:", matching_signals_matrix_all[r,w], ")")
+				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ", "(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database_matrix_all[r,w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "IntMtch:", round(intensity_matching_matrix_all[r,w], digits=3), ",", "ns:", matching_signals_matrix_all[r,w], ")")
 			}
 			if (score[r,w]<1.5) {
-				output[r,w] <- paste("NO","(Score:", round(score[r,w], digits=3), "), ", "(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database[w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "IntMtch:", round(intensity_matching_matrix_all[r,w], digits=3), ",", "ns:", matching_signals_matrix_all[r,w], ")")
+				output[r,w] <- paste("NO","(Score:", round(score[r,w], digits=3), "), ", "(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database_matrix_all[r,w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "IntMtch:", round(intensity_matching_matrix_all[r,w], digits=3), ",", "ns:", matching_signals_matrix_all[r,w], ")")
 			}
 			if (score[r,w]>=1.5 && score[r,w]<2) {
-				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ", "(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database[w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "IntMtch:", round(intensity_matching_matrix_all[r,w], digits=3), ",", "ns:", matching_signals_matrix_all[r,w], ")")
+				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ", "(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database_matrix_all[r,w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "IntMtch:", round(intensity_matching_matrix_all[r,w], digits=3), ",", "ns:", matching_signals_matrix_all[r,w], ")")
 			}
 		}
 	}
 }
 return(output)
 }
+
+
+
+
+
+######################################### SPECTRAL TYPER SCORE: SIMILARITY INDEX
+# The function calculates the score for the Spectral Typer program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity symmetry via the similarity index computation.
+# Each sample gets compared with each entry in the database, separately.
+# Parallel implemented.
+spectral_typer_score_similarity_index <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=NULL, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, low_intensity_threshold_method="element-wise", tolerance_ppm=2000, intensity_correction_coefficient=1, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=FALSE) {
+install_and_load_required_packages(c("MALDIquant", "stats", "parallel"))
+# Rename the trim function
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
+### Folder lists
+#database_folder_list <- dir(filepath_database, ignore.case=TRUE, full.names=FALSE, recursive=FALSE, include.dirs=TRUE)
+#test_folder_list <- dir(filepath_test, ignore.case=TRUE, full.names=FALSE, recursive=FALSE, include.dirs=TRUE)
+# Sample and Library size
+if (isMassPeaksList(peaks_test)) {
+    number_of_samples <- length(peaks_test)
+} else if (isMassPeaks(peaks_test)) {
+    number_of_samples <- 1
+}
+if (isMassPeaksList(peaks_database)) {
+    database_size <- length(peaks_database)
+} else if (isMassPeaks(peaks_database)) {
+    database_size <- 1
+}
+#### Replace the sample name, both in the library and in the test set
+peaks_test <- replace_sample_name(peaks_test, spectra_format=spectra_format)
+peaks_database <- replace_class_name(peaks_database, class_list=class_list_library, class_in_file_name=TRUE, spectra_format=spectra_format)
+####### Create the sample vector
+sample_vector <- character()
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
+	for (s in 1:number_of_samples) {
+		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
+	}
+}
+if (spectra_format == "imzml" | spectra_format == "imzML") {
+	for (s in 1:number_of_samples) {
+		sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
+	}
+}
+####### Create the library vector
+database_vector <- character()
+if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
+	for (s in 1:database_size) {
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
+	}
+}
+if (spectra_format == "imzml" | spectra_format == "imzML") {
+	for (s in 1:database_size) {
+		database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
+	}
+}
+# Generate the path vector
+spectra_path_vector <- character()
+for (sp in 1:length(spectra_test)) {
+	spectra_path_vector <- append(spectra_path_vector, spectra_test[[sp]]@metaData$file[1])
+}
+############################################################ SCORE (FRI)
+number_of_signals_database <- numeric(length=database_size)
+for (d in 1:database_size) {
+	number_of_signals_database[d] <- length(peaks_database[[d]]@mass)
+}
+################### Each sample gets compared with the database (create a copy of the original database each time, otherwise it gets modified when processed together with the sample)
+# Create a list to be used for lapply
+global_list <- list()
+for (spl in 1:number_of_samples) {
+	# Extract the peaklist and the spectrum
+	peaks_database_temp <- peaks_database
+	spectra_database_temp <- spectra_database
+	peaks_sample <- peaks_test[[spl]]
+	spectrum_sample <- spectra_test[[spl]]
+	# Generate the entry of the global list
+	global_list_entry <- append(peaks_sample, peaks_database_temp)
+	global_list_entry <- append(global_list_entry, spectrum_sample)
+	global_list_entry <- append(global_list_entry, spectra_database_temp)
+	global_list[[spl]] <- global_list_entry
+}
+############################################## Define the function for parLapply
+# x = each element of the global list
+comparison_sample_db_subfunction_similarity_index <- function(x) {
+	# Generate the matrix rows for the output
+	matching_signals_matrix <- matrix(0, nrow=1, ncol=database_size)
+	number_of_signals_database_matrix <- matrix(0, nrow=1, ncol=database_size)
+	fit_matrix <- matrix(0, ncol=database_size, nrow=1)
+	retrofit_matrix <- matrix(0, ncol=database_size, nrow=1)
+	similarity_index_matrix <- matrix(0, ncol=database_size, nrow=1)
+	###### Compare with all the elements in the library
+	### For each entry in the library...
+	for (db in 1:database_size) {
+		# Extract the peaklist and the spectrum
+		peaks_sample <- x[[1]]
+		spectrum_sample <- x[[(database_size+2)]]
+		peaks_database_temp_all <- x[2:(database_size+1)]
+		spectra_database_temp_all <- x[(database_size+3):length(x)]
+		peaks_database_temp <- peaks_database_temp_all[[db]]
+		spectra_database_temp <- spectra_database_temp_all[[db]]
+		####### Peak alignment
+		# Merge the peaklists
+		peaks_all <- append(peaks_database_temp, peaks_sample)
+		spectra_all <- append(spectra_database_temp, spectrum_sample)
+		# Align the peaks
+		peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+		# Restore the lists
+		peaks_database_temp <- peaks_all[[1]]
+		peaks_sample <- peaks_all[[2]]
+		#################### Number of signals
+		number_of_signals_samples <- length(peaks_sample@mass)
+		number_of_signals_database <- length(peaks_database_temp@mass)
+		number_of_signals_database_matrix[1,db] <- number_of_signals_database
+		###### COUNTER 0 - MATCHING SIGNALS
+		# Create a counter, symmetrical to the database Peaklist
+		matching_signals_number <- 0
+		matching_signals <- numeric()
+		# For each peaklist in the Library
+		if (length(peaks_sample@mass) > 0 && length(peaks_database_temp@mass) > 0) {
+			# Scroll the peaks in the sample
+			for (i in 1:length(peaks_sample@mass)) {
+				# Scroll the peaklist in the library
+				for (j in 1:length(peaks_database_temp@mass)) {
+					# Count the number of closely matching signals with the reference in the sample peaklist
+					if (peaks_sample@mass[i] == peaks_database_temp@mass[j]) {
+						matching_signals_number <- matching_signals_number + 1
+						matching_signals <- append(matching_signals, peaks_sample@mass[i])
+						break
+					}
+				}
+			}
+		} else if (length(peaks_sample@mass) == 0 || length(peaks_database_temp@mass) == 0) {
+				matching_signals_number <- 0
+		}
+		# Append this row to the global matrix
+		matching_signals_matrix [1,db] <- matching_signals_number
+		###### COUNTER 1 - FIT
+		fit_sample <- 0
+		if (length(peaks_sample@mass) > 0 && length(peaks_database_temp@mass) > 0) {
+			fit_sample <- matching_signals_number / length(peaks_sample@mass)
+		}
+		# Append this row to the global matrix
+		fit_matrix[1,db] <- fit_sample
+		###### COUNTER 2 - RETRO FIT
+		retrofit_sample <- 0
+		if (length(peaks_sample@mass) > 0 && length(peaks_database_temp@mass) > 0) {
+			retrofit_sample <- matching_signals_number / length(peaks_database_temp@mass)
+		}
+		# Append this row to the global matrix
+		retrofit_matrix[1,db] <- retrofit_sample
+		###### COUNTER 3
+		# Symmetry -> comparison between intensities
+		# Compute the similaroty index with the library
+		similarity_index_matrix_global <- intensityMatrix(peaks_all, spectra_all)
+		# Similarity index (E Id * Ix / sqrt(E Id^2 * E Ix^2)) = A / sqrt (B * E)
+		A <- 0
+		for (z in 1:ncol(similarity_index_matrix_global)) {
+			A <- A + (similarity_index_matrix_global[1,z]*similarity_index_matrix_global[2,z])
+		}
+		B <- 0
+		for (z in 1:ncol(similarity_index_matrix_global)) {
+			B <- B + (similarity_index_matrix_global[1,z])^2
+		}
+		E <- 0
+		for (z in 1:ncol(similarity_index_matrix_global)) {
+			E <- E + (similarity_index_matrix_global[2,z])^2
+		}
+		similarity_index_sample <- A / sqrt (B * E)
+		# Append this row to the global matrix
+		similarity_index_matrix[1,db] <- similarity_index_sample
+	}
+	# Return a list, each element of which is a matrix row. Finally, all the matrix rows will be rbind together.
+	return(list(number_of_signals_samples=number_of_signals_samples, number_of_signals_database_matrix=number_of_signals_database_matrix, matching_signals_matrix=matching_signals_matrix, fit_matrix=fit_matrix, retrofit_matrix=retrofit_matrix, similarity_index_matrix=similarity_index_matrix))
+}
+# Detect the number of cores
+cpu_thread_number <- detectCores(logical=TRUE)
+#cpu_core_number <- cpu_thread_number/2
+if (Sys.info()[1] == "Linux") {
+	output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_similarity_index(global_list), mc.cores=cpu_thread_number)
+} else if (Sys.info()[1] == "Windows") {
+	# Make the CPU cluster for parallelisation
+	cls <- makeCluster(cpu_thread_number)
+	# Make the cluster use the custom functions and the package functions along with their parameters
+	clusterEvalQ(cls, {library(MALDIquant)})
+	clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tolerance_ppm", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method"), envir=environment())
+	output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_similarity_index(global_list))
+	stopCluster(cls)
+} else {
+	output_list <- lapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_similarity_index(global_list))
+}
+############################ Merge the matrix pieces together
+matching_signals_matrix_all <- NULL
+number_of_signals_database_matrix_all <- NULL
+fit_matrix_all <- NULL
+retrofit_matrix_all <- NULL
+similarity_index_matrix_all <- NULL
+for (ns in 1:number_of_samples) {
+	# Matching signals
+	if (is.null(matching_signals_matrix_all)) {
+		matching_signals_matrix_all <- output_list[[ns]]$matching_signals_matrix
+	} else {
+		matching_signals_matrix_all <- rbind(matching_signals_matrix_all, output_list[[ns]]$matching_signals_matrix)
+	}
+	# Number of signals database
+	if (is.null(number_of_signals_database_matrix_all)) {
+		number_of_signals_database_matrix_all <- output_list[[ns]]$number_of_signals_database_matrix
+	} else {
+		number_of_signals_database_matrix_all <- rbind(number_of_signals_database_matrix_all, output_list[[ns]]$number_of_signals_database_matrix)
+	}
+	# Fit
+	if (is.null(fit_matrix_all)) {
+		fit_matrix_all <- output_list[[ns]]$fit_matrix
+	} else {
+		fit_matrix_all <- rbind(fit_matrix_all, output_list[[ns]]$fit_matrix)
+	}
+	# Retrofit
+	if (is.null(retrofit_matrix_all)) {
+		retrofit_matrix_all <- output_list[[ns]]$retrofit_matrix
+	} else {
+		retrofit_matrix_all <- rbind(retrofit_matrix_all, output_list[[ns]]$retrofit_matrix)
+	}
+	# Similarity index
+	if (is.null(similarity_index_matrix_all)) {
+		similarity_index_matrix_all <- output_list[[ns]]$similarity_index_matrix
+	} else {
+		similarity_index_matrix_all <- rbind(similarity_index_matrix_all, output_list[[ns]]$similarity_index_matrix)
+	}
+}
+######################################
+# Fix the rownames and colnames
+rownames(similarity_index_matrix_all) <- sample_vector
+colnames(similarity_index_matrix_all) <- database_vector
+################### Score calculation
+score <- log10(fit_matrix_all*retrofit_matrix_all*similarity_index_matrix_all*1000)
+colnames(score) <- database_vector
+rownames(score) <- sample_vector
+#### Output the classification
+output <- matrix ("", nrow=number_of_samples, ncol=database_size)
+colnames(output) <- database_vector
+rownames(output) <- sample_vector
+if (spectra_path_output == TRUE) {
+	output <- cbind(output, spectra_path_vector)
+    colnames(output) <- c(database_vector, "Spectrum path")
+}
+if (score_only == TRUE) {
+	for (r in 1:number_of_samples) {
+		for (w in 1:database_size) {
+			if (score[r,w]>=2) {
+				output[r,w] <- paste("YES","(", round(score[r,w], digits=3), ")")
+			}
+			if (score[r,w]<1.5) {
+				output[r,w] <- paste("NO", "(", round(score[r,w], digits=3), ")")
+			}
+			if (score[r,w]>=1.5 && score[r,w]<2) {
+				output[r,w] <- paste("NI","(", round(score[r,w], digits=3), ")")
+			}
+		}
+	}
+} else {
+	for (r in 1:number_of_samples) {
+		for (w in 1:database_size) {
+			if (score[r,w] >= 2) {
+				output[r,w] <- paste("YES","(Score:", round(score[r,w], digits=3), "), ","(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database_matrix_all[r,w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "SI:", round(similarity_index_matrix_all[r,w], digits=3), ")")
+			}
+			if (score[r,w] < 1.5) {
+				output[r,w] <- paste("NO","(Score:", round(score[r,w], digits=3), "), ","(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database_matrix_all[r,w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "SI:", round(similarity_index_matrix_all[r,w], digits=3), ")")
+			}
+			if (score[r,w] >= 1.5 && score[r,w] < 2) {
+				output[r,w] <- paste("NI","(Score:", round(score[r,w], digits=3), "), ","(F:", matching_signals_matrix_all[r,w], "/", output_list[[r]]$number_of_signals_samples, "=", round(fit_matrix_all[r,w], digits=3), ",", "RF:", matching_signals_matrix_all[r,w], "/", number_of_signals_database_matrix_all[r,w], "=", round(retrofit_matrix_all[r,w], digits=3), ",", "SI:", round(similarity_index_matrix_all[r,w], digits=3), ")")
+			}
+		}
+	}
+}
+return (output)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+######################## IMPORT SUCCESSFUL
+tkmessageBox(message = "The functions have been successfully imported")
