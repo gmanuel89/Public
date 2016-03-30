@@ -1,4 +1,4 @@
-################ SPECTRAL TYPER PROGRAM 2016.03.29
+################ SPECTRAL TYPER PROGRAM 2016.03.30
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 install_and_load_required_packages(c("tcltk", "xlsx", "ggplot2"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
@@ -77,13 +77,14 @@ file_type_export_choice <- function() {
 ##### Dump the peaklist of the database
 database_peaklist_dump_function <- function() {
 	peaklist_database_matrix <- NULL
-	### If there is a peaklist to be dumped
+	############### If there is a peaklist to be dumped
 	if (!is.null(peaks_database)) {
-		# Catch the filename from the menu
+		########## File name
+		##### Catch the filename from the menu
 		filename_peaklist <- tclvalue(file_name)
-		# Generate the output filename (based upon the filename)
+		##### Generate the output filename (based upon the filename)
 		filename_peaklist <- paste(filename_peaklist, " - ", "Database peaklist", sep="")
-		# Add the extension if it is not present in the filename
+		##### Add the extension if it is not present in the filename
 		if (file_type_export == "csv") {
 			if (length(grep(".csv", filename_peaklist, fixed=TRUE)) == 1) {
 				filename_peaklist <- filename_peaklist
@@ -99,32 +100,45 @@ database_peaklist_dump_function <- function() {
 				filename_peaklist <- filename_peaklist
 			}	else {filename_peaklist <- paste(filename_peaklist, ".xls", sep="")}
 		}
-		# Database size
+		##### Database size
 		if (isMassPeaksList(peaks_database)) {
 			database_size <- length(peaks_database)
 		} else if (isMassPeaks(peaks_database)) {
 			database_size <- 1
 		}
-		# Peak vector
+		##### Peak vector
 		peak_vector <- character()
 		for (i in 1:database_size) {
 			peak_vector <- append(peak_vector, peaks_database[[i]]@metaData$file)
 		}
-		# Find out the longest peaklist to define the final matrix boundary
+		########## Database peaklist matrix
+		##### Find out the longest peaklist to define the final matrix boundary
 		highest_peak_number <- NULL
 		for (p in 1:database_size) {
 			if (is.null(highest_peak_number) || length(peaks_database[[p]]@mass > highest_peak_number)) {
 				highest_peak_number <- length(peaks_database[[p]]@mass)
 			}
 		}
-		# Generate the final matrix
-		peaklist_database_matrix <- matrix ("", ncol=highest_peak_number, nrow=database_size)
-		# Fill in the matrix
-		rownames(peaklist_database_matrix) <- peak_vector
+		##### Generate the final matrix
+		peaklist_database_matrix <- NULL
+		## Fill in the matrix (for each entry)
 		for (j in 1:database_size) {
-			peaklist_database_matrix [j,(1:length(peaks_database[[j]]@mass))] <- peaks_database[[j]]@mass
+			# Two-row matrix for the database entry (mass, intensity)
+			peaklist_database_matrix_entry <- matrix ("", ncol=highest_peak_number, nrow=2)
+			# Rownames
+			rownames(peaklist_database_matrix_entry) <- c(paste(peak_vector[j], "m/z"), paste(peak_vector[j], "intensity"))
+			# Mass
+			peaklist_database_matrix_entry [1,(1:length(peaks_database[[j]]@mass))] <- peaks_database[[j]]@mass
+			# Intensity
+			peaklist_database_matrix_entry [2,(1:length(peaks_database[[j]]@intensity))] <- peaks_database[[j]]@intensity
+			# Append it to the final matrix
+			if (is.null(peaklist_database_matrix)) {
+				peaklist_database_matrix <- peaklist_database_matrix_entry
+			} else {
+				peaklist_database_matrix <- rbind(peaklist_database_matrix, peaklist_database_matrix_entry)
+			}
 		}
-		# Dump the peaklist matrix
+		########## Dump the peaklist matrix
 		if (!is.null(peaklist_database_matrix)) {
 			if (file_type_export == "csv") {
 				write.csv(peaklist_database_matrix, file=filename_peaklist)
@@ -138,12 +152,12 @@ database_peaklist_dump_function <- function() {
 				# Export
 				write.xlsx(x=peaklist_database_matrix, file=filename_peaklist, sheetName="Database peaklist", row.names=TRUE)
 			}
-			### Messagebox
+			##### Message box
 			tkmessageBox(title = "Peaklist dumped", message = "The database peaklist file has been dumped.", icon = "info")
 		}
 	} else {
-		### If there is no peaklist to be dumped
-		### Messagebox
+		############### If there is no peaklist to be dumped
+		##### Messagebox
 		tkmessageBox(title = "Missing peaklist", message = "The peaklist seems to be missing. Run the peak picking and try again.", icon = "warning")
 	}
 }
