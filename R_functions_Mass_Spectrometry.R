@@ -738,18 +738,17 @@ return (list (vector=v, outliers_position=outliers_position))
 ######################################### PEAK STATISTICS (on processed Spectra)
 # This function computes the peak statistics onto a selected spectra dataset (or to the provided peaks), both when the spectra belong to no (or one) class and more classes.
 peak_statistics <- function (spectra, peaks=NULL, SNR=3, class_list=NULL, class_in_file_name=TRUE, tof_mode="linear", spectra_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element_wise") {
-# Load the required libraries
+########## Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
-# Rename the trim function
+########## Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
-# Determine the number of classes
-if (length(class_list) == 0 | length(class_list) == 1 || is.null(class_list)) {
+########## Determine the number of classes
+if (length(class_list) == 0 || length(class_list) == 1 || is.null(class_list)) {
 number_of_classes <- 1
-}
-if (length(class_list) > 1) {
+} else if (length(class_list) > 1) {
 	number_of_classes <- length(class_list)
 }
-# Detect and Align Peaks
+########## Detect and Align Peaks
 if (is.null(peaks)) {
 	if (tof_mode == "linear") {
 		peaks <- detectPeaks(spectra, method="MAD", SNR=SNR, halfWindowSize=20)
@@ -765,69 +764,69 @@ signal_matrix <- intensityMatrix(peaks, spectra)
 #peak_vector <- as.numeric(names(signal_matrix))
 ############################################################## ONE CLASS
 if (number_of_classes == 1) {
-    ################################# FUNCTION for matrix APPLY (it will applied for each matrix column, for each peak)
-    peak_statistcs_function <- function (signal_matrix_column, signal_matrix) {
-        # Generate the output matrix row
-        peak_stat_matrix_row <- matrix (0, nrow=1, ncol=8)
-    	rownames(peak_stat_matrix_row) <- as.numeric(colnames(signal_matrix_column))
-    	colnames(peak_stat_matrix_row) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter")
-        # Start the calculation
-    	intensity_vector <- as.numeric(signal_matrix_column)
-    	if (remove_outliers == TRUE) {
-    		intensity_vector <- outliers_removal(intensity_vector)
-    		intensity_vector <- intensity_vector$vector
-    	}
-    	# Calculate the statistical parameters on the intensity values in the vector
-    	# Normality
-    	if (length(intensity_vector) >= 3 & length(intensity_vector) <= 5000) {
-    		shapiro_test <- shapiro.test(intensity_vector)
-    			if (shapiro_test$p.value < 0.05) {
-    			distribution_type <- "Non-normal"
-    			}
-    			if (shapiro_test$p.value >= 0.05) {
-    			distribution_type <- "Normal"
-    			}
-    	}
-    	if (length(intensity_vector) < 3) {
-    		distribution_type <- "Not determinable, number of samples too low"
-    	}
-    	if (length(intensity_vector) > 5000) {
-    		distribution_type <- "Number of samples too high, assume it is normal"
-    	}
-    	# Other parameters
-    	st_dev_intensity <- sd(intensity_vector)
-    	summary_intensity_vector <- summary(intensity_vector)
-    	mean_intensity <- summary_intensity_vector [4]
-    	coeff_variation <- (st_dev_intensity / mean_intensity) *100
-    	median_intensityensity <- summary_intensity_vector [3]
-    	first_quartile <- summary_intensity_vector [2]
-    	third_quartile <- summary_intensity_vector [5]
-    	inter_quartile_range <- third_quartile - first_quartile
-    	spectra_counter <- length(intensity_vector)
-    	# Fill the matrix with the values
-    	peak_stat_matrix_row [,1] <- distribution_type
-    	peak_stat_matrix_row [,2] <- as.numeric(mean_intensity)
-    	peak_stat_matrix_row [,3] <- as.numeric(st_dev_intensity)
-    	peak_stat_matrix_row [,4] <- as.numeric(coeff_variation)
-    	peak_stat_matrix_row [,5] <- as.numeric(median_intensityensity)
-    	peak_stat_matrix_row [,6] <- as.numeric(inter_quartile_range)
-    	peak_stat_matrix_row [,7] <- paste("1st quartile", first_quartile, "; 3rd quartile", third_quartile)
-    	peak_stat_matrix_row [,8] <- as.numeric(spectra_counter)
-        return (peak_stat_matrix_row)
-    }
-    ###############
+	################################# FUNCTION for matrix APPLY (it will applied for each matrix column, for each peak)
+	peak_statistcs_function <- function (signal_matrix_column, signal_matrix) {
+		# Generate the output matrix row
+		peak_stat_matrix_row <- matrix (0, nrow=1, ncol=8)
+		rownames(peak_stat_matrix_row) <- as.numeric(colnames(signal_matrix_column))
+		colnames(peak_stat_matrix_row) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter")
+		# Start the calculation
+		intensity_vector <- as.numeric(signal_matrix_column)
+		if (remove_outliers == TRUE) {
+			intensity_vector <- outliers_removal(intensity_vector)
+			intensity_vector <- intensity_vector$vector
+		}
+		# Calculate the statistical parameters on the intensity values in the vector
+		# Normality
+		if (length(intensity_vector) >= 3 & length(intensity_vector) <= 5000) {
+			shapiro_test <- shapiro.test(intensity_vector)
+			if (shapiro_test$p.value < 0.05) {
+				distribution_type <- "Non-normal"
+			}
+			if (shapiro_test$p.value >= 0.05) {
+				distribution_type <- "Normal"
+			}
+		}
+		if (length(intensity_vector) < 3) {
+			distribution_type <- "Not determinable, number of samples too low"
+		}
+		if (length(intensity_vector) > 5000) {
+			distribution_type <- "Number of samples too high, assume it is normal"
+		}
+		# Other parameters
+		st_dev_intensity <- sd(intensity_vector)
+		summary_intensity_vector <- summary(intensity_vector)
+		mean_intensity <- summary_intensity_vector [4]
+		coeff_variation <- (st_dev_intensity / mean_intensity) *100
+		median_intensityensity <- summary_intensity_vector [3]
+		first_quartile <- summary_intensity_vector [2]
+		third_quartile <- summary_intensity_vector [5]
+		inter_quartile_range <- third_quartile - first_quartile
+		spectra_counter <- length(intensity_vector)
+		# Fill the matrix with the values
+		peak_stat_matrix_row [,1] <- distribution_type
+		peak_stat_matrix_row [,2] <- as.numeric(mean_intensity)
+		peak_stat_matrix_row [,3] <- as.numeric(st_dev_intensity)
+		peak_stat_matrix_row [,4] <- as.numeric(coeff_variation)
+		peak_stat_matrix_row [,5] <- as.numeric(median_intensityensity)
+		peak_stat_matrix_row [,6] <- as.numeric(inter_quartile_range)
+		peak_stat_matrix_row [,7] <- paste("1st quartile", first_quartile, "; 3rd quartile", third_quartile)
+		peak_stat_matrix_row [,8] <- as.numeric(spectra_counter)
+		return (peak_stat_matrix_row)
+	}
+	###############
 	# Fix the signal_matrix (Add the sample column)
 	signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, spectra_format=spectra_format, sample_output=TRUE, class_output=FALSE)
 	# Output matrix
 	peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-1), ncol=9)
 	rownames(peak_stat_matrix) <- as.numeric(colnames(signal_matrix)[1:(ncol(signal_matrix)-1)])
 	colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter", "Sample")
-    # Only peaks
-    signal_matrix_peaks <- signal_matrix [,1:(ncol(signal_matrix)-1)]
-    # Apply the function (transpose the result matrix)
-    peak_stat_matrix <- t(apply(signal_matrix_peaks, MARGIN=2, FUN=function(x) peak_statistcs_function(x, signal_matrix)))
-    # Fix the column names
-    colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter")
+	# Only peaks
+	signal_matrix_peaks <- signal_matrix [,1:(ncol(signal_matrix)-1)]
+	# Apply the function (transpose the result matrix)
+	peak_stat_matrix <- t(apply(signal_matrix_peaks, MARGIN=2, FUN=function(x) peak_statistcs_function(x, signal_matrix)))
+	# Fix the column names
+	colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter")
 }
 ############################################################ TWO OR MORE CLASSES
 # Every variable now is a list, each element of which corresponds to a certain value from a class
@@ -5301,16 +5300,16 @@ return (list(training_dataset = training_dataset, testDataset = test_dataset))
 ############################################################## FEATURE SELECTION
 # This function runs the feature selection algorithm onto the peaklist matrix, returning the peaklist without the redundant/non-informative features, the original peaklist and the list of selected features.
 # The function allows for the use of several feature selection algorithms
-feature_selection <- function (peaklist, feature_selection_method="rfe", features_to_select=20, selection_method="pls", correlation_method="pearson", correlation_threshold=0.75, cv_repeats_control=5, k_fold_cv_control=10, discriminant_attribute="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE, generate_plots=TRUE) {
+feature_selection <- function (peaklist, feature_selection_method="rfe", features_to_select=20, selection_method="pls", correlation_method="pearson", correlation_threshold=0.75, auc_threshold=0.7, cv_repeats_control=5, k_fold_cv_control=10, discriminant_attribute="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE, generate_plots=TRUE) {
 # Load the required libraries
-install_and_load_required_packages(c("caret", "pls", "stats", "doMC"))
+install_and_load_required_packages(c("caret", "pls", "stats", "doMC", "randomForest", "pROC"))
 ##### MULTICORE
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
 cpu_core_number <- cpu_thread_number/2
 # Register the foreach backend
 registerDoMC(cores = cpu_core_number)
-########################################################### RFE MODEL (with PLS)
+########################################################### RFE MODEL
 if (feature_selection_method == "rfe" || feature_selection_method == "recursive feature elimination") {
 	rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control)
 	# The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
@@ -5426,8 +5425,47 @@ if (feature_selection_method == "importance") {
 	# Predictors
 	predictors_feature_selection <- feature_importance_df$Features [1:features_to_select]
 }
+########################################################################### ROC
+if (feature_selection_method == "ROC" || feature_selection_method == "roc") {
+	feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
+	# List of important features
+	features_ROC <- character()
+	##### Automatically select features
+	if (automatically_select_features == TRUE) {
+		# For each feature, calculate the impact on the classification capability by computing a ROC
+		for (feature in feature_list){
+			# Compute the ROC of the feature
+			feature_ROC <- roc(response=peaklist[,discriminant_attribute], predictor=peaklist[,feature])
+			# Extract the AUC
+			feature_ROC_AUC <- feature_ROC$auc
+			# Keep the feature if with a great impact
+			if (feature_ROC_AUC >= auc_threshold) {
+				features_ROC <- append(features_ROC, feature)
+			}
+		}
+	} else {
+		##### Select the most N important features
+		# For each feature, calculate the impact on the classification capability by computing a ROC
+		feature_ROC_vector <- numeric(length=length(feature_list))
+		names(feature_ROC_vector) <- feature_list
+		for (f in 1:length(feature_list)) {
+			# Compute the ROC of the feature
+			feature_ROC <- roc(response=peaklist[,discriminant_attribute], predictor=peaklist[,feature_list[f]])
+			# Append the AUC to a vector
+			feature_ROC_vector[f] <- feature_ROC$auc
+		}
+		# Sort the vector
+		feature_ROC_vector_sorted <- sort(feature_ROC_vector, decreasing=TRUE)
+		# Take the first N features
+		features_ROC <- names(feature_ROC_vector_sorted)[1:features_to_select]
+	}
+	# Predictors
+	predictors_feature_selection <- features_ROC
+}
 ########################################################################## Plot
 if (generate_plots == TRUE) {
+	# Initialize
+	feature_selection_graphics <- NULL
 	if (feature_selection_method == "rfe" || feature_selection_method == "recursive feature elimination") {
 		feature_selection_graphics <- plot(rfe_model, type=c("g","o"))
 	}
@@ -5780,7 +5818,7 @@ if (pca == TRUE) {
 ###################################################### SVM TUNING AND VALIDATION
 # This function operates the tuning of the Support Vector Machine (SVM), by testing all the parameters of the SVM (choosing them from a list provided by the user) and selecting the best.
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
-svm_tuning_and_validation2 <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), autotuning=TRUE, tuning_parameters=list(sigma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, scale=1, kernel="radial"), k_fold_cv=10, repeats_cv=2, parameters=list(sigma=0.001, scale=1, gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial"), positive_class_cv="HP", seed=NULL, evaluation_method="Accuracy") {
+svm_tuning_and_validation2 <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), autotuning=TRUE, tuning_parameters=list(sigma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, scale=1, kernel="radial"), k_fold_cv=10, repeats_cv=2, preprocessing=c("scale","center"), parameters=list(sigma=0.001, scale=1, gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial"), positive_class_cv="HP", seed=NULL, evaluation_method="Accuracy") {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "kernlab", "e1071", "doMC", "pROC"))
 ##### MULTICORE
@@ -5798,30 +5836,30 @@ if (autotuning == TRUE) {
 		set.seed(seed)
 	}
 	# Define the control function for training
-	training_ctrl <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv, summaryFunction=twoClassSummary, classProbs=TRUE)
+	training_ctrl <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv, classProbs=TRUE) #, summaryFunction=twoClassSummary)
 	# Train and tune the model
 	if (tuning_parameters$kernel == "radial") {
 		if (!is.null(tuning_parameters$sigma)) {
 			# Define the tune grid for the model
 			svm_tune_grid <- expand.grid(sigma=tuning_parameters$sigma, C=tuning_parameters$cost)
 			# Training and tuning
-			svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmRadial", preProc = c("center","scale"), metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
+			svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmRadial", preProcess = preprocessing, metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
 		} else {
 			# Define the tune grid for the model
 			svm_tune_grid <- expand.grid(C=tuning_parameters$cost)
 			# Training and tuning
-			svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmRadialCost", preProc = c("center","scale"), metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
+			svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmRadialCost", preProcess = preprocessing, metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
 		}
 	} else if (tuning_parameters$kernel == "polynomial") {
 		# Define the tune grid for the model
 		svm_tune_grid <- expand.grid(scale=tuning_parameters$scale, C=tuning_parameters$cost, degree=tuning_parameters$degree)
 		# Training and tuning
-		svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmPoly", preProc = c("center","scale"), metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
+		svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmPoly", preProcess = preprocessing, metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
 	} else if (tuning_parameters$kernel == "linear") {
 		# Define the tune grid for the model
 		svm_tune_grid <- expand.grid(cost=tuning_parameters$cost, gamma=tuning_parameters$gamma)
 		# Training and tuning
-		svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmLinear2", preProc = c("center","scale"), metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
+		svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmLinear2", preProcess = preprocessing, metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
 	}
 	# Extract the cross-validation information
 	cv_svm_model <- confusionMatrix(svm_tuning)
@@ -5847,30 +5885,30 @@ if (autotuning == FALSE || is.null(tuning_parameters) || length(tuning_parameter
 		set.seed(seed)
 	}
 	# Define the control function for training
-	training_ctrl <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv, summaryFunction=twoClassSummary, classProbs=TRUE)
+	training_ctrl <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv, classProbs=TRUE) #, summaryFunction=twoClassSummary)
 	# Train the model
 	if (tuning_parameters$kernel == "radial") {
 		if (!is.null(tuning_parameters$sigma)) {
 			# Define the tune grid for the model
 			svm_tune_grid <- expand.grid(sigma=parameters$sigma, C=parameters$cost)
 			# Training and tuning
-			svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmRadial", preProc = c("center","scale"), metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
+			svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmRadial", preProcess = preprocessing, metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
 		} else {
 			# Define the tune grid for the model
 			svm_tune_grid <- expand.grid(C=parameters$cost)
 			# Training and tuning
-			svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmRadialCost", preProc = c("center","scale"), metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
+			svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmRadialCost", preProcess = preprocessing, metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
 		}
 	} else if (tuning_parameters$kernel == "polynomial") {
 		# Define the tune grid for the model
 		svm_tune_grid <- expand.grid(scale=parameters$scale, C=parameters$cost, degree=parameters$degree)
 		# Training and tuning
-		svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmPoly", preProc = c("center","scale"), metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
+		svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmPoly", preProcess = preprocessing, metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
 	} else if (tuning_parameters$kernel == "linear") {
 		# Define the tune grid for the model
 		svm_tune_grid <- expand.grid(cost=parameters$cost, gamma=parameters$gamma)
 		# Training and tuning
-		svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmLinear2", preProc = c("center","scale"), metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
+		svm_tuning <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="svmLinear2", preProcess = preprocessing, metric=evaluation_method, trControl=training_ctrl, tuneGrid=svm_tune_grid)
 	}
 	# Extract the cross-validation information
 	cv_svm_model <- confusionMatrix(svm_tuning)
@@ -5937,7 +5975,7 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 ###################################################### PLS TUNING AND VALIDATION
 # This function operates the training of a Partial Least Squares (PLS) model, by testing all the parameters of the PLS and selecting the best (in terms of accuracy). The tuning is performed via cross-validation onto the training dataset.
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
-pls_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(ncomp=1:5), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximise_selection_criteria_values=TRUE) {
+pls_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(ncomp=1:5), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximize_selection_criteria_values=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "e1071", "doMC"))
 ##### MULTICORE
@@ -5960,7 +5998,7 @@ if (!is.null(seed)) {
 	# Make the randomness reproducible
 	set.seed(seed)
 }
-pls_model <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="pls", trControl=train_control_pls, preProcess=preprocessing, metric=selection_criteria, maximize=maximise_selection_criteria_values, tuneGrid=tune_grid)
+pls_model <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="pls", trControl=train_control_pls, preProcess=preprocessing, metric=selection_criteria, maximize=maximize_selection_criteria_values, tuneGrid=tune_grid)
 # Output the parameters
 pls_performances <- pls_model$results
 # Plots
@@ -6021,7 +6059,7 @@ return (list(model=pls_model, classification_results=classification_results_pls,
 ################################### NAIVE BAYES CLASSIFIER TUNING AND VALIDATION
 # This function operates the training of a Naive Bayes Classifier (NBC) model, by testing all the parameters of the NBC and selecting the best (in terms of accuracy). The tuning is performed via cross-validation onto the training dataset.
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
-nbc_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(fL=NULL,usekernel=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximise_selection_criteria_values=TRUE) {
+nbc_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(fL=NULL,usekernel=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximize_selection_criteria_values=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "e1071", "doMC", "klaR", "MASS"))
 ##### MULTICORE
@@ -6044,7 +6082,7 @@ if (is.null(tuning_parameters) || is.null(tuning_parameters$fL) && is.null(tunin
 if (!is.null(seed)) {
 	set.seed(seed)
 }
-nbc_model <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="nb", trControl=train_control_nbc, preProcess=preprocessing, metric=selection_criteria, maximize=maximise_selection_criteria_values, tuneGrid=tune_grid)
+nbc_model <- train(x=peaklist_training [,!(names(peaklist_training) %in% non_features)], y=factor(peaklist_training$Class), method="nb", trControl=train_control_nbc, preProcess=preprocessing, metric=selection_criteria, maximize=maximize_selection_criteria_values, tuneGrid=tune_grid)
 # Output the parameters
 nbc_performances <- nbc_model$results
 # Plots
@@ -6105,15 +6143,15 @@ return (list(model=nbc_model, classification_results=classification_results_nbc,
 ################################################# ENSEMBLE TUNING AND VALIDATION
 # This function operates the tuning of the ensemble classifier, by relying upon other functions to train, tune and validate the individual classifiers.
 # It returns the best models in terms of classification performances, along with their parameters and performances (cross-validation or external validation, according to if an external dataset is provided).
-ensemble_tuning_and_validation <- function(peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), classifiers=c("svm","pls","bayes"), autotuning=TRUE,  classifier_parameters=list(svm=list(gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial"), pls=data.frame(ncomp=1:5), bayes=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria=data.frame(pls="Accuracy",bayes="Accuracy"), maximise_selection_criteria_values=data.frame(pls=TRUE,bayes=TRUE)) {
+ensemble_tuning_and_validation <- function(peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), classifiers=c("svm","pls","bayes"), autotuning=TRUE,  classifier_parameters=list(svm=list(gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial"), pls=data.frame(ncomp=1:5), bayes=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria=data.frame(pls="Accuracy",bayes="Accuracy"), maximize_selection_criteria_values=data.frame(pls=TRUE,bayes=TRUE)) {
 	if ("svm" %in% classifiers || "SVM" %in% classifiers) {
 		svm_classifier <- svm_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, autotuning=autotuning, tuning_parameters=classifier_parameters$svm, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, parameters=classifier_parameters$svm, positive_class_cv=positive_class_cv, seed=seed, pca=FALSE, numer_of_components=3)
 	}
 	if ("pls" %in% classifiers || "PLS" %in% classifiers) {
-		pls_classifier <- pls_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, tuning_parameters=classifier_parameters$pls, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, positive_class_cv="HP", seed=seed, preprocessing=preprocessing, selection_criteria=as.character(selection_criteria$pls), maximise_selection_criteria_values=maximise_selection_criteria_values$pls)
+		pls_classifier <- pls_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, tuning_parameters=classifier_parameters$pls, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, positive_class_cv="HP", seed=seed, preprocessing=preprocessing, selection_criteria=as.character(selection_criteria$pls), maximize_selection_criteria_values=maximize_selection_criteria_values$pls)
 	}
 	if ("bayes" %in% classifiers || "Bayes" %in% classifiers) {
-		bayes_classifier <- nbc_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, tuning_parameters=classifier_parameters$bayes, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, positive_class_cv=positive_class_cv, seed=seed, preprocessing=preprocessing, selection_criteria=as.character(selection_criteria$bayes), maximise_selection_criteria_values=maximise_selection_criteria_values$bayes)
+		bayes_classifier <- nbc_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, tuning_parameters=classifier_parameters$bayes, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, positive_class_cv=positive_class_cv, seed=seed, preprocessing=preprocessing, selection_criteria=as.character(selection_criteria$bayes), maximize_selection_criteria_values=maximize_selection_criteria_values$bayes)
 	}
 	return(list(svm_classifier=svm_classifier, pls_classifier=pls_classifier, bayes_classifier=bayes_classifier))
 }
