@@ -1,14 +1,21 @@
-############################ PEAK STATISTICS 2016.02.17
+############################ PEAK STATISTICS 2016.05.11
 
-# Update packages and load the required packages
-update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
+############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
 install_and_load_required_packages(c("tcltk", "xlsx", "parallel"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
 
 
 
+# Update packages and load the required packages
+update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
 
-###################################### Initialise the variables (default values)
+
+
+
+
+
+
+###################################### Initialize the variables (default values)
 filepath_import <- NULL
 tof_mode <- "linear"
 filepath_export <- NULL
@@ -87,12 +94,28 @@ set_file_name <- function() {
 
 ##### Samples
 select_samples_function <-function() {
-	filepath_import_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\nIf there are imzML files in the folder, each one of them should contain spectra from the same class.\nIf there are subfolders, each one of them should contain spectra from the same class as imzML files.", icon = "info")
-	filepath_import <- tclvalue(tkchooseDirectory())
-	if (!nchar(filepath_import)) {
-	    tkmessageBox(message = "No folder selected")
-	}	else {
-	    tkmessageBox(message = paste("The sample spectra will be read from:", filepath_import))
+	########## Prompt if a folder has to be selected or a single file
+	# Catch the value from the popping out menu
+	spectra_input_type <- select.list(c("file","folder"), title="Folder or file?")
+	if (spectra_input_type == "") {
+		spectra_input_type <- "file"
+	}
+	if (spectra_input_type == "folder") {
+		filepath_import_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be imported.\nIf there are imzML files in the folder, each one of them should contain spectra from the same class.\nIf there are subfolders, each one of them should contain spectra from the same class as imzML files.", icon = "info")
+		filepath_import <- tclvalue(tkchooseDirectory())
+		if (!nchar(filepath_import)) {
+		    tkmessageBox(message = "No folder selected")
+		}	else {
+		    tkmessageBox(message = paste("The sample spectra will be read from:", filepath_import))
+		}
+	} else if (spectra_input_type == "file") {
+		filepath_import_select <- tkmessageBox(title = "Samples", message = "Select the file for the spectra to be imported.", icon = "info")
+		filepath_import <- tclvalue(tkgetOpenFile())
+		if (!nchar(filepath_import)) {
+		    tkmessageBox(message = "No file selected")
+		}	else {
+		    tkmessageBox(message = paste("The sample spectra will be read from:", filepath_import))
+		}
 	}
 	# Set the value for displaying purposes
 	filepath_import_value <- filepath_import
@@ -139,6 +162,13 @@ import_spectra_function <- function() {
 		spectra <- importBrukerFlex(filepath_import)
 	}
 	if (spectra_format == "imzml" | spectra_format == "imzML") {
+		### Fix the name, if the ibd file was selected instead of the imzML
+		if (length(grep(".ibd",filepath_import)) != 0) {
+			# Split the filepath
+			filepath_splitted <- unlist(strsplit(filepath_import, ".ibd"))
+			# Rebuild the imzML filename
+			filepath_import <- paste(filepath_splitted, ".imzML", sep="")
+		}
 		### Load the spectra
 		spectra <- importImzMl(filepath_import)
 	}
@@ -217,23 +247,23 @@ run_peak_statistics_function <- function() {
 		} else if (tof_mode == "reflectron" || tof_mode == "reflector") {
 			tolerance_ppm <- 200
 		}
-        ### Run the peak statistics function
-        peak_statistics_results <- peak_statistics(spectra, peaks, class_list=class_list, class_in_file_name=TRUE, tof_mode=tof_mode, spectra_format=spectra_format, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_threshold_percent, remove_outliers=TRUE, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_percentage_threshold, intensity_threshold_method=intensity_threshold_method)
-        # Save the files (CSV)
+	### Run the peak statistics function
+	peak_statistics_results <- peak_statistics(spectra, peaks, class_list=class_list, class_in_file_name=TRUE, tof_mode=tof_mode, spectra_format=spectra_format, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_threshold_percent, remove_outliers=TRUE, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_percentage_threshold, intensity_threshold_method=intensity_threshold_method)
+	# Save the files (CSV)
 		if (file_type_export == "csv") {
 			filename <- set_file_name()
 			    write.csv(peak_statistics_results, file=filename)
 		} else if (file_type_export == "xlsx" || file_type_export == "xls") {
-            # Save the files (Excel)
-			filename <- set_file_name()
-            peak_statistics_results <- as.data.frame(peak_statistics_results)
-            # Generate unique row names
-            unique_row_names <- make.names(rownames(peak_statistics_results), unique=TRUE)
-            rownames(peak_statistics_results) <- unique_row_names
-            # Export
-            write.xlsx(x=peak_statistics_results, file=filename, sheetName="Peak statistics", row.names=TRUE)
-        }
-        ### Messagebox
+		# Save the files (Excel)
+		filename <- set_file_name()
+		peak_statistics_results <- as.data.frame(peak_statistics_results)
+		# Generate unique row names
+		unique_row_names <- make.names(rownames(peak_statistics_results), unique=TRUE)
+		rownames(peak_statistics_results) <- unique_row_names
+		# Export
+		write.xlsx(x=peak_statistics_results, file=filename, sheetName="Peak statistics", row.names=TRUE)
+	}
+	### Messagebox
 		tkmessageBox(title = "Done!", message = "The peak statistics file has been dumped!", icon = "info")
 	} else if (is.null(spectra) || is.null(peaks)) {
 		### Messagebox
@@ -426,8 +456,8 @@ window <- tktoplevel()
 tktitle(window) <- "Peak statistics"
 #### Browse
 # Library
-select_samples_label <- tklabel(window, text="Select the folder containing the spectra files")
-select_samples_button <- tkbutton(window, text="Browse spectra folder", command=select_samples_function)
+select_samples_label <- tklabel(window, text="Select the file/folder containing the spectra")
+select_samples_button <- tkbutton(window, text="Browse spectra...", command=select_samples_function)
 # Output
 select_output_label <- tklabel(window, text="Select the folder where to save all the outputs")
 browse_output_button <- tkbutton(window, text="Browse output folder", command=browse_output_function)
