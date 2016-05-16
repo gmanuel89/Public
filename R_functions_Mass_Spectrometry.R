@@ -5299,8 +5299,8 @@ return (list(training_dataset = training_dataset, testDataset = test_dataset))
 
 ############################################################## FEATURE SELECTION
 # This function runs the feature selection algorithm onto the peaklist matrix, returning the peaklist without the redundant/non-informative features, the original peaklist and the list of selected features.
-# The function allows for the use of several feature selection algorithms
-feature_selection <- function (peaklist, feature_selection_method="rfe", features_to_select=20, selection_method="pls", correlation_method="pearson", correlation_threshold=0.75, auc_threshold=0.7, cv_repeats_control=5, k_fold_cv_control=10, discriminant_attribute="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE, generate_plots=TRUE) {
+# The function allows for the use of several feature selection algorithms.
+feature_selection <- function (peaklist, feature_selection_method="rfe", features_to_select=20, selection_method="pls", selection_metric="Accuracy", correlation_method="pearson", correlation_threshold=0.75, auc_threshold=0.7, cv_repeats_control=5, k_fold_cv_control=10, discriminant_attribute="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE, generate_plots=TRUE, preprocessing=c("center", "scale")) {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "pls", "stats", "doMC", "randomForest", "pROC"))
 ##### MULTICORE
@@ -5319,95 +5319,126 @@ if (feature_selection_method == "rfe" || feature_selection_method == "recursive 
 		if (selection_method != "") {
 			# Define the feature subset sizes
 			subset_sizes <- seq(2, features_to_select, by=1)
+			# Set the seeds (for each resampling iteration in the cv)
+			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
+			seeds <- vector(mode = "list", length=number_of_iterations)
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
 				# Make the randomness reproducible
 				set.seed(seed)
 			}
-			# Set the seeds (for each resampling iteration in the cv)
-			seeds <- vector(mode = "list", length=51)
-			for (s in 1:50) {
+			for (s in 1:(number_of_iterations-1)) {
 				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace=TRUE)
 			}
-			seeds[51] <- sample.int(nrow(peaklist), 1)
+			# Plant the seed only if a specified value is entered
+			if (!is.null(seed)) {
+				# Make the randomness reproducible
+				set.seed(seed)
+			}
+			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
 			# Define the control function of the RFE
 			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails=TRUE)
 			# Run the RFE
-			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method)
+			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess=preprocessing)
 			# Variable importance
-			variable_importance <- varImp(rfe_model)
+			variable_importance <- varImp(rfe_model$fit)
+			# Feature weights
+			feature_weights <- rfe_model$fit
 		} else {
 			# Define the feature subset sizes
 			subset_sizes <- seq(2, features_to_select, by=1)
+			# Set the seeds (for each resampling iteration in the cv)
+			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
+			seeds <- vector(mode = "list", length=number_of_iterations)
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
 				# Make the randomness reproducible
 				set.seed(seed)
 			}
-			# Set the seeds (for each resampling iteration in the cv)
-			seeds <- vector(mode = "list", length=51)
-			for (s in 1:50) {
+			for (s in 1:(number_of_iterations-1)) {
 				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace=TRUE)
 			}
-			seeds[51] <- sample.int(nrow(peaklist), 1)
+			# Plant the seed only if a specified value is entered
+			if (!is.null(seed)) {
+				# Make the randomness reproducible
+				set.seed(seed)
+			}
+			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
 			# Define the control function of the RFE
 			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails=TRUE)
 			# Run the RFE
-			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl)
+			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess=preprocessing)
 			# Variable importance
-			variable_importance <- varImp(rfe_model)
+			variable_importance <- varImp(rfe_model$fit)
+			# Feature weights
+			feature_weights <- rfe_model$fit
 		}
 		# Output the best predictors after the RFE
 		predictors_rfe <- predictors(rfe_model)
 	} else {
+		############# NO AUTOMATIC DETERMINATION
 		if (selection_method != "") {
 			# Define the feature subset sizes
 			subset_sizes <- features_to_select
+			# Set the seeds (for each resampling iteration in the cv)
+			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
+			seeds <- vector(mode = "list", length=number_of_iterations)
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
 				# Make the randomness reproducible
 				set.seed(seed)
 			}
-			# Set the seeds (for each resampling iteration in the cv)
-			seeds <- vector(mode = "list", length=51)
-			for (s in 1:50) {
+			for (s in 1:(number_of_iterations-1)) {
 				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace=TRUE)
 			}
-			seeds[51] <- sample.int(nrow(peaklist), 1)
+			# Plant the seed only if a specified value is entered
+			if (!is.null(seed)) {
+				# Make the randomness reproducible
+				set.seed(seed)
+			}
+			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
 			# Define the control function of the RFE
 			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails=TRUE)
 			# Run the RFE
-			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method)
+			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess=preprocessing)
 			# Variable importance
-			variable_importance <- varImp(rfe_model)
+			variable_importance <- varImp(rfe_model$fit)
+			# Feature weights
+			feature_weights <- rfe_model$fit
 		} else {
 			# Define the feature subset sizes
 			subset_sizes <- features_to_select
+			# Set the seeds (for each resampling iteration in the cv)
+			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
+			seeds <- vector(mode = "list", length=number_of_iterations)
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
 				# Make the randomness reproducible
 				set.seed(seed)
 			}
-			# Set the seeds (for each resampling iteration in the cv)
-			seeds <- vector(mode = "list", length=51)
-			for (s in 1:50) {
+			for (s in 1:(number_of_iterations-1)) {
 				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace=TRUE)
 			}
-			seeds[51] <- sample.int(nrow(peaklist), 1)
+			# Plant the seed only if a specified value is entered
+			if (!is.null(seed)) {
+				# Make the randomness reproducible
+				set.seed(seed)
+			}
+			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
 			# Define the control function of the RFE
 			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails=TRUE)
 			# Run the RFE
-			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl)
+			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess=preprocessing)
 			# Variable importance
-			variable_importance <- varImp(rfe_model)
+			variable_importance <- varImp(rfe_model$fit)
+			# Feature weights
+			feature_weights <- rfe_model$fit
 		}
 		# Output the best predictors after the RFE
 		predictors_rfe <- predictors (rfe_model) [1:features_to_select]
 	}
 	# Predictors
 	predictors_feature_selection <- predictors_rfe
-	# Feature weights
-	feature_weights <- rfe_model$fit
 }
 ######################################################################### ANOVA
 if (feature_selection_method == "ANOVA") {
@@ -5889,7 +5920,7 @@ if (autotuning == TRUE) {
 		set.seed(seed)
 	}
 	# Define the control function for training
-	training_ctrl <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv, classProbs=TRUE) #, summaryFunction=twoClassSummary)
+	training_ctrl <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv, classProbs=TRUE)#, seeds=seeds) #, summaryFunction=twoClassSummary)
 	# Train and tune the model
 	if (tuning_parameters$kernel == "radial") {
 		if (!is.null(tuning_parameters$sigma)) {
@@ -5938,7 +5969,7 @@ if (autotuning == FALSE || is.null(tuning_parameters) || length(tuning_parameter
 		set.seed(seed)
 	}
 	# Define the control function for training
-	training_ctrl <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv, classProbs=TRUE) #, summaryFunction=twoClassSummary)
+	training_ctrl <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv, classProbs=TRUE)#, seeds=seeds) #, summaryFunction=twoClassSummary)
 	# Train the model
 	if (tuning_parameters$kernel == "radial") {
 		if (!is.null(tuning_parameters$sigma)) {
