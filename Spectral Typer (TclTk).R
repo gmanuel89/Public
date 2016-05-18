@@ -1,4 +1,4 @@
-################ SPECTRAL TYPER PROGRAM 2016.03.30
+################ SPECTRAL TYPER PROGRAM 2016.05.18
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 install_and_load_required_packages(c("tcltk", "xlsx", "ggplot2"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
@@ -29,6 +29,7 @@ spectra_format <- "brukerflex"
 score_only <- FALSE
 spectra_path_output <- TRUE
 peak_picking_mode <- "all"
+peak_picking_algorithm <- "MAD"
 similarity_criteria <- "correlation"
 signal_intensity_evaluation <- "intensity percentage"
 file_type_export <- "xlsx"
@@ -49,6 +50,7 @@ low_intensity_peaks_removal_value <- "NO"
 score_only_value <- "NO"
 spectra_path_output_value <- "YES"
 similarity_criteria_value <- "correlation"
+peak_picking_algorithm_value <- "        MAD        "
 peak_picking_mode_value <- "all"
 tof_mode_value <- "linear"
 intensity_threshold_method_value <- "element-wise"
@@ -308,6 +310,26 @@ import_spectra_function <- function() {
 	}
 }
 
+##### Peak picking mode
+peak_picking_mode_choice <- function() {
+	# Catch the value from the menu
+	peak_picking_mode <- select.list(c("all","most intense"), title="Choose")
+	# Default
+	if (peak_picking_mode == "") {
+		peak_picking_mode <- "all"
+	}
+	# Set the value of the displaying label
+	peak_picking_mode_value <- peak_picking_mode
+	if (peak_picking_mode_value == "all") {
+		peak_picking_mode_value <- "        all        "
+	}
+	peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value)
+	tkgrid(peak_picking_mode_value_label, row=2, column=5)
+	# Escape the function
+	.GlobalEnv$peak_picking_mode <- peak_picking_mode
+	.GlobalEnv$peak_picking_mode_value <- peak_picking_mode_value
+}
+
 ##### Peak picking function
 peak_picking_function <- function() {
 	############ Do not run if the spectra have not been imported
@@ -321,18 +343,12 @@ peak_picking_function <- function() {
 		SNR <- tclvalue(SNR)
 		SNR <- as.numeric(SNR)
 		SNR_value <- as.character(SNR)
-		# Define the halfWindowSize for peak picking
-		if (tof_mode == "linear") {
-			halfWindowSize <- 20
-		} else if (tof_mode == "reflector") {
-			halfWindowSize <- 5
-		}
 		if (peak_picking_mode == "most intense") {
 			peaks_database <- most_intense_signals(spectra_database, signals_to_take=signals_to_take, tof_mode=tof_mode)
 			peaks_test <- most_intense_signals(spectra_test, signals_to_take=signals_to_take)
 		} else if (peak_picking_mode == "all"){
-			peaks_database <- detectPeaks(spectra_database, method="MAD", SNR=SNR, halfWindowSize=halfWindowSize)
-			peaks_test <- detectPeaks(spectra_test, method="MAD", SNR=SNR, halfWindowSize=halfWindowSize)
+			peaks_database <- peak_picking(spectra_database, peak_picking_algorithm=peak_picking_algorithm, SNR=SNR, tof_mode=tof_mode)
+			peaks_test <- peak_picking(spectra_test, peak_picking_algorithm=peak_picking_algorithm, SNR=SNR, tof_mode=tof_mode)
 		}
 		# Exit the function and put the variable into the R workspace
 		.GlobalEnv$peaks_database <- peaks_database
@@ -378,6 +394,7 @@ run_spectral_typer_function <- function() {
 		score_correlation_matrix <- NULL
 		score_hca <- NULL
 		score_intensity_matrix <- NULL
+		score_si_matrix <- NULL
 		############### CORRELATION
 		if (similarity_criteria == "correlation") {
 			score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_correction_coefficient=intensity_correction_coefficient, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only)
@@ -564,24 +581,26 @@ signal_intensity_evaluation_choice <- function() {
 	tkgrid(signal_intensity_evaluation_value_label, row=4, column=6)
 }
 
-##### Peak picking mode
-peak_picking_mode_choice <- function() {
+##### Peak picking algorithm
+peak_picking_algorithm_choice <- function() {
 	# Catch the value from the menu
-	peak_picking_mode <- select.list(c("all","most intense"), title="Choose")
+	peak_picking_algorithm <- select.list(c("MAD","SuperSmoother"), title="Choose")
 	# Default
-	if (peak_picking_mode == "") {
-		peak_picking_mode <- "all"
+	if (peak_picking_algorithm == "") {
+		peak_picking_algorithm <- "MAD"
 	}
 	# Set the value of the displaying label
-	peak_picking_mode_value <- peak_picking_mode
-	if (peak_picking_mode_value == "all") {
-		peak_picking_mode_value <- "        all        "
+	peak_picking_algorithm_value <- peak_picking_algorithm
+	if (peak_picking_algorithm_value == "MAD") {
+		peak_picking_algorithm_value <- "          MAD          "
+	} else if (peak_picking_algorithm_value == "SuperSmoother") {
+		peak_picking_algorithm_value <- "Super Smoother"
 	}
-	peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value)
-	tkgrid(peak_picking_mode_value_label, row=5, column=3)
+	peak_picking_algorithm_value_label <- tklabel(window, text=peak_picking_algorithm_value)
+	#tkgrid(peak_picking_algorithm_value_label, row=6, column=6)
 	# Escape the function
-	.GlobalEnv$peak_picking_mode <- peak_picking_mode
-	.GlobalEnv$peak_picking_mode_value <- peak_picking_mode_value
+	.GlobalEnv$peak_picking_algorithm <- peak_picking_algorithm
+	.GlobalEnv$peak_picking_algorithm_value <- peak_picking_algorithm_value
 }
 
 ##### Peaks filtering
@@ -859,7 +878,10 @@ signal_intensity_evaluation_label <- tklabel(window, text="Signal intensity eval
 signal_intensity_evaluation_entry <- tkbutton(window, text="Choose signal intensity\nevaluation method", command=signal_intensity_evaluation_choice)
 # Peak picking mode
 peak_picking_mode_label <- tklabel(window, text="Peak picking mode")
-peak_picking_mode_entry <- tkbutton(window, text="Choose pick picking\nmode", command=peak_picking_mode_choice)
+peak_picking_mode_entry <- tkbutton(window, text="Choose peak picking\nmode", command=peak_picking_mode_choice)
+# Peak picking mode
+peak_picking_algorithm_label <- tklabel(window, text="Peak picking algorithm")
+peak_picking_algorithm_entry <- tkbutton(window, text="Choose peak picking\nalgorithm", command=peak_picking_algorithm_choice)
 # Signals to take
 signals_to_take_label <- tklabel(window, text="Most intense signals to take\n(if 'most intense' is selected)")
 signals_to_take_entry <- tkentry(window, width=10, textvariable=signals_to_take)
@@ -973,6 +995,7 @@ tkgrid(peak_picking_mode_entry, row=5, column=2)
 tkgrid(peak_picking_mode_value_label, row=5, column=3)
 tkgrid(signals_to_take_label, row=5, column=4)
 tkgrid(signals_to_take_entry, row=5, column=5)
+tkgrid(peak_picking_algorithm_entry, row=5, column=6)
 tkgrid(SNR_label, row=6, column=2)
 tkgrid(SNR_entry, row=6, column=3)
 tkgrid(peaks_filtering_label, row=7, column=1)
