@@ -1,4 +1,4 @@
-############################ PEAK STATISTICS 2016.05.17
+############################ PEAK STATISTICS 2016.05.18
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
@@ -24,7 +24,7 @@ peaks_filtering <- TRUE
 low_intensity_peaks_removal <- FALSE
 intensity_threshold_method <- "element-wise"
 peak_picking_mode <- "all"
-peak_picking_method <- "MAD"
+peak_picking_algorithm <- "MAD"
 file_type_export <- "xlsx"
 spectra <- NULL
 peaks <- NULL
@@ -41,7 +41,7 @@ spectra_format_value <- "imzML"
 peaks_filtering_value <- "YES"
 low_intensity_peaks_removal_value <- "NO"
 peak_picking_mode_value <- "all"
-peak_picking_method_value <- "          MAD          "
+peak_picking_algorithm_value <- "          MAD          "
 intensity_threshold_method_value <- "element-wise"
 spectra_format_value <- "imzML"
 remove_outliers_value <- "NO"
@@ -198,16 +198,10 @@ peak_picking_function <- function() {
 		SNR <- tclvalue(SNR)
 		SNR <- as.numeric(SNR)
 		SNR_value <- as.character(SNR)
-		# Define the halfWindowSize for peak picking
-		if (tof_mode == "linear") {
-			halfWindowSize <- 20
-		} else if (tof_mode == "reflector") {
-			halfWindowSize <- 5
-		}
 		if (peak_picking_mode == "most intense") {
 			peaks <- most_intense_signals(spectra, signals_to_take=signals_to_take, tof_mode=tof_mode)
 		} else if (peak_picking_mode == "all"){
-			peaks <- detectPeaks(spectra, method=peak_picking_method, SNR=SNR, halfWindowSize=halfWindowSize)
+			peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, SNR=SNR, tof_mode=tof_mode)
 		}
 		# Exit the function and put the variable into the R workspace
 		.GlobalEnv$peaks <- peaks
@@ -249,7 +243,7 @@ run_peak_statistics_function <- function() {
 			tolerance_ppm <- 200
 		}
 	### Run the peak statistics function
-	peak_statistics_results <- peak_statistics(spectra, peaks, class_list=class_list, class_in_file_name=TRUE, tof_mode=tof_mode, spectra_format=spectra_format, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peak_picking_method=peak_picking_method, frequency_threshold_percent=peaks_filtering_threshold_percent, remove_outliers=TRUE, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_percentage_threshold, intensity_threshold_method=intensity_threshold_method)
+	peak_statistics_results <- peak_statistics(spectra, peaks, class_list=class_list, class_in_file_name=TRUE, tof_mode=tof_mode, spectra_format=spectra_format, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peak_picking_algorithm=peak_picking_algorithm, frequency_threshold_percent=peaks_filtering_threshold_percent, remove_outliers=TRUE, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_percentage_threshold, intensity_threshold_method=intensity_threshold_method)
 	# Save the files (CSV)
 		if (file_type_export == "csv") {
 			filename <- set_file_name()
@@ -292,26 +286,26 @@ peak_picking_mode_choice <- function() {
 	.GlobalEnv$peak_picking_mode_value <- peak_picking_mode_value
 }
 
-##### Peak picking method
-peak_picking_method_choice <- function() {
+##### Peak picking algorithm
+peak_picking_algorithm_choice <- function() {
 	# Catch the value from the menu
-	peak_picking_method <- select.list(c("MAD","SuperSmoother"), title="Choose")
+	peak_picking_algorithm <- select.list(c("MAD","SuperSmoother"), title="Choose")
 	# Default
-	if (peak_picking_method == "") {
-		peak_picking_method <- "MAD"
+	if (peak_picking_algorithm == "") {
+		peak_picking_algorithm <- "MAD"
 	}
 	# Set the value of the displaying label
-	peak_picking_method_value <- peak_picking_method
-	if (peak_picking_method_value == "MAD") {
-		peak_picking_method_value <- "          MAD          "
-	} else if (peak_picking_method_value == "SuperSmoother") {
-		peak_picking_method_value <- "Super Smoother"
+	peak_picking_algorithm_value <- peak_picking_algorithm
+	if (peak_picking_algorithm_value == "MAD") {
+		peak_picking_algorithm_value <- "          MAD          "
+	} else if (peak_picking_algorithm_value == "SuperSmoother") {
+		peak_picking_algorithm_value <- "Super Smoother"
 	}
-	peak_picking_method_value_label <- tklabel(window, text=peak_picking_method_value)
-	tkgrid(peak_picking_method_value_label, row=6, column=6)
+	peak_picking_algorithm_value_label <- tklabel(window, text=peak_picking_algorithm_value)
+	tkgrid(peak_picking_algorithm_value_label, row=6, column=6)
 	# Escape the function
-	.GlobalEnv$peak_picking_method <- peak_picking_method
-	.GlobalEnv$peak_picking_method_value <- peak_picking_method_value
+	.GlobalEnv$peak_picking_algorithm <- peak_picking_algorithm
+	.GlobalEnv$peak_picking_algorithm_value <- peak_picking_algorithm_value
 }
 
 ##### Peaks filtering
@@ -497,8 +491,8 @@ tkinsert(preprocess_spectra_in_packages_of_entry, "end", "200")
 peak_picking_mode_label <- tklabel(window, text="Peak picking mode")
 peak_picking_mode_entry <- tkbutton(window, text="Choose pick picking\nmode", command=peak_picking_mode_choice)
 # Peak picking method
-peak_picking_method_label <- tklabel(window, text="Peak picking method")
-peak_picking_method_entry <- tkbutton(window, text="Choose pick picking\nmethod", command=peak_picking_method_choice)
+peak_picking_algorithm_label <- tklabel(window, text="Peak picking method")
+peak_picking_algorithm_entry <- tkbutton(window, text="Choose pick picking\nmethod", command=peak_picking_algorithm_choice)
 # Signals to take
 signals_to_take_label <- tklabel(window, text="Most intense signals to take\n(if 'most intense' is selected)")
 signals_to_take_entry <- tkentry(window, width=10, textvariable=signals_to_take)
@@ -553,7 +547,7 @@ tkinsert(set_file_name_entry, "end", "Peak statistics")
 #### Displaying labels
 file_type_export_value_label <- tklabel(window, text=file_type_export)
 peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value)
-peak_picking_method_value_label <- tklabel(window, text=peak_picking_method_value)
+peak_picking_algorithm_value_label <- tklabel(window, text=peak_picking_algorithm_value)
 peaks_filtering_value_label <- tklabel(window, text=peaks_filtering_value)
 low_intensity_peaks_removal_value_label <- tklabel(window, text=low_intensity_peaks_removal_value)
 intensity_threshold_method_value_label <- tklabel(window, text=intensity_threshold_method_value)
@@ -591,9 +585,9 @@ tkgrid(intensity_percentage_threshold_entry, row=5, column=5)
 tkgrid(intensity_threshold_method_label, row=6, column=1)
 tkgrid(intensity_threshold_method_entry, row=6, column=2)
 tkgrid(intensity_threshold_method_value_label, row=6, column=3)
-tkgrid(peak_picking_method_label, row=6, column=4)
-tkgrid(peak_picking_method_entry, row=6, column=5)
-tkgrid(peak_picking_method_value_label, row=6, column=6)
+tkgrid(peak_picking_algorithm_label, row=6, column=4)
+tkgrid(peak_picking_algorithm_entry, row=6, column=5)
+tkgrid(peak_picking_algorithm_value_label, row=6, column=6)
 tkgrid(remove_outliers_label, row=7, column=1)
 tkgrid(remove_outliers_entry, row=7, column=2)
 tkgrid(remove_outliers_value_label, row=7, column=3)
