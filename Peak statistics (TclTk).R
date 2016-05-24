@@ -1,4 +1,4 @@
-############################ PEAK STATISTICS 2016.05.18
+############################ PEAK STATISTICS 2016.05.24
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
@@ -29,6 +29,8 @@ file_type_export <- "xlsx"
 spectra <- NULL
 peaks <- NULL
 remove_outliers <- FALSE
+exclude_spectra_without_peak <- FALSE
+multicore_processing <- TRUE
 
 
 
@@ -45,6 +47,8 @@ peak_picking_algorithm_value <- "          MAD          "
 intensity_threshold_method_value <- "element-wise"
 spectra_format_value <- "imzML"
 remove_outliers_value <- "NO"
+exclude_spectra_without_peak_value <- "NO"
+multicore_processing_value <- "YES"
 
 
 
@@ -176,7 +180,7 @@ import_spectra_function <- function() {
 	### Truncation
 	spectra <- trim_spectra(spectra, range = mass_range)
 	### Preprocessing
-	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of)
+	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE)
 	# Exit the function and put the variable into the R workspace
 	.GlobalEnv$spectra <- spectra
 	.GlobalEnv$mass_range_value <- mass_range_value
@@ -199,9 +203,9 @@ peak_picking_function <- function() {
 		SNR <- as.numeric(SNR)
 		SNR_value <- as.character(SNR)
 		if (peak_picking_mode == "most intense") {
-			peaks <- most_intense_signals(spectra, signals_to_take=signals_to_take, tof_mode=tof_mode)
+			peaks <- most_intense_signals(spectra, signals_to_take=signals_to_take, tof_mode=tof_mode, multicore_processing=multicore_processing)
 		} else if (peak_picking_mode == "all"){
-			peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, SNR=SNR, tof_mode=tof_mode)
+			peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, SNR=SNR, tof_mode=tof_mode, multicore_processing=multicore_processing)
 		}
 		# Exit the function and put the variable into the R workspace
 		.GlobalEnv$peaks <- peaks
@@ -215,20 +219,43 @@ peak_picking_function <- function() {
 	}
 }
 
-##### Run the Spectral Typer
+##### Output the average number of signals with the SD
+signals_avg_and_sd_function <- function() {
+	############ Do not run if the peaks have not been picked
+	if (!is.null(peaks)) {
+		# Generate the vector recording the number of signals
+		number_of_signals_vector <- numeric()
+		for (p in 1:length(peaks)) {
+			number_of_signals_vector <- append(number_of_signals_vector, length(peaks[[p]]@mass))
+		}
+		# Compute the mean and the standard deviation
+		mean_signal_number <- mean(number_of_signals_vector, na.rm=TRUE)
+		sd_signal_number <- sd(number_of_signals_vector, na.rm=TRUE)
+		cv_signal_number <- (sd_signal_number / mean_signal_number) *100
+		### Messagebox
+		# Message
+		message_avg_sd <- paste("The mean number of signals in the spectral dataset is:", mean_signal_number, ",\n\nthe standard deviation is:", sd_signal_number, ",\n\nthe coefficient of variation is:", cv_signal_number, "%")
+		tkmessageBox(title = "Mean and SD of the number of signals", message = message_avg_sd, icon = "info")
+	} else if (is.null(peaks)) {
+		### Messagebox
+		tkmessageBox(title = "Something is wrong", message = "Some elements are needed to perform this operation: make sure that the peak picking process has been performed", icon = "warning")
+	}
+}
+
+##### Run the Peak Statistics
 run_peak_statistics_function <- function() {
-    ############ Do not run if the spectra have not been imported or the peaks have not been picked
+	############ Do not run if the spectra have not been imported or the peaks have not been picked
 	if (!is.null(spectra) && !is.null(peaks)) {
-        ### List the directories in the filepath_import folder
-        folder_list <- list.dirs(filepath_import, full.names=FALSE, recursive=FALSE)
-        # If there are only imzML files <- one for class
-        if (length(folder_list) == 0) {
-            # Each imzML file is a class
-            class_list <- read_spectra_files(filepath_import, spectra_format=spectra_format)
-        } else if ((length(folder_list) == 1 && folder_list != "") || (length(folder_list) >= 1)) {
-            class_list <- folder_list
-        }
-        ## Peaks filtering threshold
+		### List the directories in the filepath_import folder
+		folder_list <- list.dirs(filepath_import, full.names=FALSE, recursive=FALSE)
+		# If there are only imzML files <- one for class
+		if (length(folder_list) == 0) {
+			# Each imzML file is a class
+			class_list <- read_spectra_files(filepath_import, spectra_format=spectra_format)
+		} else if ((length(folder_list) == 1 && folder_list != "") || (length(folder_list) >= 1)) {
+			class_list <- folder_list
+		}
+		## Peaks filtering threshold
 		peaks_filtering_threshold_percent <- tclvalue(peaks_filtering_threshold_percent)
 		peaks_filtering_threshold_percent <- as.numeric(peaks_filtering_threshold_percent)
 		peaks_filtering_threshold_percent_value <- as.character(peaks_filtering_threshold_percent)
@@ -236,29 +263,23 @@ run_peak_statistics_function <- function() {
 		intensity_percentage_threshold <- tclvalue(intensity_percentage_threshold)
 		intensity_percentage_threshold <- as.numeric(intensity_percentage_threshold)
 		intensity_percentage_threshold_value <- as.character(intensity_percentage_threshold)
-		### Tolerance (PPM)
-		if (tof_mode == "linear") {
-			tolerance_ppm <- 2000
-		} else if (tof_mode == "reflectron" || tof_mode == "reflector") {
-			tolerance_ppm <- 200
-		}
-	### Run the peak statistics function
-	peak_statistics_results <- peak_statistics(spectra, peaks, class_list=class_list, class_in_file_name=TRUE, tof_mode=tof_mode, spectra_format=spectra_format, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, peak_picking_algorithm=peak_picking_algorithm, frequency_threshold_percent=peaks_filtering_threshold_percent, remove_outliers=TRUE, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_percentage_threshold, intensity_threshold_method=intensity_threshold_method)
-	# Save the files (CSV)
+		### Run the peak statistics function
+		peak_statistics_results <- peak_statistics(spectra, peaks, class_list=class_list, class_in_file_name=TRUE, tof_mode=tof_mode, spectra_format=spectra_format, peaks_filtering=peaks_filtering, peak_picking_algorithm=peak_picking_algorithm, frequency_threshold_percent=peaks_filtering_threshold_percent, remove_outliers=remove_outliers, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_percentage_threshold, intensity_threshold_method=intensity_threshold_method, alignment_iterations=5)
+		# Save the files (CSV)
 		if (file_type_export == "csv") {
 			filename <- set_file_name()
 			    write.csv(peak_statistics_results, file=filename)
 		} else if (file_type_export == "xlsx" || file_type_export == "xls") {
 		# Save the files (Excel)
-		filename <- set_file_name()
-		peak_statistics_results <- as.data.frame(peak_statistics_results)
-		# Generate unique row names
-		unique_row_names <- make.names(rownames(peak_statistics_results), unique=TRUE)
-		rownames(peak_statistics_results) <- unique_row_names
-		# Export
-		write.xlsx(x=peak_statistics_results, file=filename, sheetName="Peak statistics", row.names=TRUE)
-	}
-	### Messagebox
+			filename <- set_file_name()
+			peak_statistics_results <- as.data.frame(peak_statistics_results)
+			# Generate unique row names
+			unique_row_names <- make.names(rownames(peak_statistics_results), unique=TRUE)
+			rownames(peak_statistics_results) <- unique_row_names
+			# Export
+			write.xlsx(x=peak_statistics_results, file=filename, sheetName="Peak statistics", row.names=TRUE)
+		}
+		### Messagebox
 		tkmessageBox(title = "Done!", message = "The peak statistics file has been dumped!", icon = "info")
 	} else if (is.null(spectra) || is.null(peaks)) {
 		### Messagebox
@@ -332,6 +353,30 @@ peaks_filtering_choice <- function() {
 	.GlobalEnv$peaks_filtering_value <- peaks_filtering_value
 }
 
+##### Multicore processing
+multicore_processing_choice <- function() {
+	# Catch the value from the menu
+	multicore_processing <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (multicore_processing == "YES" || multicore_processing == "") {
+		multicore_processing <- TRUE
+	}
+	if (multicore_processing == "NO") {
+		multicore_processing <- FALSE
+	}
+	# Set the value of the displaying label
+	if (multicore_processing == TRUE) {
+		multicore_processing_value <- "YES"
+	} else {
+		multicore_processing_value <- "NO"
+	}
+	multicore_processing_value_label <- tklabel(window, text=multicore_processing_value)
+	#tkgrid(multicore_processing_value_label, row=4, column=3)
+	# Escape the function
+	.GlobalEnv$multicore_processing <- multicore_processing
+	.GlobalEnv$multicore_processing_value <- multicore_processing_value
+}
+
 ##### Low intensity peaks removal
 low_intensity_peaks_removal_choice <- function() {
 	# Catch the value from the menu
@@ -376,7 +421,7 @@ intensity_threshold_method_choice <- function() {
 	.GlobalEnv$intensity_threshold_method_value <- intensity_threshold_method_value
 }
 
-##### Average replicates in database
+##### Remove outliers from the peak intensity evaluation
 remove_outliers_choice <- function() {
 	# Catch the value from the menu
 	remove_outliers <- select.list(c("YES","NO"), title="Choose")
@@ -398,6 +443,29 @@ remove_outliers_choice <- function() {
 	# Escape the function
 	.GlobalEnv$remove_outliers <- remove_outliers
 	.GlobalEnv$remove_outliers_value <- remove_outliers_value
+}
+
+##### Exclude spectra without the peak
+exclude_spectra_without_peak_function <- function() {
+	# Catch the value from the menu
+	exclude_spectra_without_peak <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (exclude_spectra_without_peak == "" || exclude_spectra_without_peak == "NO") {
+		exclude_spectra_without_peak <- FALSE
+	} else if (exclude_spectra_without_peak == "YES") {
+		exclude_spectra_without_peak <- TRUE
+	}
+	# Set the value of the displaying label
+	if (exclude_spectra_without_peak == TRUE) {
+		exclude_spectra_without_peak_value <- "YES"
+	} else {
+		exclude_spectra_without_peak_value <- "NO"
+	}
+	exclude_spectra_without_peak_value_label <- tklabel(window, text=exclude_spectra_without_peak_value)
+	tkgrid(exclude_spectra_without_peak_value_label, row=7, column=5)
+	# Escape the function
+	.GlobalEnv$exclude_spectra_without_peak <- exclude_spectra_without_peak
+	.GlobalEnv$exclude_spectra_without_peak_value <- exclude_spectra_without_peak_value
 }
 
 ##### TOF mode
@@ -489,10 +557,10 @@ preprocess_spectra_in_packages_of_entry <- tkentry(window, width=10, textvariabl
 tkinsert(preprocess_spectra_in_packages_of_entry, "end", "200")
 # Peak picking mode
 peak_picking_mode_label <- tklabel(window, text="Peak picking mode")
-peak_picking_mode_entry <- tkbutton(window, text="Choose pick picking\nmode", command=peak_picking_mode_choice)
+peak_picking_mode_entry <- tkbutton(window, text="Choose peak picking\nmode", command=peak_picking_mode_choice)
 # Peak picking method
 peak_picking_algorithm_label <- tklabel(window, text="Peak picking method")
-peak_picking_algorithm_entry <- tkbutton(window, text="Choose pick picking\nmethod", command=peak_picking_algorithm_choice)
+peak_picking_algorithm_entry <- tkbutton(window, text="Choose peak picking\nmethod", command=peak_picking_algorithm_choice)
 # Signals to take
 signals_to_take_label <- tklabel(window, text="Most intense signals to take\n(if 'most intense' is selected)")
 signals_to_take_entry <- tkentry(window, width=10, textvariable=signals_to_take)
@@ -524,6 +592,8 @@ remove_outliers_entry <- tkbutton(window, text="Choose if outliers are to be dis
 # Tof mode
 tof_mode_label <- tklabel(window, text="Select the TOF mode")
 tof_mode_entry <- tkbutton(window, text="Choose the TOF mode", command=tof_mode_choice)
+# Exclude spectra without the peak
+exclude_spectra_without_peak_button <- tkbutton(window, text="Exclude spectra without\nthe peak", command=exclude_spectra_without_peak_function)
 # File format
 spectra_format_label <- tklabel(window, text="Select the spectra format")
 spectra_format_entry <- tkbutton(window, text="Choose the spectra format", command=spectra_format_choice)
@@ -537,8 +607,12 @@ end_session_button <- tkbutton(window, text="QUIT", command=end_session_function
 import_spectra_button <- tkbutton(window, text="SPECTRA IMPORT AND\nPREPROCESSING", command=import_spectra_function)
 # Peak picking
 peak_picking_button <- tkbutton(window, text="PEAK PICKING", command=peak_picking_function)
-# Run the Spectral typer!
+# Run the Peak Statistics!!
 run_peak_statistics_button <- tkbutton(window, text="COMPUTE THE PEAK STATISTICS", command=run_peak_statistics_function)
+# Average number of signals and standard deviation
+signals_avg_and_sd_button <- tkbutton(window, text="MEAN +/- SD of number of signals", command=signals_avg_and_sd_function)
+# Multicore
+multicore_processing_button <- tkbutton(window, text="ALLOW PARALLEL\nPROCESSING", command=multicore_processing_choice)
 # Set the file name
 set_file_name_label <- tklabel(window, text="<-- Set the file name")
 set_file_name_entry <- tkentry(window, width=30, textvariable=file_name)
@@ -554,6 +628,7 @@ intensity_threshold_method_value_label <- tklabel(window, text=intensity_thresho
 remove_outliers_value_label <- tklabel(window, text=remove_outliers_value)
 tof_mode_value_label <- tklabel(window, text=tof_mode_value)
 spectra_format_value_label <- tklabel(window, text=spectra_format_value)
+exclude_spectra_without_peak_value_label <- tklabel(window, text=exclude_spectra_without_peak_value)
 
 #### Geometry manager
 # Scrollbar
@@ -591,6 +666,8 @@ tkgrid(peak_picking_algorithm_value_label, row=6, column=6)
 tkgrid(remove_outliers_label, row=7, column=1)
 tkgrid(remove_outliers_entry, row=7, column=2)
 tkgrid(remove_outliers_value_label, row=7, column=3)
+tkgrid(exclude_spectra_without_peak_button, row=7, column=4)
+tkgrid(exclude_spectra_without_peak_value_label, row=7, column=5)
 tkgrid(tof_mode_label, row=8, column=1)
 tkgrid(tof_mode_entry, row=8, column=2)
 tkgrid(tof_mode_value_label, row=8, column=3)
@@ -603,6 +680,8 @@ tkgrid(file_type_export_label, row=10, column=2)
 tkgrid(file_type_export_entry, row=10, column=3)
 tkgrid(file_type_export_value_label, row=10, column=4)
 tkgrid(import_spectra_button, row=11, column=2)
+tkgrid(multicore_processing_button, row=11, column=1)
 tkgrid(peak_picking_button, row=11, column=3)
 tkgrid(run_peak_statistics_button, row=11, column=4)
+tkgrid(signals_avg_and_sd_button, row=11, column=5)
 tkgrid(end_session_button, row=12, column=3)
