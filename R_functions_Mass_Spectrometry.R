@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.05.18
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.05.24
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -290,13 +290,8 @@ for (lib in 1:length(filepath)) {
 	spectra <- importImzMl(filepath[lib])
 	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=process_in_packages_of)
 	### Peak Picking and alignment
-	if (tof_mode == "linear") {
-		peaks <- detectPeaks(spectra, method=peak_picking_algorithm, SNR=SNR, halfWindowSize=20)
-	}
-	if (tof_mode == "reflectron" || tof_mode == "reflector") {
-		peaks <- detectPeaks(spectra, method=peak_picking_algorithm, SNR=SNR, halfWindowSize=5)
-	}
-	peaks <- align_and_filter_peaks(peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25)
+	peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+	peaks <- align_and_filter_peaks(peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25)
 	# Generate the intensity matrix
 	intensity_matrix <- intensityMatrix(peaks, spectra)
 	#### Create the partial result matrices
@@ -350,7 +345,7 @@ return (result_matrix)
 ##################################################### REMOVE LOW INTENSITY PEAKS
 # This function removes low-intensity peaks (in terms of level of intensity compared with the most intense peak in the peaklist) from the list of provided peaks (MALDIquant).
 # If the method is selected to be "element-wise", each element of the peaklist is evaluated, and the intensity threshold is calculated over the peaks of only that element. Otherwise, if "whole" is selected, the threshold is calculated on all the peaks in the dataset.
-remove_low_intensity_peaks <- function (peaks, intensity_threshold_percent=0.1, intensity_threshold_method="element-wise") {
+remove_low_intensity_peaks <- function (peaks, intensity_threshold_percent=0.1, intensity_threshold_method="element-wise", multicore_processing=TRUE) {
 # Load the required libraries
 install_and_load_required_packages("parallel")
 # If there is only one peaklist, there is no point in doing the whole method, but only the element-wise.
@@ -394,20 +389,25 @@ if (intensity_threshold_method == "element-wise") {
 	}
 	######################################### Multiple peaks elements
 	if (isMassPeaksList(peaks)) {
-		# Detect the number of cores
-		cpu_thread_number <- detectCores(logical=TRUE)
-		#cpu_core_number <- cpu_thread_number/2
-		if (Sys.info()[1] == "Linux") {
-			peaks_filtered <- mclapply(peaks, FUN = function (peaks) intensity_filtering_subfunction_element(peaks, intensity_threshold_percent), mc.cores=cpu_thread_number)
-		} else if (Sys.info()[1] == "Windows") {
-			# Make the CPU cluster for parallelisation
-			cl <- makeCluster(cpu_thread_number)
-			# Make the cluster use the custom functions and the package functions along with their parameters
-			clusterEvalQ(cl, {library(MALDIquant)})
-			clusterExport(cl=cl, varlist=c("peaks", "intensity_threshold_percent", "intensity_filtering_subfunction_element"), envir=environment())
-			# Apply the multicore function
-			peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_subfunction_element(peaks, intensity_threshold_percent))
-			stopCluster(cl)
+		########## MULTICORE
+		if (multicore_processing == TRUE) {
+			# Detect the number of cores
+			cpu_thread_number <- detectCores(logical=TRUE)
+			if (Sys.info()[1] == "Linux") {
+				peaks_filtered <- mclapply(peaks, FUN = function (peaks) intensity_filtering_subfunction_element(peaks, intensity_threshold_percent), mc.cores=cpu_thread_number)
+			} else if (Sys.info()[1] == "Windows") {
+				# Make the CPU cluster for parallelisation
+				cl <- makeCluster(cpu_thread_number)
+				# Make the cluster use the custom functions and the package functions along with their parameters
+				clusterEvalQ(cl, {library(MALDIquant)})
+				clusterExport(cl=cl, varlist=c("peaks", "intensity_threshold_percent", "intensity_filtering_subfunction_element"), envir=environment())
+				# Apply the multicore function
+				peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_subfunction_element(peaks, intensity_threshold_percent))
+				stopCluster(cl)
+			}
+		} else {
+			########## SINGLE CORE
+			peaks_filtered <- lapply(peaks, FUN = function (peaks) intensity_filtering_subfunction_element(peaks, intensity_threshold_percent))
 		}
 	} else {
 		######################################### Single peaks element
@@ -465,20 +465,25 @@ if (intensity_threshold_method == "whole") {
 	# Filter the peaks
 	######################################### Multiple peaks elements
 	if (isMassPeaksList(peaks)) {
-		# Detect the number of cores
-		cpu_thread_number <- detectCores(logical=TRUE)
-		#cpu_core_number <- cpu_thread_number/2
-		if (Sys.info()[1] == "Linux") {
-			peaks_filtered <- mclapply(peaks, FUN = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity), mc.cores=cpu_thread_number)
-		} else if (Sys.info()[1] == "Windows") {
-			# Make the CPU cluster for parallelisation
-			cl <- makeCluster(cpu_thread_number)
-			# Make the cluster use the custom functions and the package functions along with their parameters
-			clusterEvalQ(cl, {library(MALDIquant)})
-			clusterExport(cl=cl, varlist=c("peaks", "intensity_threshold_percent", "intensity_filtering_subfunction_whole", "highest_intensity"), envir=environment())
-			# Apply the multicore function
-			peaks_filtered <- parLapply(cl, peaks, fun = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity))
-			stopCluster(cl)
+		########## MULTICORE
+		if (multicore_processing == TRUE) {
+			# Detect the number of cores
+			cpu_thread_number <- detectCores(logical=TRUE)
+			if (Sys.info()[1] == "Linux") {
+				peaks_filtered <- mclapply(peaks, FUN = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity), mc.cores=cpu_thread_number)
+			} else if (Sys.info()[1] == "Windows") {
+				# Make the CPU cluster for parallelisation
+				cl <- makeCluster(cpu_thread_number)
+				# Make the cluster use the custom functions and the package functions along with their parameters
+				clusterEvalQ(cl, {library(MALDIquant)})
+				clusterExport(cl=cl, varlist=c("peaks", "intensity_threshold_percent", "intensity_filtering_subfunction_whole", "highest_intensity"), envir=environment())
+				# Apply the multicore function
+				peaks_filtered <- parLapply(cl, peaks, fun = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity))
+				stopCluster(cl)
+			}
+		} else {
+			########## SINGLE CORE
+			peaks_filtered <- lapply(peaks, FUN = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity))
 		}
 	} else {
 		######################################### Single peaks element
@@ -607,24 +612,13 @@ if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
 	avg_spectrum <- removeBaseline(avg_spectrum, method="TopHat")
 	avg_spectrum <- calibrateIntensity(avg_spectrum, method="TIC")
 	# Peak picking
-	if (tof_mode == "linear") {
-		peaks <- detectPeaks(spectra, SNR=SNR, method=peak_picking_algorithm, halfWindowSize=20)
-		peaks_avg <- detectPeaks(avg_spectrum, SNR=SNR, method=peak_picking_algorithm, halfWindowSize=20)
-		# Merge for the alignment
-		global_peaks <- append(peaks_avg, peaks)
-		global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25)
-		peaks_avg <- global_peaks[[1]]
-		peaks <- global_peaks [2:length(global_peaks)]
-	}
-	if (tof_mode == "reflectron" || tof_mode =="reflector") {
-		peaks <- detectPeaks(spectra, SNR=SNR, method=peak_picking_algorithm, halfWindowSize=5)
-		peaks_avg <- detectPeaks(avg_spectrum, SNR=SNR, method=peak_picking_algorithm, halfWindowSize=5)
-		# Merge for the alignment
-		global_peaks <- append(peaks_avg, peaks)
-		global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25)
-		peaks_avg <- global_peaks[[1]]
-		peaks <- global_peaks [2:length(global_peaks)]
-	}
+	peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+	peaks_avg <- peak_picking(avg_spectrum, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+	# Merge for the alignment
+	global_peaks <- append(peaks_avg, peaks)
+	global_peaks <- align_and_filter_peaks(global_peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25)
+	peaks_avg <- global_peaks[[1]]
+	peaks <- global_peaks [2:length(global_peaks)]
 	# Compute the intensity matrix
 	intensity_matrix <- intensityMatrix(peaks, spectra)
 	# Scroll the peaks of the average peaklist...
@@ -737,11 +731,17 @@ return (list (vector=v, outliers_position=outliers_position))
 
 ######################################### PEAK STATISTICS (on processed Spectra)
 # This function computes the peak statistics onto a selected spectra dataset (or to the provided peaks), both when the spectra belong to no (or one) class and more classes.
-peak_statistics <- function (spectra, peaks=NULL, SNR=3, class_list=NULL, class_in_file_name=TRUE, tof_mode="linear", spectra_format="imzml", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element_wise", peak_picking_algorithm="MAD") {
+peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm="MAD", class_list=NULL, class_in_file_name=TRUE, tof_mode="linear", spectra_format="imzml", exclude_spectra_without_peak=FALSE, alignment_iterations=5, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element_wise") {
 ########## Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 ########## Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
+########## Define the tolerance in PPM
+if (tof_mode =="linear" || tof_mode=="Linear" || tof_mode=="L") {
+	tolerance_ppm <- 2000
+} else if (tof_mode =="reflector" || tof_mode=="reflectron" || tof_mode=="R") {
+	tolerance_ppm <- 200
+}
 ########## Determine the number of classes
 if (length(class_list) == 0 || length(class_list) == 1 || is.null(class_list)) {
 number_of_classes <- 1
@@ -750,22 +750,22 @@ number_of_classes <- 1
 }
 ########## Detect and Align Peaks
 if (is.null(peaks)) {
-	if (tof_mode == "linear") {
-		peaks <- detectPeaks(spectra, method=peak_picking_algorithm, SNR=SNR, halfWindowSize=20)
-	}
-	if (tof_mode == "reflector" | tof_mode == "reflectron") {
-		peaks <- detectPeaks(spectra, method=peak_picking_algorithm, SNR=SNR, halfWindowSize=5)
-	}
+	peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
 }
-peaks <- align_and_filter_peaks(peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=frequency_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_threshold_percent, intensity_threshold_method=intensity_threshold_method, reference_peaklist=NULL, spectra=NULL)
+peaks <- align_and_filter_peaks(peaks, tof_mode=tof_mode, alignment_iterations=alignment_iterations, peaks_filtering=peaks_filtering, frequency_threshold_percent=frequency_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_threshold_percent, intensity_threshold_method=intensity_threshold_method, reference_peaklist=NULL, spectra=NULL)
 # Generate the matrix (and convert it into a data frame)
-signal_matrix <- intensityMatrix(peaks, spectra)
+if (exclude_spectra_without_peak == FALSE) {
+	signal_matrix <- intensityMatrix(peaks, spectra)
+} else if (exclude_spectra_without_peak == TRUE) {
+	signal_matrix <- intensityMatrix(peaks)
+}
+
 # Peak vector
 #peak_vector <- as.numeric(names(signal_matrix))
 ############################################################## ONE CLASS
 if (number_of_classes == 1) {
 	################################# FUNCTION for matrix APPLY (it will applied for each matrix column, for each peak)
-	peak_statistcs_function <- function (signal_matrix_column, signal_matrix) {
+	peak_statistcs_function <- function (signal_matrix_column, signal_matrix, remove_outliers) {
 		# Generate the output matrix row
 		peak_stat_matrix_row <- matrix (0, nrow=1, ncol=8)
 		rownames(peak_stat_matrix_row) <- as.numeric(colnames(signal_matrix_column))
@@ -773,28 +773,25 @@ if (number_of_classes == 1) {
 		# Start the calculation
 		intensity_vector <- as.numeric(signal_matrix_column)
 		if (remove_outliers == TRUE) {
-			intensity_vector <- outliers_removal(intensity_vector)
-			intensity_vector <- intensity_vector$vector
+			intensity_vector <- outliers_removal(intensity_vector)$vector
 		}
 		# Calculate the statistical parameters on the intensity values in the vector
 		# Normality
 		if (length(intensity_vector) >= 3 & length(intensity_vector) <= 5000) {
 			shapiro_test <- shapiro.test(intensity_vector)
 			if (shapiro_test$p.value < 0.05) {
-				distribution_type <- "Non-normal"
+				distribution_type <- paste("Non-normal", "(Shapiro p-value:", round(shapiro_test$p.value,3), ")")
 			}
 			if (shapiro_test$p.value >= 0.05) {
-				distribution_type <- "Normal"
+				distribution_type <- paste("Normal", "(Shapiro p-value:", round(shapiro_test$p.value,3), ")")
 			}
-		}
-		if (length(intensity_vector) < 3) {
+		} else if (length(intensity_vector) < 3) {
 			distribution_type <- "Not determinable, number of samples too low"
-		}
-		if (length(intensity_vector) > 5000) {
+		} else if (length(intensity_vector) > 5000) {
 			distribution_type <- "Number of samples too high, assume it is normal"
 		}
 		# Other parameters
-		st_dev_intensity <- sd(intensity_vector)
+		st_dev_intensity <- sd(intensity_vector, na.rm=TRUE)
 		summary_intensity_vector <- summary(intensity_vector)
 		mean_intensity <- summary_intensity_vector [4]
 		coeff_variation <- (st_dev_intensity / mean_intensity) *100
@@ -802,7 +799,7 @@ if (number_of_classes == 1) {
 		first_quartile <- summary_intensity_vector [2]
 		third_quartile <- summary_intensity_vector [5]
 		inter_quartile_range <- third_quartile - first_quartile
-		spectra_counter <- length(intensity_vector)
+		spectra_counter <- length(intensity_vector[!is.na(intensity_vector)])
 		# Fill the matrix with the values
 		peak_stat_matrix_row [,1] <- distribution_type
 		peak_stat_matrix_row [,2] <- as.numeric(mean_intensity)
@@ -824,7 +821,7 @@ if (number_of_classes == 1) {
 	# Only peaks
 	signal_matrix_peaks <- signal_matrix [,1:(ncol(signal_matrix)-1)]
 	# Apply the function (transpose the result matrix)
-	peak_stat_matrix <- t(apply(signal_matrix_peaks, MARGIN=2, FUN=function(x) peak_statistcs_function(x, signal_matrix)))
+	peak_stat_matrix <- t(apply(signal_matrix_peaks, MARGIN=2, FUN=function(x) peak_statistcs_function(x, signal_matrix, remove_outliers=remove_outliers)))
 	# Fix the column names
 	colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter")
 }
@@ -850,7 +847,7 @@ if (number_of_classes > 1) {
 		}
 		if (remove_outliers == TRUE) {
 			for (i in 1:length(intensity_vector)) {
-				intensity_vector[[l]] <- outliers_removal (intensity_vector[[l]])
+				intensity_vector[[l]] <- outliers_removal(intensity_vector[[l]])
 				intensity_vector[[l]] <- intensity_vector[[l]]$vector
 			}
 		}
@@ -1129,7 +1126,7 @@ return (peak_stat_matrix)
 ############################################# SPECTRA
 
 ################## PLOT THE SIGNALS OF INTEREST WITH THE SD BARS ON THE AVERAGE
-average_spectrum_bars_signals_of_interest <- function (spectra, SNR=5, signals_of_interest=peaks_average@mass, tolerance_ppm=2000, half_window_plot=1000, graph_title="Spectrum", average_spectrum_colour="black", peak_points=TRUE, points_colour="red", bar_width=40, bar_colour="blue", peak_picking_algorithm="MAD") {
+average_spectrum_bars_signals_of_interest <- function (spectra, SNR=5, signals_of_interest=peaks_average@mass, tolerance_ppm=2000, tof_mode="linear", half_window_plot=1000, graph_title="Spectrum", average_spectrum_colour="black", peak_points=TRUE, points_colour="red", bar_width=40, bar_colour="blue", peak_picking_algorithm="MAD") {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
@@ -1140,9 +1137,9 @@ spectrum_images <- list()
 average_spectrum <- averageMassSpectra(spectra, method="mean")
 average_spectrum <- removeBaseline(average_spectrum, method="TopHat")
 # Peak picking on the average spectrum (for plotting)
-peaks_average <- detectPeaks(average_spectrum, method=peak_picking_algorithm, SNR=SNR)
+peaks_average <- peak_picking(average_spectrum, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
 # Peak picking on the dataset
-peaks <- detectPeaks(spectra, method=peak_picking_algorithm, SNR=SNR)
+peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
 ######## Generate a vector with the standard deviations of the peaks of interest
 # For each peak in the average peaklist
 for (a in 1:length(signals_of_interest)) {
@@ -1380,7 +1377,7 @@ if (spectra_alignment==TRUE) {
 	if (length(spectra_dataset) > 0 && isMassSpectrumList(spectra_dataset)) {
 		# Average the spectra: the avg spectrum peaks will be used as reference
 	    spectra_avg_ref <- averageMassSpectra(spectra_dataset, method="mean")
-		peaks_avg_ref <- detectPeaks(spectra_avg_ref, SNR=5)
+		peaks_avg_ref <- peak_picking(spectra_avg_ref, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
 		reference_for_alignment <- peaks_avg_ref@mass
 		if (length(reference_for_alignment@mass) > 0) {
 			if (tof_mode == "linear") {
@@ -1407,7 +1404,7 @@ return (list(spectra=spectra_dataset, spectra_dataset_grouped=spectra_dataset_gr
 
 ################################################################ SPECTRA BINNING
 # The function performs the binning onto a selected spectra dataset (list of MALDIquant spectra objects)
-resample_spectra <- function (spectra, final_data_points=lowest_data_points, binning_method="sum") {
+resample_spectra <- function (spectra, final_data_points=lowest_data_points, binning_method="sum", multicore_processing=TRUE) {
 ####################################################### BINNING FUNCTION
 binning_subfunction <- function (spectra, final_data_points, binning_method) {
 	# Create the new spectra_binned list
@@ -1462,7 +1459,6 @@ if (isMassSpectrumList(spectra)) {
 	install_and_load_required_packages("parallel")
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	#cpu_core_number <- cpu_thread_number/2
 	########################
 	# Calculate the lowest amount of data points, that corresponds to the maximum
 	# number of data points that can be used for the binning
@@ -1479,7 +1475,6 @@ if (isMassSpectrumList(spectra)) {
 	datapoints_dataset <- as.numeric(names(data_points_table))
 	equality_data_points <- length(data_points_table)
 	######## Do not bin if all the spectra are of the same lengthand have the same number of datapoints as defined
-	cl <- makeCluster(cpu_thread_number)
 	if ((equality_data_points == 1) && (datapoints_dataset == final_data_points)) {
 		spectra_binned <- spectra
 	}
@@ -1492,22 +1487,32 @@ if (isMassSpectrumList(spectra)) {
 		if (final_data_points > lowest_data_points) {
 			finalDatapoints <- lowest_data_points
 			print("Binning at this sample rate is not possible, the highest number of data points possible will be used")
-			if (Sys.info()[1] == "Linux") {
-				spectra_binned <- mclapply(spectra, FUN=function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores=cpu_thread_number)
+			if (multicore_processing == TRUE) {
+				if (Sys.info()[1] == "Linux") {
+					spectra_binned <- mclapply(spectra, FUN=function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores=cpu_thread_number)
+				} else {
+					cl <- makeCluster(cpu_thread_number)
+					spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
+					stopCluster(cl)
+				}
 			} else {
-				spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
+				spectra_binned <- lapply(spectra, FUN=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
 			}
 		}
 		if (final_data_points <= lowest_data_points) {
-			if (Sys.info()[1] == "Linux") {
-				spectra_binned <- mclapply(spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores=cpu_thread_number)
+			if (multicore_processing == TRUE) {
+				if (Sys.info()[1] == "Linux") {
+					spectra_binned <- mclapply(spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores=cpu_thread_number)
+				} else {
+					cl <- makeCluster(cpu_thread_number)
+					spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
+					stopCluster(cl)
+				}
 			} else {
-				spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
+				spectra_binned <- lapply(spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
 			}
 		}
 	}
-	# Close the processes
-	stopCluster(cl)
 	print(table(sapply(spectra_binned, length)))
 	print(paste("Equal distance between datapoints", (all(sapply(spectra_binned, isRegular)))))
 } else {
@@ -1667,7 +1672,7 @@ return (spectra)
 
 ######################################################## SPECTRA PRE-PROCESSING
 # The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalization)
-preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra)) {
+preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra), align_spectra=FALSE, multicore_processing=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "parallel"))
 # Rename the trim function
@@ -1677,7 +1682,6 @@ trim_spectra <- get(x="trim", pos="package:MALDIquant")
 if (isMassSpectrumList(spectra)) {
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	#cpu_core_number <- cpu_thread_number/2
 	# Packages of preprocessing
 	if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
 		process_in_packages_of <- length(spectra)
@@ -1688,9 +1692,6 @@ if (isMassSpectrumList(spectra)) {
 	index2 <- process_in_packages_of
 	spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
 	for (p in 1:spectra_packages) {
-		# Make the cluster (one for each core/thread)
-		cl <- makeCluster(cpu_thread_number)
-		clusterEvalQ(cl, {library(MALDIquant)})
 		# If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
 		if (index2 < length(spectra)) {
 			spectra_temp <- spectra [index1:index2]
@@ -1699,362 +1700,121 @@ if (isMassSpectrumList(spectra)) {
 		index1 <- index2 + 1
 		index2 <- index2 + process_in_packages_of
 		# Process the selected spectra
+		## Remove flat spectra
+		#spectra <- removeEmptyMassObjects (spectra)
+		## Smoothing
 		if (tof_mode == "linear") {
-			## Remove flat spectra
-			#spectra <- removeEmptyMassObjects (spectra)
 			if (smoothing_strength == "small") {
-				## Smoothing (Savitzky-Golay filter, with window size 5, 11 points)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5))
-				}
+				smoothing_half_window_size <- 5
+			} else if (smoothing_strength == "medium") {
+				smoothing_half_window_size <- 10
+			} else if (smoothing_strength == "strong") {
+				smoothing_half_window_size <- 20
+			} else if (smoothing_strength == "stronger") {
+				smoothing_half_window_size <- 30
 			}
-			if (smoothing_strength == "medium") {
-				## Smoothing (Savitzky-Golay filter, with window size 10, 21 points)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10))
-				}
+		} else if (tof_mode == "reflector") {
+			if (smoothing_strength == "small") {
+				smoothing_half_window_size <- 1
+			} else if (smoothing_strength == "medium") {
+				smoothing_half_window_size <- 3
+			} else if (smoothing_strength == "strong") {
+				smoothing_half_window_size <- 6
+			} else if (smoothing_strength == "stronger") {
+				smoothing_half_window_size <- 9
 			}
-			if (smoothing_strength == "strong") {
-				## Smoothing (Savitzky-Golay filter, with window size 20, 41 points)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20))
-				}
+		}
+		if (multicore_processing == TRUE) {
+			if (Sys.info()[1] == "Linux") {
+				spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=smoothing_half_window_size), mc.cores=cpu_thread_number)
+			} else {
+				# Make the cluster (one for each core/thread)
+				cl <- makeCluster(cpu_thread_number)
+				clusterEvalQ(cl, {library(MALDIquant)})
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=smoothing_half_window_size))
+				stopCluster(cl)
 			}
-			if (smoothing_strength == "veryStrong") {
-				## Smoothing (Savitzky-Golay filter, with window size 30, 61 points)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30))
-				}
-			}
-			## Baseline correction
+		} else {
+			spectra_temp <- lapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=smoothing_half_window_size))
+		}
+		## Baseline correction
+		if (multicore_processing == TRUE) {
 			if (Sys.info()[1] == "Linux") {
 				spectra_temp <- mclapply(spectra_temp, FUN = function (spectra) removeBaseline(spectra, method="TopHat"), mc.cores=cpu_thread_number)
 			} else {
+				# Make the cluster (one for each core/thread)
+				cl <- makeCluster(cpu_thread_number)
+				clusterEvalQ(cl, {library(MALDIquant)})
 				spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline(spectra, method="TopHat"))
+				stopCluster(cl)
 			}
-			## Normalization (TIC)
+		} else {
+			spectra_temp <- lapply(spectra_temp, FUN = function (spectra) removeBaseline(spectra, method="TopHat"))
+		}
+		## Normalization (TIC)
+		if (multicore_processing == TRUE) {
 			if (Sys.info()[1] == "Linux") {
 				spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) calibrateIntensity(spectra, method="TIC"), mc.cores=cpu_thread_number)
 			} else {
+				# Make the cluster (one for each core/thread)
+				cl <- makeCluster(cpu_thread_number)
+				clusterEvalQ(cl, {library(MALDIquant)})
 				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity(spectra, method="TIC"))
+				stopCluster(cl)
 			}
+		} else {
+			spectra_temp <- lapply(spectra_temp, FUN=function (spectra) calibrateIntensity(spectra, method="TIC"))
 		}
-		if (tof_mode == "reflectron" || tof_mode == "reflector") {
-			## Remove flat spectra
-			#spectra <- removeEmptyMassObjects (spectra)
-			if (smoothing_strength == "small") {
-				## Smoothing (Savitzky-Golay filter, with window size 2, 5 points)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1))
-				}
-			}
-			if (smoothing_strength == "medium") {
-				## Smoothing (Savitzky-Golay filter, with window size 6, 13 points)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3))
-				}
-			}
-			if (smoothing_strength == "strong") {
-				## Smoothing (Savitzky-Golay filter, with window size 12, 25 points)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6))
-				}
-			}
-			if (smoothing_strength == "veryStrong") {
-				## Smoothing (Savitzky-Golay filter, with window size 18, 37 points)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9))
-				}
-			}
-			## Baseline correction
-			if (Sys.info()[1] == "Linux") {
-				spectra_temp <- mclapply(spectra_temp, FUN = function (spectra) removeBaseline (spectra, method="TopHat"), mc.cores=cpu_thread_number)
-			} else {
-				spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline (spectra, method="TopHat"))
-			}
-			## Normalization (TIC)
-			if (Sys.info()[1] == "Linux") {
-				spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) calibrateIntensity (spectra, method="TIC"), mc.cores=cpu_thread_number)
-			} else {
-				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity (spectra, method="TIC"))
-			}
-		}
-		# Close the processes
-		stopCluster(cl)
-		# Append these preprocessed spectra to the final list
-		preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
+	# Append these preprocessed spectra to the final list
+	preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
 	}
 }
 ######################################### Single spectra
 if (!isMassSpectrumList(spectra)) {
 	if (tof_mode == "linear") {
-		## Remove flat spectra
-		#spectra <- removeEmptyMassObjects (spectra)
 		if (smoothing_strength == "small") {
-			## Smoothing (Savitzky-Golay filter, with window size 5, 11 points)
-			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5)
+			smoothing_half_window_size <- 5
+		} else if (smoothing_strength == "medium") {
+			smoothing_half_window_size <- 10
+		} else if (smoothing_strength == "strong") {
+			smoothing_half_window_size <- 20
+		} else if (smoothing_strength == "stronger") {
+			smoothing_half_window_size <- 30
 		}
-		if (smoothing_strength == "medium") {
-			## Smoothing (Savitzky-Golay filter, with window size 10, 21 points)
-			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10)
-		}
-		if (smoothing_strength == "strong") {
-			## Smoothing (Savitzky-Golay filter, with window size 20, 41 points)
-			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20)
-		}
-		if (smoothing_strength == "veryStrong") {
-			## Smoothing (Savitzky-Golay filter, with window size 30, 61 points)
-			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30)
-		}
-		## Baseline correction
-		spectra_temp <- removeBaseline(spectra, method="TopHat")
-		## Normalization (TIC)
-		spectra_temp <- calibrateIntensity(spectra, method="TIC")
-	}
-	if (tof_mode == "reflectron" || tof_mode == "reflector") {
-		## Remove flat spectra
-		#spectra <- removeEmptyMassObjects (spectra)
+	} else if (tof_mode == "reflector") {
 		if (smoothing_strength == "small") {
-			## Smoothing (Savitzky-Golay filter, with window size 2, 5 points)
-			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1)
+			smoothing_half_window_size <- 1
+		} else if (smoothing_strength == "medium") {
+			smoothing_half_window_size <- 3
+		} else if (smoothing_strength == "strong") {
+			smoothing_half_window_size <- 6
+		} else if (smoothing_strength == "stronger") {
+			smoothing_half_window_size <- 9
 		}
-		if (smoothing_strength == "medium") {
-			## Smoothing (Savitzky-Golay filter, with window size 6, 13 points)
-			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3)
-		}
-		if (smoothing_strength == "strong") {
-			## Smoothing (Savitzky-Golay filter, with window size 12, 25 points)
-			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6)
-		}
-		if (smoothing_strength == "veryStrong") {
-			## Smoothing (Savitzky-Golay filter, with window size 18, 37 points)
-			spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9)
-		}
-		## Baseline correction
-		spectra_temp <- removeBaseline(spectra, method="TopHat")
-		## Normalization (TIC)
-		spectra_temp <- calibrateIntensity(spectra, method="TIC")
 	}
+	## Remove flat spectra
+	#spectra <- removeEmptyMassObjects (spectra)
+	spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=smoothing_half_window_size)
+	## Baseline correction
+	spectra_temp <- removeBaseline(spectra, method="TopHat")
+	## Normalization (TIC)
+	spectra_temp <- calibrateIntensity(spectra, method="TIC")
 	preprocessed_spectra <- spectra_temp
 }
-return (preprocessed_spectra)
-}
-
-
-
-
-
-###############################################################################
-
-
-
-
-
-######################################################## SPECTRA PRE-PROCESSING
-# The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalization). The function allows to preprocess the spectra by choosing many parameters
-preprocess_spectra2 <- function (spectra, tof_mode="linear", process_in_packages_of=length(spectra), preprocessing_parameters=list(smoothing_strength="medium", baseline_subtraction_algorithm="TopHat", number_of_iterative_convolutions=200, normalization_algorithm="TIC")) {
-	# Load the required libraries
-	install_and_load_required_packages(c("MALDIquant", "parallel"))
-	# Rename the trim function
-	trim_spectra <- get(x="trim", pos="package:MALDIquant")
-	# Check if it is not a single spectrum
-	######################################### Multiple spectra
+######################################### SPECTRAL ALIGNMENT
+if (align_spectra == TRUE) {
 	if (isMassSpectrumList(spectra)) {
-		# Detect the number of cores
-		cpu_thread_number <- detectCores(logical=TRUE)
-		#cpu_core_number <- cpu_thread_number/2
-		# Packages of preprocessing
-		if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
-			process_in_packages_of <- length(spectra)
+		if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+			half_window_alignment <- 20
+			tolerance_ppm <- 2000
+		} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+			half_window_alignment <- 5
+			tolerance_ppm <- 200
 		}
-		# Create the list containing the processed spectra
-		preprocessed_spectra <- list()
-		index1 <- 1
-		index2 <- process_in_packages_of
-		spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
-		for (p in 1:spectra_packages) {
-			# Make the cluster (one for each core/thread)
-			cl <- makeCluster(cpu_thread_number)
-			clusterEvalQ(cl, {library(MALDIquant)})
-			# If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
-			if (index2 < length(spectra)) {
-				spectra_temp <- spectra [index1:index2]
-			} else {spectra_temp <- spectra [index1:length(spectra)]}
-			# Fix the indexes at every cycle
-			index1 <- index2 + 1
-			index2 <- index2 + process_in_packages_of
-			# Process the selected spectra
-			if (tof_mode == "linear") {
-				## Remove flat spectra
-				#spectra <- removeEmptyMassObjects (spectra)
-				if (preprocessing_parameters$smoothing_strength == "small") {
-					## Smoothing (Savitzky-Golay filter, with window size 5, 11 points)
-					if (Sys.info()[1] == "Linux") {
-						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5), mc.cores=cpu_thread_number)
-					} else {
-						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5))
-					}
-				}
-				if (preprocessing_parameters$smoothing_strength == "medium") {
-					## Smoothing (Savitzky-Golay filter, with window size 10, 21 points)
-					if (Sys.info()[1] == "Linux") {
-						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10), mc.cores=cpu_thread_number)
-					} else {
-						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10))
-					}
-				}
-				if (preprocessing_parameters$smoothing_strength == "strong") {
-					## Smoothing (Savitzky-Golay filter, with window size 20, 41 points)
-					if (Sys.info()[1] == "Linux") {
-						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20), mc.cores=cpu_thread_number)
-					} else {
-						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20))
-					}
-				}
-				if (preprocessing_parameters$smoothing_strength == "veryStrong") {
-					## Smoothing (Savitzky-Golay filter, with window size 30, 61 points)
-					if (Sys.info()[1] == "Linux") {
-						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30), mc.cores=cpu_thread_number)
-					} else {
-						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30))
-					}
-				}
-				## Baseline correction
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN = function (spectra) removeBaseline(spectra, method=preprocessing_parameters$baseline_subtraction_algorithm), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline(spectra, method=preprocessing_parameters$baseline_subtraction_algorithm))
-				}
-				## Normalization (TIC)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) calibrateIntensity(spectra, method=preprocessing_parameters$normalization_algorithm), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity(spectra, method=preprocessing_parameters$normalization_algorithm))
-				}
-			}
-			if (tof_mode == "reflectron" || tof_mode == "reflector") {
-				## Remove flat spectra
-				#spectra <- removeEmptyMassObjects (spectra)
-				if (preprocessing_parameters$smoothing_strength == "small") {
-					## Smoothing (Savitzky-Golay filter, with window size 2, 5 points)
-					if (Sys.info()[1] == "Linux") {
-						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1), mc.cores=cpu_thread_number)
-					} else {
-						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1))
-					}
-				}
-				if (preprocessing_parameters$smoothing_strength == "medium") {
-					## Smoothing (Savitzky-Golay filter, with window size 6, 13 points)
-					if (Sys.info()[1] == "Linux") {
-						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3), mc.cores=cpu_thread_number)
-					} else {
-						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3))
-					}
-				}
-				if (preprocessing_parameters$smoothing_strength == "strong") {
-					## Smoothing (Savitzky-Golay filter, with window size 12, 25 points)
-					if (Sys.info()[1] == "Linux") {
-						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6), mc.cores=cpu_thread_number)
-					} else {
-						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6))
-					}
-				}
-				if (preprocessing_parameters$smoothing_strength == "veryStrong") {
-					## Smoothing (Savitzky-Golay filter, with window size 18, 37 points)
-					if (Sys.info()[1] == "Linux") {
-						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9), mc.cores=cpu_thread_number)
-					} else {
-						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9))
-					}
-				}
-				## Baseline correction
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN = function (spectra) removeBaseline(spectra, method=preprocessing_parameters$baseline_subtraction_algorithm), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra) removeBaseline(spectra, method=preprocessing_parameters$baseline_subtraction_algorithm))
-				}
-				## Normalization (TIC)
-				if (Sys.info()[1] == "Linux") {
-					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) calibrateIntensity(spectra, method=preprocessing_parameters$normalization_algorithm), mc.cores=cpu_thread_number)
-				} else {
-					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) calibrateIntensity(spectra, method=preprocessing_parameters$normalization_algorithm))
-				}
-			}
-			# Close the processes
-			stopCluster(cl)
-			# Append these preprocessed spectra to the final list
-			preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
-		}
+		preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize=half_window_alignment, SNR=3, tolerance=(tolerance_ppm/10^6), warpingMethod="cubic")
 	}
-	######################################### Single spectra
-	if (!isMassSpectrumList(spectra)) {
-		if (tof_mode == "linear") {
-			## Remove flat spectra
-			#spectra <- removeEmptyMassObjects (spectra)
-			if (preprocessing_parameters$smoothing_strength == "small") {
-				## Smoothing (Savitzky-Golay filter, with window size 5, 11 points)
-				spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=5)
-			}
-			if (preprocessing_parameters$smoothing_strength == "medium") {
-				## Smoothing (Savitzky-Golay filter, with window size 10, 21 points)
-				spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=10)
-			}
-			if (preprocessing_parameters$smoothing_strength == "strong") {
-				## Smoothing (Savitzky-Golay filter, with window size 20, 41 points)
-				spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=20)
-			}
-			if (preprocessing_parameters$smoothing_strength == "veryStrong") {
-				## Smoothing (Savitzky-Golay filter, with window size 30, 61 points)
-				spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=30)
-			}
-			## Baseline correction
-			spectra_temp <- removeBaseline(spectra, method=preprocessing_parameters$baseline_subtraction_algorithm)
-			## Normalization (TIC)
-			spectra_temp <- calibrateIntensity(spectra, method=preprocessing_parameters$normalization_algorithm)
-		}
-		if (tof_mode == "reflectron" || tof_mode == "reflector") {
-			## Remove flat spectra
-			#spectra <- removeEmptyMassObjects (spectra)
-			if (preprocessing_parameters$smoothing_strength == "small") {
-				## Smoothing (Savitzky-Golay filter, with window size 2, 5 points)
-				spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=1)
-			}
-			if (preprocessing_parameters$smoothing_strength == "medium") {
-				## Smoothing (Savitzky-Golay filter, with window size 6, 13 points)
-				spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=3)
-			}
-			if (preprocessing_parameters$smoothing_strength == "strong") {
-				## Smoothing (Savitzky-Golay filter, with window size 12, 25 points)
-				spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=6)
-			}
-			if (preprocessing_parameters$smoothing_strength == "veryStrong") {
-				## Smoothing (Savitzky-Golay filter, with window size 18, 37 points)
-				spectra_temp <- smoothIntensity(spectra, method="SavitzkyGolay", halfWindowSize=9)
-			}
-			## Baseline correction
-			spectra_temp <- removeBaseline(spectra, method=preprocessing_parameters$baseline_subtraction_algorithm)
-			## Normalization (TIC)
-			spectra_temp <- calibrateIntensity(spectra, method=preprocessing_parameters$normalization_algorithm)
-		}
-		preprocessed_spectra <- spectra_temp
-	}
-	return (preprocessed_spectra)
+}
+return (preprocessed_spectra)
 }
 
 
@@ -2224,14 +1984,8 @@ if (spectra_per_patient > 1) {
 				# Adjust the spectra per patient value accordingo to how many nodes should be discarded
 				spectra_per_patient <- spectra_per_patient + discarded_nodes
 				# Detect and align peaks
-				if (tof_mode=="linear") {
-					peaks <- detectPeaks(patient_spectra, method=peak_picking_algorithm, SNR=3, halfWindowSize=20)
-					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
-				}
-				if (tof_mode=="reflectron" | tof_mode=="reflector") {
-					peaks <- detectPeaks(patient_spectra, method=peak_picking_algorithm, SNR=3, halfWindowSize=5)
-					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
-				}
+				peaks <- peak_picking(patient_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+				peaks <- align_and_filter_peaks(peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25)
 				# Generate the peaklist matrix
 				peaklist <- intensityMatrix(peaks, patient_spectra)
 				# Compute the distance matrix
@@ -2334,14 +2088,8 @@ if (spectra_per_patient > 1) {
 				# Adjust the spectra per patient value accordingo to how many nodes should be discarded
 				spectra_per_patient <- spectra_per_patient + discarded_nodes
 				# Detect and align peaks
-				if (tof_mode=="linear") {
-					peaks <- detectPeaks(patient_spectra, method=peak_picking_algorithm, SNR=3, halfWindowSize=20)
-					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
-				}
-				if (tof_mode=="reflectron" | tof_mode=="reflector") {
-					peaks <- detectPeaks(patient_spectra, method=peak_picking_algorithm, SNR=3, halfWindowSize=5)
-					peaks <- align_and_filter_peaks(peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
-				}
+				peaks <- peak_picking(patient_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+				peaks <- align_and_filter_peaks(peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25)
 				# Generate the peaklist matrix
 				peaklist <- intensityMatrix(peaks, patient_spectra)
 				# Compute the k-Means clustering
@@ -2541,12 +2289,12 @@ trim_spectra <- get(x="trim", pos="package:MALDIquant")
 average_spectrum <- averageMassSpectra(spectra, method="mean")
 average_spectrum <- removeBaseline(average_spectrum, method="TopHat")
 # Peak picking on the average spectrum (for plotting)
-peaks_average <- detectPeaks(average_spectrum, method=peak_picking_algorithm, SNR=SNR)
+peaks_average <- peak_picking(average_spectrum, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
 # Peak picking on the dataset
-peaks <- detectPeaks(spectra, method=peak_picking_algorithm, SNR=SNR)
+peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
 # Alignment: merge the two lists and align them all
 peaks_all <- append(peaks, peaks_average)
-peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
+peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
 # Empty the lists
 peaks_average <- list()
 peaks <- list()
@@ -2606,7 +2354,7 @@ return(avg_spectrum_with_bars)
 
 ############################################# MOST INTENSE PEAKS IN PEAK PICKING
 # This function returns a peak list containing only the most intense peaks per spectrum. If the input is a list of spectra, the function computes the peak picking and keeps only the most intense ones, if it's a list of peaklists, it applies the filtering function directly on the peaks.
-most_intense_signals <- function (spectra, signals_to_take=20, tof_mode="linear", peak_picking_algorithm="MAD") {
+most_intense_signals <- function (spectra, signals_to_take=20, tof_mode="linear", peak_picking_algorithm="MAD", multicore_processing=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("parallel", "MALDIquant"))
 # Rename the trim function
@@ -2632,33 +2380,30 @@ picking_subfunction <- function (peaks, signals_to_take) {
 	return (peaks)
 }
 ########################################################################
-# Define the half window size
-if (tof_mode == "linear") {
-	half_window_size <- 20
-} else if (tof_mode == "reflectron" || tof_mode == "reflector") {
-	half_window_size <- 5
-}
 # Peak picking
 if (isMassSpectrumList(spectra)) {
-    peaks <- detectPeaks(spectra, method=peak_picking_algorithm, SNR=3, halfWindowSize=half_window_size)
+	peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=3, multicore_processing=multicore_processing)
 } else if (isMassPeaksList(spectra)) {
-    peaks <- spectra
+peaks <- spectra
 }
 # Most intense signals
 if (isMassPeaksList(peaks)) {
-    # Detect the number of cores
-    cpu_thread_number <- detectCores(logical=TRUE)
-    #cpu_core_number <- cpu_thread_number/2
-	if (Sys.info()[1] == "Linux") {
-		most_intense_peaks <- mclapply(peaks, FUN = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take), mc.cores=cpu_thread_number)
+	if (multicore_processing == TRUE) {
+		# Detect the number of cores
+		cpu_thread_number <- detectCores(logical=TRUE)
+		if (Sys.info()[1] == "Linux") {
+			most_intense_peaks <- mclapply(peaks, FUN = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take), mc.cores=cpu_thread_number)
+		} else {
+			# Make the CPU cluster for parallelisation
+			cl <- makeCluster(cpu_thread_number)
+			most_intense_peaks <- parLapply(cl, peaks, fun = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take))
+			stopCluster(cl)
+		}
 	} else {
-		# Make the CPU cluster for parallelisation
-	    cl <- makeCluster(cpu_thread_number)
-		most_intense_peaks <- parLapply(cl, peaks, fun = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take))
-		stopCluster(cl)
+		most_intense_peaks <- lapply(peaks, FUN = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take))
 	}
 } else if (isMassPeaks(peaks)) {
-    most_intense_peaks <- picking_subfunction(peaks, signals_to_take)
+	most_intense_peaks <- picking_subfunction(peaks, signals_to_take)
 }
 return (most_intense_peaks)
 }
@@ -2869,13 +2614,12 @@ return (spectra_replicates_averaged)
 
 ################################################################### PEAK PICKING
 # This function takes a list of spectra (MALDIquant) and computes the peak picking.
-peak_picking <- function(spectra, peak_picking_algorithm="MAD", tof_mode="linear", SNR=3) {
+peak_picking <- function(spectra, peak_picking_algorithm="MAD", tof_mode="linear", SNR=3, multicore_processing=TRUE) {
 	########## Load the required libraries
 	install_and_load_required_packages(c("MALDIquant", "parallel"))
 	########## Multi-core
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	#cpu_core_number <- cpu_thread_number/2
 	##### TOF-MODE
 	if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
 		half_window_size <- 20
@@ -2888,18 +2632,22 @@ peak_picking <- function(spectra, peak_picking_algorithm="MAD", tof_mode="linear
 	}
 	########## MULTIPLE SPECTRA
 	if (isMassSpectrumList(spectra)) {
-		# Make the cluster (one for each core/thread)
-		cl <- makeCluster(cpu_thread_number)
-		clusterEvalQ(cl, {library(MALDIquant)})
 		# Peak detection
 		peaks <- list()
-		if (Sys.info()[1] == "Linux") {
-			peaks <- mclapply(spectra, FUN=function (spectra) detectPeaks(spectra, method=peak_picking_algorithm, halfWindowSize=half_window_size, SNR=SNR), mc.cores=cpu_thread_number)
+		if (multicore_processing == TRUE) {
+			if (Sys.info()[1] == "Linux") {
+				peaks <- mclapply(spectra, FUN=function (spectra) detectPeaks(spectra, method=peak_picking_algorithm, halfWindowSize=half_window_size, SNR=SNR), mc.cores=cpu_thread_number)
+			} else {
+				# Make the cluster (one for each core/thread)
+				cl <- makeCluster(cpu_thread_number)
+				clusterEvalQ(cl, {library(MALDIquant)})
+				peaks <- parLapply(cl, spectra, fun=function (spectra) detectPeaks(spectra, method=peak_picking_algorithm, halfWindowSize=half_window_size, SNR=SNR))
+				stopCluster(cl)
+			}
 		} else {
-		peaks <- parLapply(cl, spectra, fun=function (spectra) detectPeaks(spectra, method=peak_picking_algorithm, halfWindowSize=half_window_size, SNR=SNR))
+			peaks <- lapply(spectra, FUN=function (spectra) detectPeaks(spectra, method=peak_picking_algorithm, halfWindowSize=half_window_size, SNR=SNR))
 		}
-		# Stop the cluster
-		stopCluster(cl)
+
 	}
 	return (peaks)
 }
@@ -2909,7 +2657,13 @@ peak_picking <- function(spectra, peak_picking_algorithm="MAD", tof_mode="linear
 
 ################################################################# PEAK ALIGNMENT
 # This function takes a list of peaks (MALDIquant) and computes the peak alignment, along with the false positive removal and the removal of low-intensity peaks.
-align_and_filter_peaks <- function (peaks, peak_picking_algorithm="MAD", tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element-wise", reference_peaklist=NULL, spectra=NULL, alignment_iterations=5) {
+align_and_filter_peaks <- function (peaks, peak_picking_algorithm="MAD", tof_mode="linear", peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element-wise", reference_peaklist=NULL, spectra=NULL, alignment_iterations=5, multicore_processing=TRUE) {
+########## Determine the tolerance in PPM
+if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+	tolerance_ppm <- 2000
+} else if (tof_mode == "reflectron" || tof_mode == "reflector" || tof_mode == "R") {
+	tolerance_ppm <- 200
+}
 ########## Align only if there are many peaklists
 if (isMassPeaksList(peaks)) {
 	##### Load the required libraries
@@ -2940,14 +2694,14 @@ if (isMassPeaksList(peaks)) {
 	}
 	##### Low-intensity peaks removal
 	if (low_intensity_peaks_removal == TRUE) {
-		peaks_aligned <- remove_low_intensity_peaks(peaks_aligned, intensity_threshold_percent=intensity_threshold_percent, intensity_threshold_method=intensity_threshold_method)
+		peaks_aligned <- remove_low_intensity_peaks(peaks_aligned, intensity_threshold_percent=intensity_threshold_percent, intensity_threshold_method=intensity_threshold_method, multicore_processing=multicore_processing)
 	}
 	##### Align to a reference peaklist: AVERAGE SPECTRUM (if a spectra list is provided)
 	if (is.character(reference_peaklist) && reference_peaklist == "average" && !is.null(spectra)) {
 		# Average the spectra
 		average_spectrum <- averageMassSpectra(spectra, method="mean")
 		# Peak picking
-		average_spectrum_peaks <- peak_picking(average_spectrum, peak_picking_algorithm=peak_picking_algorithm, SNR=5)
+		average_spectrum_peaks <- peak_picking(average_spectrum, peak_picking_algorithm=peak_picking_algorithm, SNR=5, multicore_processing=multicore_processing)
 		reference_peaklist <- average_spectrum_peaks@mass
 	} else if (is.character(reference_peaklist) && reference_peaklist == "average" && is.null(spectra)) {
 		reference_peaklist <- NULL
@@ -2968,17 +2722,20 @@ if (isMassPeaksList(peaks)) {
 		}
 		############# If there are many peaklists or one peaklist (use multicore)
 		if (isMassPeaksList(peaks_aligned)) {
-			# Detect the number of cores
-			cpu_thread_number <- detectCores(logical=TRUE)
-			#cpu_core_number <- cpu_thread_number/2
-			if (Sys.info()[1] == "Linux") {
-				peaks_aligned <- mclapply(peaks_aligned, FUN=function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm), mc.cores=cpu_thread_number)
+			if (multicore_processing == TRUE) {
+				# Detect the number of cores
+				cpu_thread_number <- detectCores(logical=TRUE)
+				if (Sys.info()[1] == "Linux") {
+					peaks_aligned <- mclapply(peaks_aligned, FUN=function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm), mc.cores=cpu_thread_number)
+				} else {
+					# Make the CPU cluster for parallelisation
+					cl <- makeCluster(cpu_thread_number)
+					# Apply the multicore function
+					peaks_aligned <- parLapply(cl, peaks_aligned, fun=function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm))
+					stopCluster(cl)
+				}
 			} else {
-				# Make the CPU cluster for parallelisation
-				cl <- makeCluster(cpu_thread_number)
-				# Apply the multicore function
-				peaks_aligned <- parLapply(cl, peaks_aligned, fun=function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm))
-				stopCluster(cl)
+				peaks_aligned <- lapply(peaks_aligned, FUN=function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm))
 			}
 		} else {
 			peaks_aligned <- align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm)
@@ -2988,7 +2745,7 @@ if (isMassPeaksList(peaks)) {
 } else {
 	# Low-intensity peaks removal
 	if (low_intensity_peaks_removal == TRUE) {
-		peaks <- remove_low_intensity_peaks(peaks, intensity_threshold_percent=intensity_threshold_percent, intensity_threshold_method=intensity_threshold_method)
+		peaks <- remove_low_intensity_peaks(peaks, intensity_threshold_percent=intensity_threshold_percent, intensity_threshold_method=intensity_threshold_method, multicore_processing=multicore_processing)
 	}
 	return (peaks)
 }
@@ -3052,8 +2809,8 @@ spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=spe
 if (most_intense_peaks == TRUE) {
 	peaks_database <- most_intense_signals(spectra, signals_to_take=signals_to_take)
 } else {
-	peaks_database <- detectPeaks(spectra, method=peak_picking_algorithm, SNR=SNR)
-	#peaks_database <- align_and_filter_peaks(peaks_database, tolerance_ppm=tolerance_ppm, peaks_filtering=FALSE, low_intensity_peaks_removal=FALSE, reference_peaklist=reference_peaklist_for_alignment)
+	peaks_database <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+	#peaks_database <- align_and_filter_peaks(peaks_database, tof_mode=tof_mode, peaks_filtering=FALSE, low_intensity_peaks_removal=FALSE, reference_peaklist=reference_peaklist_for_alignment)
 }
 ####
 library_list <- list(spectra = spectra, peaks = peaks_database)
@@ -3233,14 +2990,8 @@ for (p in 1:length(patient_vector)) {
     patient_spectra_clustered <- patient_spectra_grouped$spectra_hca_grouped[[1]]
     # Put the database and the spectra together
     global_spectra <- append(spectra_database, patient_spectra_clustered_average)
-    if (tof_mode == "linear") {
-        global_peaks <- detectPeaks(global_spectra, SNR=3, method=peak_picking_algorithm, halfWindowSize=20)
-        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
-    }
-    if (tof_mode == "reflectron" || tof_mode =="reflector") {
-        global_peaks <- detectPeaks(global_spectra, SNR=3, method=peak_picking_algorithm, halfWindowSize=5)
-        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
-    }
+	global_peaks <- peak_picking(global_spectra, SNR=SNR, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode)
+	global_peaks <- align_and_filter_peaks(global_peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25)
     # Compute the intensity matrix
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
     intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, spectra_format="imzml", sample_output=TRUE, class_output=FALSE)
@@ -3306,14 +3057,8 @@ for (p in 1:length(patient_vector)) {
 	if ("pixels" %in% classification_of) {
     # Put the database and the spectra together
     global_spectra <- append(spectra_database, patient_spectra)
-    if (tof_mode == "linear") {
-        global_peaks <- detectPeaks(global_spectra, SNR=3, method=peak_picking_algorithm, halfWindowSize=20)
-        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
-    }
-    if (tof_mode == "reflectron" || tof_mode =="reflector") {
-        global_peaks <- detectPeaks(global_spectra, SNR=3, method=peak_picking_algorithm, halfWindowSize=5)
-        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
-    }
+	global_peaks <- peak_picking(global_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+        global_peaks <- align_and_filter_peaks(global_peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25)
     # Compute the intensity matrix
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
     intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, spectra_format="imzml", sample_output=TRUE, class_output=FALSE)
@@ -3376,14 +3121,8 @@ for (p in 1:length(patient_vector)) {
 		}
 		# Put the database and the spectra together
 	    global_spectra <- append(spectra_database, patient_spectra)
-	    if (tof_mode == "linear") {
-	        global_peaks <- detectPeaks(global_spectra, SNR=3, method=peak_picking_algorithm, halfWindowSize=20)
-	        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=2000, peaks_filtering=TRUE, frequency_threshold_percent=25)
-	    }
-	    if (tof_mode == "reflectron" || tof_mode =="reflector") {
-	        global_peaks <- detectPeaks(global_spectra, SNR=3, method=peak_picking_algorithm, halfWindowSize=5)
-	        global_peaks <- align_and_filter_peaks(global_peaks, tolerance_ppm=200, peaks_filtering=TRUE, frequency_threshold_percent=25)
-	    }
+	global_peaks <- peak_picking(global_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+	global_peaks <- align_and_filter_peaks(global_peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25)
 	    # Compute the intensity matrix
 	    intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
 	    intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks=global_peaks, class_list=class_list, spectra_format="imzml", sample_output=TRUE, class_output=FALSE)
@@ -3452,11 +3191,17 @@ return (list(classification_hca_results_avg=classification_hca_results_avg, clas
 ################################################ CLASSIFICATION VIA SVM: PROFILE
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the SVM model itself and the average spectrum of the patients with red bars on the signals used by the SVM to classify it.
-classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_name="SVMModel", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, peak_picking_algorithm="MAD", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000) {
+classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_name="SVMModel", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, peak_picking_algorithm="MAD", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 ########## Load the required packages
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
+#### TOF-MODE
+if (tof_mode == "linear") {
+	tolerance_ppm <- 2000
+} else if (tof_mode == "reflectron" || tof_mode == "reflector") {
+	tolerance_ppm <- 200
+}
 ########### List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 ## Multiple imzML file path provided (folder)
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
@@ -3526,7 +3271,7 @@ sample_spectra_avg <- smoothIntensity(sample_spectra_avg, method="SavitzkyGolay"
 sample_spectra_avg <- removeBaseline(sample_spectra_avg, method="TopHat")
 sample_spectra_avg <- calibrateIntensity(sample_spectra_avg, method="TIC")
 ## Peak picking
-sample_peaks_avg <- detectPeaks(sample_spectra_avg, method=peak_picking_algorithm, SNR=5)
+sample_peaks_avg <- peak_picking(sample_spectra_avg, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
 ##### Generate the intensity matrix for classification
 sample_matrix_avg <- matrix (nrow=1, ncol=length(sample_peaks_avg@mass))
 colnames(sample_matrix_avg) <- sample_peaks_avg@mass
@@ -3613,7 +3358,7 @@ if (is.null(final_result_matrix_avg)) {
 ################# Average spectrum with bars onto the signals used by the model
 # Average spectrum: sample_spectra_avg; model features: features_model; peaks: sample_peaks_avg
 # Detect peaks in the avg (SNR=1)
-sample_peaks_avg_for_bars <- detectPeaks(sample_spectra_avg, method=peak_picking_algorithm, SNR=3)
+sample_peaks_avg_for_bars <- peak_picking(sample_spectra_avg, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=3)
 # Determine the coordinates of the bars
 coordinates_of_bars <- list(x=numeric(), y=numeric())
 # Check if the features used for the model are in the spectrum
@@ -3674,11 +3419,17 @@ return (list(patient_classification_matrix=final_result_matrix_avg, average_spec
 ######################################### CLASSIFICATION VIA SVM: PIXEL-BY-PIXEL
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the SVM model itself.
-classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_model_name="SVMModel", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000) {
+classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_model_name="SVMModel", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
+### TOF-MODE
+if (tof_mode == "linear") {
+	tolerance_ppm <- 2000
+} else if (tof_mode == "reflector" || tof_mode == "reflectron") {
+	tolerance_ppm <- 200
+}
 ########## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 ## Multiple imzML filepath (path)
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
@@ -3747,8 +3498,8 @@ if (preprocessing == TRUE) {
 	sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
 }
 # Peak picking and alignment
-sample_peaks <- detectPeaks(sample_spectra, method=peak_picking_algorithm, SNR=5)
-sample_peaks <- align_and_filter_peaks(sample_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
+sample_peaks <- peak_picking(sample_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
+sample_peaks <- align_and_filter_peaks(sample_peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
 # Generate the intensity matrix for classification
 sample_matrix <- intensityMatrix(sample_peaks, sample_spectra)
 ########################### Determine the columns to keep and the column to add
@@ -3870,11 +3621,17 @@ return (list(pixel_by_pixel_classification=final_result_matrix, pixel_by_pixel_c
 ################################################ CLASSIFICATION VIA PLS: PROFILE
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the PLS model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel and the patient's average spectrum), MS images with the pixel-by-pixel classification, the PLS model itself and the average spectrum of the patients with red bars on the signals used by the PLS to classify it.
-classify_patients_pls_profile <- function (spectra_path, filepath_R, pls_model_name="pls_model", smoothing_strength_preprocessing="medium", tof_mode="linear", peak_picking_algorithm="MAD", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000) {
+classify_patients_pls_profile <- function (spectra_path, filepath_R, pls_model_name="pls_model", smoothing_strength_preprocessing="medium", tof_mode="linear", peak_picking_algorithm="MAD", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
+### TOF-MODE
+if (tof_mode == "linear") {
+	tolerance_ppm <- 2000
+} else if (tof_mode == "reflectron" || tof_mode == "reflector") {
+	tolerance_ppm <- 200
+}
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, spectra_format="imzml", full_path=TRUE)
@@ -3931,7 +3688,7 @@ sample_spectra_avg <- smoothIntensity(sample_spectra_avg, method="SavitzkyGolay"
 sample_spectra_avg <- removeBaseline(sample_spectra_avg, method="TopHat")
 sample_spectra_avg <- calibrateIntensity(sample_spectra_avg, method="TIC")
 # Peak picking
-sample_peaks_avg <- detectPeaks(sample_spectra_avg, method=peak_picking_algorithm, SNR=5)
+sample_peaks_avg <- peak_picking(sample_spectra_avg, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
 # Generate the intensity matrix for classification
 sample_matrix_avg <- matrix (nrow=1, ncol=length(sample_peaks_avg@mass))
 colnames(sample_matrix_avg) <- sample_peaks_avg@mass
@@ -4013,7 +3770,7 @@ if (is.null(final_result_matrix_avg)) {
 ################# Average spectrum with bars onto the signals used by the model
 # Average spectrum: sample_spectra_avg; model features: features_model; peaks: sample_peaks_avg
 # Detect peaks in the avg (SNR=1)
-sample_peaks_avg_for_bars <- detectPeaks(sample_spectra_avg, method=peak_picking_algorithm, SNR=3)
+sample_peaks_avg_for_bars <- peak_picking(sample_spectra_avg, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=3)
 # Determine the coordinates of the bars
 coordinates_of_bars <- list(x=numeric(), y=numeric())
 # Check if the features used for the model are in the spectrum
@@ -4075,11 +3832,17 @@ return (list(patient_classification_matrix=final_result_matrix_avg, average_spec
 ######################################### CLASSIFICATION VIA PLS: PIXEL-BY-PIXEL
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the PLS model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the PLS model itself.
-classify_patients_pls_pixelbypixel <- function (spectra_path, filepath_R, pls_model_name="pls_model", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000) {
+classify_patients_pls_pixelbypixel <- function (spectra_path, filepath_R, pls_model_name="pls_model", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
+### TOF-MODE
+if (tof_mode == "linear") {
+	tolerance_ppm <- 2000
+} else if (tof_mode == "reflector" || tof_mode == "reflectron") {
+	tolerance_ppm <- 200
+}
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, spectra_format="imzml", full_path=TRUE)
@@ -4135,8 +3898,8 @@ if (preprocessing == TRUE) {
 	sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
 }
 # Peak picking and alignment
-sample_peaks <- detectPeaks(sample_spectra, method=peak_picking_algorithm, SNR=5)
-sample_peaks <- align_and_filter_peaks(sample_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
+sample_peaks <- peak_picking(sample_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
+sample_peaks <- align_and_filter_peaks(sample_peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
 # Generate the intensity matrix for classification
 sample_matrix <- intensityMatrix(sample_peaks, sample_spectra)
 ########################### Determine the columns to keep and the column to add
@@ -4253,11 +4016,17 @@ return (list(pixel_by_pixel_classification=final_result_matrix, pixel_by_pixel_c
 ############################# CLASSIFICATION VIA NAIVE BAYES CLASSIFIER: PROFILE
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the Naive Bayes Classifier (NBC) model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the NBC model itself and the average spectrum of the patients with red bars on the signals used by the NBC to classify it.
-classify_patients_nbc_profile <- function (spectra_path, filepath_R, nbc_model_name="bayes_model", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000) {
+classify_patients_nbc_profile <- function (spectra_path, filepath_R, nbc_model_name="bayes_model", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
+### TOF-MODE
+if (tof_mode == "linear") {
+	tolerance_ppm <- 2000
+} else if (tof_mode == "reflectron" || tof_mode == "reflector") {
+	tolerance_ppm <- 200
+}
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, spectra_format="imzml", full_path=TRUE)
@@ -4314,7 +4083,7 @@ sample_spectra_avg <- smoothIntensity(sample_spectra_avg, method="SavitzkyGolay"
 sample_spectra_avg <- removeBaseline(sample_spectra_avg, method="TopHat")
 sample_spectra_avg <- calibrateIntensity(sample_spectra_avg, method="TIC")
 # Peak picking
-sample_peaks_avg <- detectPeaks(sample_spectra_avg, method=peak_picking_algorithm, SNR=5)
+sample_peaks_avg <- peak_picking(sample_spectra_avg, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
 # Generate the intensity matrix for classification
 sample_matrix_avg <- matrix (nrow=1, ncol=length(sample_peaks_avg@mass))
 colnames(sample_matrix_avg) <- sample_peaks_avg@mass
@@ -4396,7 +4165,7 @@ if (is.null(final_result_matrix_avg)) {
 ################# Average spectrum with bars onto the signals used by the model
 # Average spectrum: sample_spectra_avg; model features: features_model; peaks: sample_peaks_avg
 # Detect peaks in the avg (SNR=1)
-sample_peaks_avg_for_bars <- detectPeaks(sample_spectra_avg, method=peak_picking_algorithm, SNR=3)
+sample_peaks_avg_for_bars <- peak_picking(sample_spectra_avg, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=3)
 # Determine the coordinates of the bars
 coordinates_of_bars <- list(x=numeric(), y=numeric())
 # Check if the features used for the model are in the spectrum
@@ -4458,11 +4227,16 @@ return (list(patient_classification_matrix=final_result_matrix_avg, average_spec
 ###################### CLASSIFICATION VIA NAIVE BAYES CLASSIFIER: PIXEL-BY-PIXEL
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the Naive Bayes Classifier (NBC) model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the NBC model itself.
-classify_patients_nbc_pixelbypixel <- function (spectra_path, filepath_R, nbc_model_name="bayes_model", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000) {
+classify_patients_nbc_pixelbypixel <- function (spectra_path, filepath_R, nbc_model_name="bayes_model", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
+if (tof_mode == "linear") {
+	tolerance_ppm <- 2000
+} else if (tof_mode == "reflectron" || tof_mode == "reflector") {
+	tolerance_ppm <- 200
+}
 ## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
 	filepath_test_imzml <- read_spectra_files(spectra_path, spectra_format="imzml", full_path=TRUE)
@@ -4518,8 +4292,8 @@ if (preprocessing == TRUE) {
 	sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
 }
 # Peak picking and alignment
-sample_peaks <- detectPeaks(sample_spectra, method=peak_picking_algorithm, SNR=5)
-sample_peaks <- align_and_filter_peaks(sample_peaks, tolerance_ppm=tolerance_ppm, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
+sample_peaks <- peak_picking(sample_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
+sample_peaks <- align_and_filter_peaks(sample_peaks, tof_mode=tof_mode, peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1)
 # Generate the intensity matrix for classification
 sample_matrix <- intensityMatrix(sample_peaks, sample_spectra)
 ########################### Determine the columns to keep and the column to add
@@ -5346,9 +5120,8 @@ install_and_load_required_packages(c("caret", "pls", "stats", "doMC", "randomFor
 ##### MULTICORE
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
 # Register the foreach backend
-registerDoMC(cores = cpu_core_number)
+registerDoMC(cores = cpu_thread_number)
 # Initialization
 feature_weights <- NULL
 variable_importance <- NULL
@@ -5790,9 +5563,8 @@ install_and_load_required_packages(c("caret", "kernlab", "e1071", "doMC", "pROC"
 ##### MULTICORE
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
 # Register the foreach backend
-registerDoMC(cores = cpu_core_number)
+registerDoMC(cores = cpu_thread_number)
 ######################################## PCA
 if (pca == TRUE) {
 	# Compute the PCs
@@ -5948,9 +5720,8 @@ install_and_load_required_packages(c("caret", "kernlab", "e1071", "doMC", "pROC"
 ##### MULTICORE
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
 # Register the foreach backend
-registerDoMC(cores = cpu_core_number)
+registerDoMC(cores = cpu_thread_number)
 ################# FEATURES
 if (autotuning == TRUE) {
 	# Find the best tuning parameters for the SVM
@@ -6105,9 +5876,8 @@ install_and_load_required_packages(c("caret", "e1071", "doMC"))
 ##### MULTICORE
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
 # Register the foreach backend
-registerDoMC(cores = cpu_core_number)
+registerDoMC(cores = cpu_thread_number)
 ################ Tuning
 # A tune grid has to be generated and passed to the tuning algorithm
 if (is.null(tuning_parameters) || is.null(tuning_parameters$ncomp)) {
@@ -6189,9 +5959,8 @@ install_and_load_required_packages(c("caret", "e1071", "doMC", "klaR", "MASS"))
 ##### MULTICORE
 # Detect the number of cores
 cpu_thread_number <- detectCores(logical=TRUE)
-cpu_core_number <- cpu_thread_number/2
 # Register the foreach backend
-registerDoMC(cores = cpu_core_number)
+registerDoMC(cores = cpu_thread_number)
 # Fit the model with the features and tune it with cross-validation
 train_control_nbc <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv)
 ################ Tuning
@@ -6341,7 +6110,7 @@ if (isMassPeaksList(peaks_database)) {
 # Merge the peaklists
 peaks_all <- append(peaks_database, peaks_test)
 # Align
-peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 # Restore the lists
 peaks_database <- peaks_all [1:database_size]
 peaks_test <- peaks_all [(database_size+1):length(peaks_all)]
@@ -6558,7 +6327,7 @@ if (isMassPeaksList(peaks_database)) {
 peaks_all <- append(peaks_database, peaks_test)
 spectra_all <- append(spectra_database, spectra_test)
 # Align
-peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 # Restore the lists
 peaks_database <- peaks_all [1:database_size]
 peaks_test <- peaks_all [(database_size+1):length(peaks_all)]
@@ -6759,7 +6528,7 @@ if (isMassPeaksList(peaks_database)) {
 # Merge the peaklists
 peaks_all <- append(peaks_database, peaks_test)
 # Align
-peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 # Restore the lists
 peaks_database <- peaks_all [1:database_size]
 peaks_test <- peaks_all [(database_size+1):length(peaks_all)]
@@ -7053,7 +6822,7 @@ for (s in 1:number_of_samples) {
 	peaks_all <- append(peaks_database_temp, peaks_sample)
 	spectra_all <- append(spectra_database_temp, spectrum_sample)
 	# Align the peaks
-	peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+	peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 	# Restore the lists
 	peaks_database_temp <- peaks_all [1:database_size]
 	peaks_sample <- peaks_all [[length(peaks_all)]]
@@ -7288,7 +7057,7 @@ if (isMassPeaksList(peaks_database)) {
 peaks_all <- append(peaks_database, peaks_test)
 spectra_all <- append(spectra_database, spectra_test)
 # Align
-peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 # Restore the lists
 peaks_database <- peaks_all [1:database_size]
 peaks_test <- peaks_all [(database_size+1):length(peaks_all)]
@@ -7487,7 +7256,7 @@ for (s in 1:number_of_samples) {
 	peaks_all <- append(peaks_database_temp, peaks_sample)
 	spectra_all <- append(spectra_database_temp, spectrum_sample)
 	# Align the peaks
-	peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+	peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 	# Restore the lists
 	peaks_database_temp <- peaks_all [1:database_size]
 	peaks_sample <- peaks_all [[length(peaks_all)]]
@@ -7734,7 +7503,7 @@ for (spl in 1:number_of_samples) {
 		peaks_all <- append(peaks_database_temp, peaks_sample)
 		spectra_all <- append(spectra_database_temp, spectrum_sample)
 		# Align the peaks
-		peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+		peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 		# Restore the lists
 		peaks_database_temp <- peaks_all[[1]]
 		peaks_sample <- peaks_all[[2]]
@@ -7973,7 +7742,7 @@ for (spl in 1:number_of_samples) {
 		peaks_all <- append(peaks_database_temp, peaks_sample)
 		spectra_all <- append(spectra_database_temp, spectrum_sample)
 		# Align the peaks
-		peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+		peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 		# Restore the lists
 		peaks_database_temp <- peaks_all[[1]]
 		peaks_sample <- peaks_all[[2]]
@@ -8111,7 +7880,7 @@ return(output)
 # The function calculates the score for the Spectral Typer program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity symmetry via the correlation matrix.
 # Each sample gets compared with each entry in the database, separately.
 # Parallel implemented.
-spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=NULL, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, low_intensity_threshold_method="element-wise", tolerance_ppm=2000, intensity_correction_coefficient=1, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=FALSE) {
+spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=NULL, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, low_intensity_threshold_method="element-wise", tolerance_ppm=2000, intensity_correction_coefficient=1, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=FALSE, multicore_processing=TRUE) {
 install_and_load_required_packages(c("MALDIquant", "corrplot", "weights", "stats", "parallel"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
@@ -8211,7 +7980,7 @@ comparison_sample_db_subfunction_correlation <- function(x) {
 		peaks_all <- append(peaks_database_temp, peaks_sample)
 		spectra_all <- append(spectra_database_temp, spectrum_sample)
 		# Align the peaks
-		peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+		peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 		# Restore the lists
 		peaks_database_temp <- peaks_all[[1]]
 		peaks_sample <- peaks_all[[2]]
@@ -8313,19 +8082,20 @@ comparison_sample_db_subfunction_correlation <- function(x) {
 	# Return a list, each element of which is a matrix row. Finally, all the matrix rows will be rbind together.
 	return(list(number_of_signals_samples=number_of_signals_samples, number_of_signals_database_matrix=number_of_signals_database_matrix, matching_signals_matrix=matching_signals_matrix, fit_matrix=fit_matrix, retrofit_matrix=retrofit_matrix, intensity_correlation_matrix=intensity_correlation_matrix, pvalue_matrix=pvalue_matrix, slope_matrix=slope_matrix))
 }
-# Detect the number of cores
-cpu_thread_number <- detectCores(logical=TRUE)
-#cpu_core_number <- cpu_thread_number/2
-if (Sys.info()[1] == "Linux") {
-	output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_correlation(global_list), mc.cores=cpu_thread_number)
-} else if (Sys.info()[1] == "Windows") {
-	# Make the CPU cluster for parallelisation
-	cls <- makeCluster(cpu_thread_number)
-	# Make the cluster use the custom functions and the package functions along with their parameters
-	clusterEvalQ(cls, {library(MALDIquant)})
-	clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tolerance_ppm", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue"), envir=environment())
-	output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_correlation(global_list))
-	stopCluster(cls)
+if (multicore_processing == TRUE) {
+	# Detect the number of cores
+	cpu_thread_number <- detectCores(logical=TRUE)
+	if (Sys.info()[1] == "Linux") {
+		output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_correlation(global_list), mc.cores=cpu_thread_number)
+	} else {
+		# Make the CPU cluster for parallelisation
+		cls <- makeCluster(cpu_thread_number)
+		# Make the cluster use the custom functions and the package functions along with their parameters
+		clusterEvalQ(cls, {library(MALDIquant)})
+		clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue"), envir=environment())
+		output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_correlation(global_list))
+		stopCluster(cls)
+	}
 } else {
 	output_list <- lapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_correlation(global_list))
 }
@@ -8447,7 +8217,7 @@ return (output)
 # The function calculates the score for the Spectral Typer program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity comparison.
 # Each sample gets compared with each entry in the database, separately.
 # Parallel implemented.
-spectral_typer_score_signal_intensity <- function(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=NULL, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, low_intensity_threshold_method="element-wise", tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1) {
+spectral_typer_score_signal_intensity <- function(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=NULL, comparison=c("intensity percentage", "standard deviation"), peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, low_intensity_threshold_method="element-wise", tolerance_ppm=2000, intensity_tolerance_percent_threshold=50, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=TRUE, number_of_st_dev=1, multicore_processing=TRUE) {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant","parallel")
 # Rename the trim function
@@ -8544,7 +8314,7 @@ comparison_sample_db_subfunction_intensity <- function(x) {
 		peaks_all <- append(peaks_database_temp, peaks_sample)
 		spectra_all <- append(spectra_database_temp, spectrum_sample)
 		# Align the peaks
-		peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+		peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 		# Restore the lists
 		peaks_database_temp <- peaks_all[[1]]
 		peaks_sample <- peaks_all[[2]]
@@ -8624,19 +8394,20 @@ comparison_sample_db_subfunction_intensity <- function(x) {
 	# Return a list, each element of which is a matrix row. Finally, all the matrix rows will be rbind together.
 	return(list(number_of_signals_samples=number_of_signals_samples, number_of_signals_database_matrix=number_of_signals_database_matrix, matching_signals_matrix=matching_signals_matrix, fit_matrix=fit_matrix, retrofit_matrix=retrofit_matrix, intensity_matching_matrix=intensity_matching_matrix))
 }
-# Detect the number of cores
-cpu_thread_number <- detectCores(logical=TRUE)
-#cpu_core_number <- cpu_thread_number/2
-if (Sys.info()[1] == "Linux") {
-	output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_intensity(global_list), mc.cores=cpu_thread_number)
-} else if (Sys.info()[1] == "Windows") {
-	# Make the CPU cluster for parallelisation
-	cls <- makeCluster(cpu_thread_number)
-	# Make the cluster use the custom functions and the package functions along with their parameters
-	clusterEvalQ(cls, {library(MALDIquant)})
-	clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_intensity", "database_size", "tolerance_ppm", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue", "intensity_tolerance_percent_threshold", "comparison"), envir=environment())
-	output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_intensity(global_list))
-	stopCluster(cls)
+if (multicore_processing == TRUE) {
+	# Detect the number of cores
+	cpu_thread_number <- detectCores(logical=TRUE)
+	if (Sys.info()[1] == "Linux") {
+		output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_intensity(global_list), mc.cores=cpu_thread_number)
+	} else {
+		# Make the CPU cluster for parallelisation
+		cls <- makeCluster(cpu_thread_number)
+		# Make the cluster use the custom functions and the package functions along with their parameters
+		clusterEvalQ(cls, {library(MALDIquant)})
+		clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_intensity", "database_size", "tof_mode", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue", "intensity_tolerance_percent_threshold", "comparison"), envir=environment())
+		output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_intensity(global_list))
+		stopCluster(cls)
+	}
 } else {
 	output_list <- lapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_intensity(global_list))
 }
@@ -8736,7 +8507,7 @@ return(output)
 # The function calculates the score for the Spectral Typer program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity symmetry via the similarity index computation.
 # Each sample gets compared with each entry in the database, separately.
 # Parallel implemented.
-spectral_typer_score_similarity_index <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=NULL, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, low_intensity_threshold_method="element-wise", tolerance_ppm=2000, intensity_correction_coefficient=1, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=FALSE) {
+spectral_typer_score_similarity_index <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=NULL, peaks_filtering=TRUE, peaks_filtering_percentage_threshold=25, low_intensity_peaks_removal=FALSE, low_intensity_percentage_threshold=0.1, low_intensity_threshold_method="element-wise", tolerance_ppm=2000, intensity_correction_coefficient=1, spectra_format="brukerflex", spectra_path_output=TRUE, score_only=FALSE, multicore_processing=TRUE) {
 install_and_load_required_packages(c("MALDIquant", "stats", "parallel"))
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
@@ -8832,7 +8603,7 @@ comparison_sample_db_subfunction_similarity_index <- function(x) {
 		peaks_all <- append(peaks_database_temp, peaks_sample)
 		spectra_all <- append(spectra_database_temp, spectrum_sample)
 		# Align the peaks
-		peaks_all <- align_and_filter_peaks(peaks_all, tolerance_ppm=tolerance_ppm, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
+		peaks_all <- align_and_filter_peaks(peaks_all, tof_mode=tof_mode, peaks_filtering=peaks_filtering, frequency_threshold_percent=peaks_filtering_percentage_threshold, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=low_intensity_percentage_threshold, intensity_threshold_method=low_intensity_threshold_method)
 		# Restore the lists
 		peaks_database_temp <- peaks_all[[1]]
 		peaks_sample <- peaks_all[[2]]
@@ -8901,19 +8672,20 @@ comparison_sample_db_subfunction_similarity_index <- function(x) {
 	# Return a list, each element of which is a matrix row. Finally, all the matrix rows will be rbind together.
 	return(list(number_of_signals_samples=number_of_signals_samples, number_of_signals_database_matrix=number_of_signals_database_matrix, matching_signals_matrix=matching_signals_matrix, fit_matrix=fit_matrix, retrofit_matrix=retrofit_matrix, similarity_index_matrix=similarity_index_matrix))
 }
-# Detect the number of cores
-cpu_thread_number <- detectCores(logical=TRUE)
-#cpu_core_number <- cpu_thread_number/2
-if (Sys.info()[1] == "Linux") {
-	output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_similarity_index(global_list), mc.cores=cpu_thread_number)
-} else if (Sys.info()[1] == "Windows") {
-	# Make the CPU cluster for parallelisation
-	cls <- makeCluster(cpu_thread_number)
-	# Make the cluster use the custom functions and the package functions along with their parameters
-	clusterEvalQ(cls, {library(MALDIquant)})
-	clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tolerance_ppm", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method"), envir=environment())
-	output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_similarity_index(global_list))
-	stopCluster(cls)
+if (multicore_processing == TRUE) {
+	# Detect the number of cores
+	cpu_thread_number <- detectCores(logical=TRUE)
+	if (Sys.info()[1] == "Linux") {
+		output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_similarity_index(global_list), mc.cores=cpu_thread_number)
+	} else {
+		# Make the CPU cluster for parallelisation
+		cls <- makeCluster(cpu_thread_number)
+		# Make the cluster use the custom functions and the package functions along with their parameters
+		clusterEvalQ(cls, {library(MALDIquant)})
+		clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method"), envir=environment())
+		output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_similarity_index(global_list))
+		stopCluster(cls)
+	}
 } else {
 	output_list <- lapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_similarity_index(global_list))
 }
