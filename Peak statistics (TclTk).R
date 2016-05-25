@@ -1,4 +1,4 @@
-############################ PEAK STATISTICS 2016.05.24
+############################ PEAK STATISTICS 2016.05.25
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
@@ -24,13 +24,15 @@ peaks_filtering <- TRUE
 low_intensity_peaks_removal <- FALSE
 intensity_threshold_method <- "element-wise"
 peak_picking_mode <- "all"
-peak_picking_algorithm <- "MAD"
+peak_picking_algorithm <- "SuperSmoother"
 file_type_export <- "xlsx"
 spectra <- NULL
 peaks <- NULL
 remove_outliers <- FALSE
 exclude_spectra_without_peak <- FALSE
 multicore_processing <- TRUE
+transform_data <- FALSE
+transform_data_algorithm <- NULL
 
 
 
@@ -43,12 +45,13 @@ spectra_format_value <- "imzML"
 peaks_filtering_value <- "YES"
 low_intensity_peaks_removal_value <- "NO"
 peak_picking_mode_value <- "all"
-peak_picking_algorithm_value <- "          MAD          "
+peak_picking_algorithm_value <- "Super Smoother"
 intensity_threshold_method_value <- "element-wise"
 spectra_format_value <- "imzML"
 remove_outliers_value <- "NO"
 exclude_spectra_without_peak_value <- "NO"
 multicore_processing_value <- "YES"
+transform_data_value <- "    NO    "
 
 
 
@@ -180,7 +183,7 @@ import_spectra_function <- function() {
 	### Truncation
 	spectra <- trim_spectra(spectra, range = mass_range)
 	### Preprocessing
-	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE)
+	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm)
 	# Exit the function and put the variable into the R workspace
 	.GlobalEnv$spectra <- spectra
 	.GlobalEnv$mass_range_value <- mass_range_value
@@ -371,10 +374,39 @@ multicore_processing_choice <- function() {
 		multicore_processing_value <- "NO"
 	}
 	multicore_processing_value_label <- tklabel(window, text=multicore_processing_value)
-	#tkgrid(multicore_processing_value_label, row=4, column=3)
+	tkgrid(multicore_processing_value_label, row=12, column=3)
 	# Escape the function
 	.GlobalEnv$multicore_processing <- multicore_processing
 	.GlobalEnv$multicore_processing_value <- multicore_processing_value
+}
+
+##### Transform the data
+transform_data_choice <- function() {
+	# Catch the value from the menu
+	transform_data <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (transform_data == "YES") {
+		transform_data <- TRUE
+		# Ask for the algorithm
+		transform_data_algorithm <- select.list(c("sqrt","log","log2","log10"), title="Choose")
+		# Default
+		if (transform_data_algorithm == "") {
+			transform_data_algorithm <- "sqrt"
+		}
+	} else if (transform_data == "NO" || transform_data == "") {
+		transform_data <- FALSE
+	}
+	# Set the value of the displaying label
+	if (transform_data == TRUE) {
+		transform_data_value <- paste("YES", "(", transform_data_algorithm, ")")
+	} else {
+		transform_data_value <- "    NO    "
+	}
+	transform_data_value_label <- tklabel(window, text=transform_data_value)
+	tkgrid(transform_data_value_label, row=12, column=5)
+	# Escape the function
+	.GlobalEnv$transform_data <- transform_data
+	.GlobalEnv$transform_data_value <- transform_data_value
 }
 
 ##### Low intensity peaks removal
@@ -613,6 +645,8 @@ run_peak_statistics_button <- tkbutton(window, text="COMPUTE THE PEAK STATISTICS
 signals_avg_and_sd_button <- tkbutton(window, text="MEAN +/- SD of number of signals", command=signals_avg_and_sd_function)
 # Multicore
 multicore_processing_button <- tkbutton(window, text="ALLOW PARALLEL\nPROCESSING", command=multicore_processing_choice)
+# Transform the data
+transform_data_button <- tkbutton(window, text="TRANSFORM THE DATA", command=transform_data_choice)
 # Set the file name
 set_file_name_label <- tklabel(window, text="<-- Set the file name")
 set_file_name_entry <- tkentry(window, width=30, textvariable=file_name)
@@ -629,6 +663,8 @@ remove_outliers_value_label <- tklabel(window, text=remove_outliers_value)
 tof_mode_value_label <- tklabel(window, text=tof_mode_value)
 spectra_format_value_label <- tklabel(window, text=spectra_format_value)
 exclude_spectra_without_peak_value_label <- tklabel(window, text=exclude_spectra_without_peak_value)
+multicore_processing_value_label <- tklabel(window, text=multicore_processing_value)
+transform_data_value_label <- tklabel(window, text=transform_data_value)
 
 #### Geometry manager
 # Scrollbar
@@ -679,9 +715,12 @@ tkgrid(preprocess_spectra_in_packages_of_entry, row=9, column=5)
 tkgrid(file_type_export_label, row=10, column=2)
 tkgrid(file_type_export_entry, row=10, column=3)
 tkgrid(file_type_export_value_label, row=10, column=4)
-tkgrid(import_spectra_button, row=11, column=2)
-tkgrid(multicore_processing_button, row=11, column=1)
-tkgrid(peak_picking_button, row=11, column=3)
-tkgrid(run_peak_statistics_button, row=11, column=4)
-tkgrid(signals_avg_and_sd_button, row=11, column=5)
-tkgrid(end_session_button, row=12, column=3)
+tkgrid(multicore_processing_button, row=12, column=2)
+tkgrid(multicore_processing_value_label, row=12, column=3)
+tkgrid(transform_data_button, row=12, column=4)
+tkgrid(transform_data_value_label, row=12, column=5)
+tkgrid(import_spectra_button, row=13, column=2)
+tkgrid(peak_picking_button, row=13, column=3)
+tkgrid(run_peak_statistics_button, row=13, column=4)
+tkgrid(signals_avg_and_sd_button, row=13, column=5)
+tkgrid(end_session_button, row=14, column=3)
