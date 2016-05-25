@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.05.24
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.05.25
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -240,7 +240,7 @@ return (signal_matrix)
 
 ################################################################ SIGNAL FOLLOWER
 # This function takes a folder containing imzML files in it and a list of signals of interest (along with their possible names). It imports the spectra and returns a matrix listing the signal of interests along with their statistics.
-signal_follower_statistics <- function (filepath, signal_list, mass_labels=list(), SNR=5, spectra_format="imzml", tof_mode="linear", smoothing_strength_preprocessing="medium", process_in_packages_of=length(spectra), tolerance_ppm=2000, peak_picking_algorithm="MAD") {
+signal_follower_statistics <- function (filepath, signal_list, mass_labels=list(), SNR=5, spectra_format="imzml", tof_mode="linear", smoothing_strength_preprocessing="medium", process_in_packages_of=length(spectra), tolerance_ppm=2000, peak_picking_algorithm="SuperSmoother") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
 # Rename the trim function
@@ -601,7 +601,7 @@ return (spectra)
 ######################### REPLACE THE SNR WITH THE STDEV IN THE PEAKS
 # This function computes the standard deviation of each peak of an average spectrum peaklist, by replacing the existing SNR slot with the SD or CV: all the peaks (average and dataset) are aligned and each peak of the average peaklist is searched across the dataset thanks to the intensity matrix.
 replace_SNR_in_avg_peaklist <- function (spectra, SNR=5, tof_mode="linear", tolerance_ppm=2000, spectra_format="imzml", replace_snr_with="std") {
-install_and_load_required_packages(c("MALDIquant", "stats"), peak_picking_algorithm="MAD")
+install_and_load_required_packages(c("MALDIquant", "stats"), peak_picking_algorithm="SuperSmoother")
 # Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
 # Check if it is not a single spectrum
@@ -731,7 +731,7 @@ return (list (vector=v, outliers_position=outliers_position))
 
 ######################################### PEAK STATISTICS (on processed Spectra)
 # This function computes the peak statistics onto a selected spectra dataset (or to the provided peaks), both when the spectra belong to no (or one) class and more classes.
-peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm="MAD", class_list=NULL, class_in_file_name=TRUE, tof_mode="linear", spectra_format="imzml", exclude_spectra_without_peak=FALSE, alignment_iterations=5, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element_wise") {
+peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm="SuperSmoother", class_list=NULL, class_in_file_name=TRUE, tof_mode="linear", spectra_format="imzml", exclude_spectra_without_peak=FALSE, alignment_iterations=5, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element_wise") {
 ########## Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats"))
 ########## Rename the trim function
@@ -1126,7 +1126,7 @@ return (peak_stat_matrix)
 ############################################# SPECTRA
 
 ################## PLOT THE SIGNALS OF INTEREST WITH THE SD BARS ON THE AVERAGE
-average_spectrum_bars_signals_of_interest <- function (spectra, SNR=5, signals_of_interest=peaks_average@mass, tolerance_ppm=2000, tof_mode="linear", half_window_plot=1000, graph_title="Spectrum", average_spectrum_colour="black", peak_points=TRUE, points_colour="red", bar_width=40, bar_colour="blue", peak_picking_algorithm="MAD") {
+average_spectrum_bars_signals_of_interest <- function (spectra, SNR=5, signals_of_interest=peaks_average@mass, tolerance_ppm=2000, tof_mode="linear", half_window_plot=1000, graph_title="Spectrum", average_spectrum_colour="black", peak_points=TRUE, points_colour="red", bar_width=40, bar_colour="blue", peak_picking_algorithm="SuperSmoother") {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
@@ -1206,7 +1206,7 @@ return (spectrum_images)
 # This function imports the spectra in a memory efficient way: it reads spectra from one imzML file at a time, it can discard spectra according to their TIC, it runs the preprocessing of the spectra from the imzML file into packages of spectra, it can generate a set of representative average spectra (by grouping spectra randomly or according to a clustering algorithm). After this, it stores all the spectra from all the imzML files into a variable and from here it can align the spectra with the peaklist of the average spectrum of the dataset and it can crop all the spectra to a selected mass range.
 # It relies upon other functions.
 # The functions returns (the user can select what to compute) a list of elements: all the spectra, the representative spectra, the MS images after clustering.
-memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", mass_range=c(0,0), preprocess_spectra=TRUE, peak_picking_algorithm="MAD", process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", clustering_method_for_hca="agglomerative", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=2000, spectra_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
+memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", mass_range=c(0,0), preprocess_spectra=TRUE, peak_picking_algorithm="SuperSmoother", process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", clustering_method_for_hca="agglomerative", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=2000, spectra_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
 ################################################### Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
 # Rename the trim function
@@ -1672,36 +1672,51 @@ return (spectra)
 
 ######################################################## SPECTRA PRE-PROCESSING
 # The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalization)
-preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra), align_spectra=FALSE, multicore_processing=TRUE) {
-# Load the required libraries
+preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra), align_spectra=FALSE, multicore_processing=TRUE, data_transformation=FALSE, transformation_algorithm="sqrt") {
+##### Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "parallel"))
-# Rename the trim function
+##### Rename the trim function
 trim_spectra <- get(x="trim", pos="package:MALDIquant")
-# Check if it is not a single spectrum
 ######################################### Multiple spectra
 if (isMassSpectrumList(spectra)) {
-	# Detect the number of cores
+	##### Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	# Packages of preprocessing
+	##### Packages of preprocessing
 	if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
 		process_in_packages_of <- length(spectra)
 	}
-	# Create the list containing the processed spectra
+	##### Create the list containing the processed spectra
 	preprocessed_spectra <- list()
 	index1 <- 1
 	index2 <- process_in_packages_of
 	spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
 	for (p in 1:spectra_packages) {
-		# If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
+		## If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
 		if (index2 < length(spectra)) {
 			spectra_temp <- spectra [index1:index2]
 		} else {spectra_temp <- spectra [index1:length(spectra)]}
-		# Fix the indexes at every cycle
+		## Fix the indexes at every cycle
 		index1 <- index2 + 1
 		index2 <- index2 + process_in_packages_of
-		# Process the selected spectra
+		##### Process the selected spectra (spectra_temp)
 		## Remove flat spectra
 		#spectra <- removeEmptyMassObjects (spectra)
+		## Transformation
+		if (data_transformation == TRUE) {
+			if (multicore_processing == TRUE) {
+				if (Sys.info()[1] == "Linux") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra) transformIntensity(spectra, method=transformation_algorithm), mc.cores=cpu_thread_number)
+				} else {
+					# Make the cluster (one for each core/thread)
+					cl <- makeCluster(cpu_thread_number)
+					clusterEvalQ(cl, {library(MALDIquant)})
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra) transformIntensity(spectra, method=transformation_algorithm))
+					stopCluster(cl)
+				}
+			} else {
+				spectra_temp <- lapply(spectra_temp, FUN=function (spectra) transformIntensity(spectra, method=transformation_algorithm))
+			}
+		}
 		## Smoothing
 		if (tof_mode == "linear") {
 			if (smoothing_strength == "small") {
@@ -1832,7 +1847,7 @@ return (preprocessed_spectra)
 # It is advisable to use a list of spectra coming from one patient (one imzML)
 # Spectra_per_patient = 1 returns the average spectrum of the spectra dataset.
 # The function returns a list of elements: representative spectra, MS images of pixels under the same nodes coloured the same way, list of spectra under the discarded nodes (with their average spectrum), list of spectra grouped according to the node they belong to.
-group_spectra <- function (spectra, spectra_per_patient=1, spectra_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", clustering_method="agglomerative", discarded_nodes=1, balanced=TRUE, method="mean", peak_picking_algorithm="MAD") {
+group_spectra <- function (spectra, spectra_per_patient=1, spectra_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", clustering_method="agglomerative", discarded_nodes=1, balanced=TRUE, method="mean", peak_picking_algorithm="SuperSmoother") {
 # Load the required libraries
 install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
 # Rename the trim function
@@ -2280,7 +2295,7 @@ return (class_spectra_grouped)
 
 ######################## PLOT THE MEAN SPECTRUM WITH THE SD BARS ON THE AVERAGE
 # This function takes a list of spectra (MALDIquant) as input and returns the average spectrum of the provided dataset with bars onto the peaks, after calculating the standard deviation.
-average_spectrum_bars <- function (spectra, SNR=5, peak_picking_algorithm="MAD", tolerance_ppm=2000, mass_range_plot=c(4000,15000), graph_title="Spectrum", average_spectrum_colour="black", peak_points="yes", points_colour="red", bar_width=40, bar_colour="blue") {
+average_spectrum_bars <- function (spectra, SNR=5, peak_picking_algorithm="SuperSmoother", tolerance_ppm=2000, mass_range_plot=c(4000,15000), graph_title="Spectrum", average_spectrum_colour="black", peak_points="yes", points_colour="red", bar_width=40, bar_colour="blue") {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant")
 # Rename the trim function
@@ -2354,7 +2369,7 @@ return(avg_spectrum_with_bars)
 
 ############################################# MOST INTENSE PEAKS IN PEAK PICKING
 # This function returns a peak list containing only the most intense peaks per spectrum. If the input is a list of spectra, the function computes the peak picking and keeps only the most intense ones, if it's a list of peaklists, it applies the filtering function directly on the peaks.
-most_intense_signals <- function (spectra, signals_to_take=20, tof_mode="linear", peak_picking_algorithm="MAD", multicore_processing=TRUE) {
+most_intense_signals <- function (spectra, signals_to_take=20, tof_mode="linear", peak_picking_algorithm="SuperSmoother", multicore_processing=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("parallel", "MALDIquant"))
 # Rename the trim function
@@ -2614,7 +2629,7 @@ return (spectra_replicates_averaged)
 
 ################################################################### PEAK PICKING
 # This function takes a list of spectra (MALDIquant) and computes the peak picking.
-peak_picking <- function(spectra, peak_picking_algorithm="MAD", tof_mode="linear", SNR=3, multicore_processing=TRUE) {
+peak_picking <- function(spectra, peak_picking_algorithm="SuperSmoother", tof_mode="linear", SNR=3, multicore_processing=TRUE) {
 	########## Load the required libraries
 	install_and_load_required_packages(c("MALDIquant", "parallel"))
 	########## Multi-core
@@ -2657,7 +2672,7 @@ peak_picking <- function(spectra, peak_picking_algorithm="MAD", tof_mode="linear
 
 ################################################################# PEAK ALIGNMENT
 # This function takes a list of peaks (MALDIquant) and computes the peak alignment, along with the false positive removal and the removal of low-intensity peaks.
-align_and_filter_peaks <- function (peaks, peak_picking_algorithm="MAD", tof_mode="linear", peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element-wise", reference_peaklist=NULL, spectra=NULL, alignment_iterations=5, multicore_processing=TRUE) {
+align_and_filter_peaks <- function (peaks, peak_picking_algorithm="SuperSmoother", tof_mode="linear", peaks_filtering=TRUE, frequency_threshold_percent=25, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element-wise", reference_peaklist=NULL, spectra=NULL, alignment_iterations=5, multicore_processing=TRUE) {
 ########## Determine the tolerance in PPM
 if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
 	tolerance_ppm <- 2000
@@ -2765,7 +2780,7 @@ if (isMassPeaksList(peaks)) {
 # This function reads the files contained in a provided folder (no memory efficient importing), it can average them according to the class they belong to or according to the folder they are into (average replicate/patient). It also computes the peak picking and can replace the SNR field in the peaklist with the standard deviation of the peaks or the coefficient of variation.
 # It returns a list containing: the spectra and the peaks (NOT aligned).
 # It is used to create the library/database.
-library_creation <- function (filepath_database, peak_picking_algorithm="MAD", class_grouping=TRUE, mass_range=c(3000,15000), spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=length(spectra)), average_replicates=FALSE, average_patients=FALSE, SNR=5, most_intense_peaks=FALSE, signals_to_take=20, reference_peaklist_for_alignment=NULL, tof_mode="linear", spectra_format="brukerflex") {
+library_creation <- function (filepath_database, peak_picking_algorithm="SuperSmoother", class_grouping=TRUE, mass_range=c(3000,15000), spectra_preprocessing=list(smoothing_strength="medium", preprocess_in_packages_of=length(spectra)), average_replicates=FALSE, average_patients=FALSE, SNR=5, most_intense_peaks=FALSE, signals_to_take=20, reference_peaklist_for_alignment=NULL, tof_mode="linear", spectra_format="brukerflex") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 # Rename the trim function
@@ -2928,7 +2943,7 @@ return(library_list)
 #################################### CLASSIFICATION VIA HIERARCHICAL CLUSTERING
 # The input is a S4 list of spectra (MALDIquant), both for the classification and for the database, the class names (if in the spectrum file name, the filenames will be replaced with the class name and averaged to create representative spectra for the classes; if not in the files, one representative spectrum per class should be provided in the same order as the class list), the TOF-MS mode, the algorithm for the clustering and the nodes to discard.
 # The script returns a list containing: the hierarchical analysis dendrograms, a matrix with the classification (of pixels/spectra and samples) and the MS image with pixel or area classification, along with the classification of the patients.
-hierarchical_clustering_classification <- function (spectra_to_be_classified, spectra_database, peak_picking_algorithm="MAD", class_list=c("HP","PTC"), class_in_file_name=TRUE, tof_mode="linear", clustering_method="agglomerative", nodes=4, discarded_nodes=0, seed=NULL, classification_of=c("average","subareas","pixels"), true_class_in_file_name=FALSE, true_class_list=NULL) {
+hierarchical_clustering_classification <- function (spectra_to_be_classified, spectra_database, peak_picking_algorithm="SuperSmoother", class_list=c("HP","PTC"), class_in_file_name=TRUE, tof_mode="linear", clustering_method="agglomerative", nodes=4, discarded_nodes=0, seed=NULL, classification_of=c("average","subareas","pixels"), true_class_in_file_name=FALSE, true_class_list=NULL) {
 # Do everything if the user wants some outputs
 if (!is.null(classification_of) && length(classification_of) > 0) {
 ################################################## Load the required libraries
@@ -3191,7 +3206,7 @@ return (list(classification_hca_results_avg=classification_hca_results_avg, clas
 ################################################ CLASSIFICATION VIA SVM: PROFILE
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the SVM model itself and the average spectrum of the patients with red bars on the signals used by the SVM to classify it.
-classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_name="SVMModel", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, peak_picking_algorithm="MAD", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
+classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_name="SVMModel", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, peak_picking_algorithm="SuperSmoother", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 ########## Load the required packages
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
@@ -3419,7 +3434,7 @@ return (list(patient_classification_matrix=final_result_matrix_avg, average_spec
 ######################################### CLASSIFICATION VIA SVM: PIXEL-BY-PIXEL
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the SVM model itself.
-classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_model_name="SVMModel", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
+classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_model_name="SVMModel", peak_picking_algorithm="SuperSmoother", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
@@ -3621,7 +3636,7 @@ return (list(pixel_by_pixel_classification=final_result_matrix, pixel_by_pixel_c
 ################################################ CLASSIFICATION VIA PLS: PROFILE
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the PLS model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel and the patient's average spectrum), MS images with the pixel-by-pixel classification, the PLS model itself and the average spectrum of the patients with red bars on the signals used by the PLS to classify it.
-classify_patients_pls_profile <- function (spectra_path, filepath_R, pls_model_name="pls_model", smoothing_strength_preprocessing="medium", tof_mode="linear", peak_picking_algorithm="MAD", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
+classify_patients_pls_profile <- function (spectra_path, filepath_R, pls_model_name="pls_model", smoothing_strength_preprocessing="medium", tof_mode="linear", peak_picking_algorithm="SuperSmoother", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
@@ -3832,7 +3847,7 @@ return (list(patient_classification_matrix=final_result_matrix_avg, average_spec
 ######################################### CLASSIFICATION VIA PLS: PIXEL-BY-PIXEL
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the PLS model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the PLS model itself.
-classify_patients_pls_pixelbypixel <- function (spectra_path, filepath_R, pls_model_name="pls_model", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
+classify_patients_pls_pixelbypixel <- function (spectra_path, filepath_R, pls_model_name="pls_model", peak_picking_algorithm="SuperSmoother", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
@@ -4016,7 +4031,7 @@ return (list(pixel_by_pixel_classification=final_result_matrix, pixel_by_pixel_c
 ############################# CLASSIFICATION VIA NAIVE BAYES CLASSIFIER: PROFILE
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the Naive Bayes Classifier (NBC) model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the NBC model itself and the average spectrum of the patients with red bars on the signals used by the NBC to classify it.
-classify_patients_nbc_profile <- function (spectra_path, filepath_R, nbc_model_name="bayes_model", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
+classify_patients_nbc_profile <- function (spectra_path, filepath_R, nbc_model_name="bayes_model", peak_picking_algorithm="SuperSmoother", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
@@ -4227,7 +4242,7 @@ return (list(patient_classification_matrix=final_result_matrix_avg, average_spec
 ###################### CLASSIFICATION VIA NAIVE BAYES CLASSIFIER: PIXEL-BY-PIXEL
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the Naive Bayes Classifier (NBC) model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the NBC model itself.
-classify_patients_nbc_pixelbypixel <- function (spectra_path, filepath_R, nbc_model_name="bayes_model", peak_picking_algorithm="MAD", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
+classify_patients_nbc_pixelbypixel <- function (spectra_path, filepath_R, nbc_model_name="bayes_model", peak_picking_algorithm="SuperSmoother", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
 #####
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 # Rename the trim function
