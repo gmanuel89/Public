@@ -1,4 +1,4 @@
-############################ PEAK STATISTICS 2016.05.25
+############################ PEAK STATISTICS 2016.05.31
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
@@ -180,10 +180,8 @@ import_spectra_function <- function() {
 		### Load the spectra
 		spectra <- importImzMl(filepath_import)
 	}
-	### Truncation
-	spectra <- trim_spectra(spectra, range = mass_range)
 	### Preprocessing
-	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm)
+	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm, crop_spectra=TRUE, mass_range=mass_range)
 	# Exit the function and put the variable into the R workspace
 	.GlobalEnv$spectra <- spectra
 	.GlobalEnv$mass_range_value <- mass_range_value
