@@ -1,4 +1,4 @@
-############################ PEAK STATISTICS 2016.05.31
+############################ PEAK STATISTICS 2016.06.01
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
@@ -118,7 +118,7 @@ select_samples_function <-function() {
 		}
 	} else if (spectra_input_type == "file") {
 		filepath_import_select <- tkmessageBox(title = "Samples", message = "Select the file for the spectra to be imported.", icon = "info")
-		filepath_import <- tclvalue(tkgetOpenFile())
+		filepath_import <- tclvalue(tkgetOpenFile(filetypes="{{imzML files} {.imzML .imzml}}"))
 		if (!nchar(filepath_import)) {
 		    tkmessageBox(message = "No file selected")
 		}	else {
@@ -153,8 +153,6 @@ end_session_function <- function () {
 import_spectra_function <- function() {
 	# Load the required libraries
 	install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
-	# Rename the trim function
-	trim_spectra <- get(x="trim", pos="package:MALDIquant")
 	###### Get the values
 	## Mass range
 	mass_range <- tclvalue(mass_range)
@@ -170,13 +168,6 @@ import_spectra_function <- function() {
 		spectra <- importBrukerFlex(filepath_import)
 	}
 	if (spectra_format == "imzml" | spectra_format == "imzML") {
-		### Fix the name, if the ibd file was selected instead of the imzML
-		if (length(grep(".ibd",filepath_import)) != 0) {
-			# Split the filepath
-			filepath_splitted <- unlist(strsplit(filepath_import, ".ibd"))
-			# Rebuild the imzML filename
-			filepath_import <- paste(filepath_splitted, ".imzML", sep="")
-		}
 		### Load the spectra
 		spectra <- importImzMl(filepath_import)
 	}
