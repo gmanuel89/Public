@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.05.31
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.06.01
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -1206,15 +1206,17 @@ return (spectrum_images)
 # This function imports the spectra in a memory efficient way: it reads spectra from one imzML file at a time, it can discard spectra according to their TIC, it runs the preprocessing of the spectra from the imzML file into packages of spectra, it can generate a set of representative average spectra (by grouping spectra randomly or according to a clustering algorithm). After this, it stores all the spectra from all the imzML files into a variable and from here it can align the spectra with the peaklist of the average spectrum of the dataset and it can crop all the spectra to a selected mass range.
 # It relies upon other functions.
 # The functions returns (the user can select what to compute) a list of elements: all the spectra, the representative spectra, the MS images after clustering.
-memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", crop_spectra=FALSE, mass_range=NULL, preprocess_spectra=TRUE, multicore_processing=TRUE, data_transformation=FALSE, transformation_algorithm="sqrt", peak_picking_algorithm="SuperSmoother", process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", clustering_method_for_hca="agglomerative", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", spectra_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
+memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", crop_spectra=FALSE, mass_range=NULL, spectra_preprocessing=TRUE, multicore_processing=TRUE, data_transformation=FALSE, transformation_algorithm="sqrt", peak_picking_algorithm="SuperSmoother", process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", clustering_method_for_hca="agglomerative", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", spectra_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
 ##### Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
-##### Rename the trim function
-trim_spectra <- get(x="trim", pos="package:MALDIquant")
-##### Set the working directory as the folder in which there are the spectra
-setwd(folder)
-##### Read the spectra files in the folder
-folder_files <- read_spectra_files(folder, spectra_format=spectra_format, full_path=FALSE)
+##### Set the working directory as the folder in which there are the spectra (if it is not an imzML file)
+if (length(grep(".imzML",folder)) == 0) {
+	setwd(folder)
+	##### Read the spectra files in the folder
+	folder_files <- read_spectra_files(folder, spectra_format=spectra_format, full_path=FALSE)
+} else {
+	folder_files <- folder
+}
 ##### Tolerance - TOF-mode
 if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
 	tolerance_ppm <- 2000
@@ -1242,7 +1244,7 @@ for (ff in 1:length(folder_files)) {
 	}
 	##### Preprocessing (only if there is still some spectra left and only if the spectral dataset has to be returned) and add this purified spectra list to a global list (if there is still something after the TIC purification)
 	if ("spectra" %in% output_list) {
-		if (preprocess_spectra == TRUE) {
+		if (spectra_preprocessing == TRUE) {
 			if (length(spectra) > 0) {
 				spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength, process_in_packages_of=process_in_packages_of, align_spectra=spectra_alignment, spectra_alignment_method=spectra_alignment_method, multicore_processing=multicore_processing, data_transformation=data_transformation, transformation_algorithm=transformation_algorithm, crop_spectra=crop_spectra, mass_range=mass_range)
 			}
@@ -1298,14 +1300,14 @@ if (spectra_alignment == TRUE && "spectra" %in% output_list) {
 	if (length(spectra_dataset) > 0 && isMassSpectrumList(spectra_dataset)) {
 		# Average the spectra: the avg spectrum peaks will be used as reference
 	    spectra_avg_ref <- averageMassSpectra(spectra_dataset, method="mean")
-		peaks_avg_ref <- peak_picking(spectra_avg_ref, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+		peaks_avg_ref <- peak_picking(spectra_avg_ref, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=3)
 		reference_for_alignment <- peaks_avg_ref@mass
-		if (length(reference_for_alignment@mass) > 0) {
-			if (tof_mode == "linear") {
-				spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=20, noiseMethod=peak_picking_algorithm, SNR=3, reference=reference_for_alignment, tolerance=(tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
+		if (length(reference_for_alignment) > 0) {
+			if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+				spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=20, noiseMethod=peak_picking_algorithm, SNR=3, reference=peaks_avg_ref, tolerance=(tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
 			}
-			if (tof_mode == "reflector" | tof_mode == "reflectron") {
-				spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=5, noiseMethod=peak_picking_algorithm, SNR=3, reference=reference_for_alignment, tolerance=(tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
+			if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+				spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize=5, noiseMethod=peak_picking_algorithm, SNR=3, reference=peaks_avg_ref, tolerance=(tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
 			}
 		}
 	}
