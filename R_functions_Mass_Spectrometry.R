@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.06.01
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.06.08
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -287,7 +287,11 @@ rownames(mean_abs_dev_result_matrix) <- sample_names
 # The script is run for every imzML file
 for (lib in 1:length(filepath)) {
 	# Spectra import and preprocessing
-	spectra <- importImzMl(filepath[lib])
+	if (!is.null(mass_range)) {
+		spectra <- importImzMl(filepath[lib], massRange=mass_range)
+	} else {
+		spectra <- importImzMl(filepath[lib])
+	}
 	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=process_in_packages_of)
 	### Peak Picking and alignment
 	peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
@@ -393,13 +397,14 @@ if (intensity_threshold_method == "element-wise") {
 		if (multicore_processing == TRUE) {
 			# Detect the number of cores
 			cpu_thread_number <- detectCores(logical=TRUE)
-			if (Sys.info()[1] == "Linux") {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 				peaks_filtered <- mclapply(peaks, FUN = function (peaks) intensity_filtering_subfunction_element(peaks, intensity_threshold_percent), mc.cores=cpu_thread_number)
 			} else if (Sys.info()[1] == "Windows") {
 				# Make the CPU cluster for parallelisation
 				cl <- makeCluster(cpu_thread_number)
 				# Make the cluster use the custom functions and the package functions along with their parameters
 				clusterEvalQ(cl, {library(MALDIquant)})
+				# Pass the variables to the cluster for running the function
 				clusterExport(cl=cl, varlist=c("peaks", "intensity_threshold_percent", "intensity_filtering_subfunction_element"), envir=environment())
 				# Apply the multicore function
 				peaks_filtered <- parLapply(cl, peaks, fun = function (peaks) intensity_filtering_subfunction_element(peaks, intensity_threshold_percent))
@@ -469,13 +474,14 @@ if (intensity_threshold_method == "whole") {
 		if (multicore_processing == TRUE) {
 			# Detect the number of cores
 			cpu_thread_number <- detectCores(logical=TRUE)
-			if (Sys.info()[1] == "Linux") {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 				peaks_filtered <- mclapply(peaks, FUN = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity), mc.cores=cpu_thread_number)
 			} else if (Sys.info()[1] == "Windows") {
 				# Make the CPU cluster for parallelisation
 				cl <- makeCluster(cpu_thread_number)
 				# Make the cluster use the custom functions and the package functions along with their parameters
 				clusterEvalQ(cl, {library(MALDIquant)})
+				# Pass the variables to the cluster for running the function
 				clusterExport(cl=cl, varlist=c("peaks", "intensity_threshold_percent", "intensity_filtering_subfunction_whole", "highest_intensity"), envir=environment())
 				# Apply the multicore function
 				peaks_filtered <- parLapply(cl, peaks, fun = function(peaks) intensity_filtering_subfunction_whole(peaks, intensity_threshold_percent, highest_intensity))
@@ -1233,10 +1239,19 @@ spectra_dataset_representative <- list()
 for (ff in 1:length(folder_files)) {
 	##### Load the spectra
 	if (spectra_format == "imzml" || spectra_format == "imzML") {
-		spectra <- importImzMl(folder_files[ff])
+		# Crop the spectra while importing
+		if (!is.null(mass_range)) {
+			spectra <- importImzMl(folder_files[ff], massRange=mass_range)
+		} else {
+			spectra <- importImzMl(folder_files[ff])
+		}
 	}
 	if (spectra_format == "brukerflex" || spectra_format == "xmass") {
-		spectra <- importBrukerFlex(folder_files[ff])
+		if (!is.null(mass_range)) {
+			spectra <- importBrukerFlex(folder_files[ff], massRange=mass_range)
+		} else {
+			spectra <- importBrukerFlex(folder_files[ff])
+		}
 	}
 	##### TIC purification
 	if (tic_purification == TRUE) {
@@ -1412,10 +1427,12 @@ if (isMassSpectrumList(spectra)) {
 			finalDatapoints <- lowest_data_points
 			print("Binning at this sample rate is not possible, the highest number of data points possible will be used")
 			if (multicore_processing == TRUE) {
-				if (Sys.info()[1] == "Linux") {
+				if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 					spectra_binned <- mclapply(spectra, FUN=function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores=cpu_thread_number)
-				} else {
+				} else if (Sys.info()[1] == "Windows") {
 					cl <- makeCluster(cpu_thread_number)
+					# Pass the variables to the cluster for running the function
+					clusterExport(cl=cl, varlist=c("final_data_points", "binning_method"), envir=environment())
 					spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
 					stopCluster(cl)
 				}
@@ -1425,10 +1442,12 @@ if (isMassSpectrumList(spectra)) {
 		}
 		if (final_data_points <= lowest_data_points) {
 			if (multicore_processing == TRUE) {
-				if (Sys.info()[1] == "Linux") {
+				if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 					spectra_binned <- mclapply(spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores=cpu_thread_number)
-				} else {
+				} else if (Sys.info()[1] == "Windows") {
 					cl <- makeCluster(cpu_thread_number)
+					# Pass the variables to the cluster for running the function
+					clusterExport(cl=cl, varlist=c("final_data_points", "binning_method"), envir=environment())
 					spectra_binned <- parLapply(cl, spectra, fun=function (spectra) binning_subfunction(spectra, final_data_points, binning_method))
 					stopCluster(cl)
 				}
@@ -1596,7 +1615,7 @@ return (spectra)
 
 ######################################################## SPECTRA PRE-PROCESSING
 # The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalization)
-preprocess_spectra <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra), align_spectra=FALSE, spectra_alignment_method="cubic", multicore_processing=TRUE, data_transformation=FALSE, transformation_algorithm="sqrt", crop_spectra=FALSE, mass_range=NULL) {
+preprocess_spectra2 <- function (spectra, tof_mode="linear", smoothing_strength="medium", process_in_packages_of=length(spectra), align_spectra=FALSE, spectra_alignment_method="cubic", multicore_processing=TRUE, data_transformation=FALSE, transformation_algorithm="sqrt", crop_spectra=FALSE, mass_range=NULL) {
 ##### Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "parallel"))
 ##### Rename the trim function
@@ -1630,12 +1649,14 @@ if (isMassSpectrumList(spectra)) {
 			# The range is specified
 			if (!is.null(mass_range)) {
 				if (multicore_processing == TRUE) {
-					if (Sys.info()[1] == "Linux") {
+					if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) trim_spectra(spectra_temp, range=mass_range), mc.cores=cpu_thread_number)
-					} else {
+					} else if (Sys.info()[1] == "Windows") {
 						# Make the cluster (one for each core/thread)
 						cl <- makeCluster(cpu_thread_number)
 						clusterEvalQ(cl, {library(MALDIquant)})
+						# Pass the variables to the cluster for running the function
+						clusterExport(cl=cl, varlist="mass_range", envir=environment())
 						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra_temp) trim_spectra(spectra_temp, range=mass_range))
 						stopCluster(cl)
 					}
@@ -1645,9 +1666,9 @@ if (isMassSpectrumList(spectra)) {
 			} else {
 				# The range is not specified
 				if (multicore_processing == TRUE) {
-					if (Sys.info()[1] == "Linux") {
+					if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) trim_spectra(spectra_temp), mc.cores=cpu_thread_number)
-					} else {
+					} else if (Sys.info()[1] == "Windows") {
 						# Make the cluster (one for each core/thread)
 						cl <- makeCluster(cpu_thread_number)
 						clusterEvalQ(cl, {library(MALDIquant)})
@@ -1662,12 +1683,14 @@ if (isMassSpectrumList(spectra)) {
 		## Transformation
 		if (data_transformation == TRUE) {
 			if (multicore_processing == TRUE) {
-				if (Sys.info()[1] == "Linux") {
+				if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) transformIntensity(spectra_temp, method=transformation_algorithm), mc.cores=cpu_thread_number)
-				} else {
+				} else if (Sys.info()[1] == "Windows") {
 					# Make the cluster (one for each core/thread)
 					cl <- makeCluster(cpu_thread_number)
 					clusterEvalQ(cl, {library(MALDIquant)})
+					# Pass the variables to the cluster for running the function
+					clusterExport(cl=cl, varlist="transformation_algorithm", envir=environment())
 					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra_temp) transformIntensity(spectra_temp, method=transformation_algorithm))
 					stopCluster(cl)
 				}
@@ -1698,12 +1721,14 @@ if (isMassSpectrumList(spectra)) {
 			}
 		}
 		if (multicore_processing == TRUE) {
-			if (Sys.info()[1] == "Linux") {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 				spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) smoothIntensity(spectra_temp, method="SavitzkyGolay", halfWindowSize=smoothing_half_window_size), mc.cores=cpu_thread_number)
-			} else {
+			} else if (Sys.info()[1] == "Windows") {
 				# Make the cluster (one for each core/thread)
 				cl <- makeCluster(cpu_thread_number)
 				clusterEvalQ(cl, {library(MALDIquant)})
+				# Pass the variables to the cluster for running the function
+				clusterExport(cl=cl, varlist="smoothing_half_window_size", envir=environment())
 				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra_temp) smoothIntensity(spectra_temp, method="SavitzkyGolay", halfWindowSize=smoothing_half_window_size))
 				stopCluster(cl)
 			}
@@ -1712,9 +1737,9 @@ if (isMassSpectrumList(spectra)) {
 		}
 		## Baseline correction
 		if (multicore_processing == TRUE) {
-			if (Sys.info()[1] == "Linux") {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 				spectra_temp <- mclapply(spectra_temp, FUN = function (spectra_temp) removeBaseline(spectra_temp, method="TopHat"), mc.cores=cpu_thread_number)
-			} else {
+			} else if (Sys.info()[1] == "Windows") {
 				# Make the cluster (one for each core/thread)
 				cl <- makeCluster(cpu_thread_number)
 				clusterEvalQ(cl, {library(MALDIquant)})
@@ -1726,9 +1751,9 @@ if (isMassSpectrumList(spectra)) {
 		}
 		## Normalization (TIC)
 		if (multicore_processing == TRUE) {
-			if (Sys.info()[1] == "Linux") {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 				spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) calibrateIntensity(spectra_temp, method="TIC"), mc.cores=cpu_thread_number)
-			} else {
+			} else if (Sys.info()[1] == "Windows") {
 				# Make the cluster (one for each core/thread)
 				cl <- makeCluster(cpu_thread_number)
 				clusterEvalQ(cl, {library(MALDIquant)})
@@ -1780,6 +1805,506 @@ if (!isMassSpectrumList(spectra)) {
 	spectra_temp <- removeBaseline(spectra_temp, method="TopHat")
 	## Normalization (TIC)
 	spectra_temp <- calibrateIntensity(spectra_temp, method="TIC")
+	preprocessed_spectra <- spectra_temp
+}
+######################################### SPECTRAL ALIGNMENT
+if (align_spectra == TRUE) {
+	if (isMassSpectrumList(preprocessed_spectra)) {
+		if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+			half_window_alignment <- 20
+			tolerance_ppm <- 2000
+		} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+			half_window_alignment <- 5
+			tolerance_ppm <- 200
+		}
+		preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize=half_window_alignment, SNR=3, tolerance=(tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
+	}
+}
+return (preprocessed_spectra)
+}
+
+
+
+
+
+###############################################################################
+
+
+
+
+
+######################################################## SPECTRA PRE-PROCESSING
+# The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalization). The function can be applied both to a spectra list or a single spectrum, allowing parallel computation.
+# The function allows to select some additional parameters of the preprocessing.
+# Each preprocessing step is performed onto the list of spectra.
+preprocess_spectra3 <- function (spectra, tof_mode="linear", preprocessing_parameters=list(crop_spectra=FALSE, mass_range=NULL, data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), process_in_packages_of=length(spectra), align_spectra=FALSE, spectra_alignment_method="cubic", multicore_processing=TRUE) {
+##### Load the required libraries
+install_and_load_required_packages(c("MALDIquant", "parallel"))
+##### Rename the trim function
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
+##### Extract the parameters from the input list
+crop_spectra <- preprocessing_parameters$crop_spectra
+mass_range <- preprocessing_parameters$mass_range
+data_transformation <- preprocessing_parameters$data_transformation
+transformation_algorithm <- preprocessing_parameters$transformation_algorithm
+smoothing_algorithm <- preprocessing_parameters$smoothing_algorithm
+smoothing_strength <- preprocessing_parameters$smoothing_strength
+baseline_subtraction_algorithm <- preprocessing_parameters$baseline_subtraction_algorithm
+baseline_subtraction_iterations <- preprocessing_parameters$baseline_subtraction_iterations
+normalization_algorithm <- preprocessing_parameters$normalization_algorithm
+normalization_mass_range <- preprocessing_parameters$normalization_mass_range
+##### Define the smoothing half wondow size
+if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+	if (smoothing_strength == "small") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 5
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 1
+		}
+	} else if (smoothing_strength == "medium") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 10
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 2
+		}
+	} else if (smoothing_strength == "strong") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 20
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 4
+		}
+	} else if (smoothing_strength == "stronger") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 30
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 6
+		}
+	}
+} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+	if (smoothing_strength == "small") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 1
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 0.2
+		}
+	} else if (smoothing_strength == "medium") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 3
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 0.6
+		}
+	} else if (smoothing_strength == "strong") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 6
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 1.2
+		}
+	} else if (smoothing_strength == "stronger") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 9
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 1.8
+		}
+	}
+}
+######################################### Multiple spectra
+if (isMassSpectrumList(spectra)) {
+	##### Detect the number of cores
+	cpu_thread_number <- detectCores(logical=TRUE)
+	##### Packages of preprocessing
+	if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
+		process_in_packages_of <- length(spectra)
+	}
+	##### Create the list containing the processed spectra
+	preprocessed_spectra <- list()
+	index1 <- 1
+	index2 <- process_in_packages_of
+	spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
+	for (p in 1:spectra_packages) {
+		## If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
+		if (index2 < length(spectra)) {
+			spectra_temp <- spectra [index1:index2]
+		} else {spectra_temp <- spectra [index1:length(spectra)]}
+		## Fix the indexes at every cycle
+		index1 <- index2 + 1
+		index2 <- index2 + process_in_packages_of
+		##################### Process the selected spectra (spectra_temp)
+		########## Remove flat spectra
+		#spectra <- removeEmptyMassObjects (spectra)
+		########## Trimming
+		if (crop_spectra == TRUE) {
+			# The range is specified
+			if (!is.null(mass_range)) {
+				if (multicore_processing == TRUE) {
+					if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) trim_spectra(spectra_temp, range=mass_range), mc.cores=cpu_thread_number)
+					} else if (Sys.info()[1] == "Windows") {
+						# Make the cluster (one for each core/thread)
+						cl <- makeCluster(cpu_thread_number)
+						clusterEvalQ(cl, {library(MALDIquant)})
+						# Pass the variables to the cluster for running the function
+						clusterExport(cl=cl, varlist="mass_range", envir=environment())
+						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra_temp) trim_spectra(spectra_temp, range=mass_range))
+						stopCluster(cl)
+					}
+				} else {
+					spectra_temp <- lapply(spectra_temp, FUN=function (spectra_temp) trim_spectra(spectra_temp, range=mass_range))
+				}
+			} else {
+				# The range is not specified
+				if (multicore_processing == TRUE) {
+					if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+						spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) trim_spectra(spectra_temp), mc.cores=cpu_thread_number)
+					} else if (Sys.info()[1] == "Windows") {
+						# Make the cluster (one for each core/thread)
+						cl <- makeCluster(cpu_thread_number)
+						clusterEvalQ(cl, {library(MALDIquant)})
+						spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra_temp) trim_spectra(spectra_temp))
+						stopCluster(cl)
+					}
+				} else {
+					spectra_temp <- lapply(spectra_temp, FUN=function (spectra_temp) trim_spectra(spectra_temp))
+				}
+			}
+		}
+		########### Transformation
+		if (data_transformation == TRUE) {
+			if (multicore_processing == TRUE) {
+				if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) transformIntensity(spectra_temp, method=transformation_algorithm), mc.cores=cpu_thread_number)
+				} else if (Sys.info()[1] == "Windows") {
+					# Make the cluster (one for each core/thread)
+					cl <- makeCluster(cpu_thread_number)
+					clusterEvalQ(cl, {library(MALDIquant)})
+					# Pass the variables to the cluster for running the function
+					clusterExport(cl=cl, varlist="transformation_algorithm", envir=environment())
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra_temp) transformIntensity(spectra_temp, method=transformation_algorithm))
+					stopCluster(cl)
+				}
+			} else {
+				spectra_temp <- lapply(spectra_temp, FUN=function (spectra_temp) transformIntensity(spectra_temp, method=transformation_algorithm))
+			}
+		}
+		########## Smoothing
+		if (multicore_processing == TRUE) {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+				spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) smoothIntensity(spectra_temp, method=smoothing_algorithm, halfWindowSize=smoothing_half_window_size), mc.cores=cpu_thread_number)
+			} else if (Sys.info()[1] == "Windows") {
+				# Make the cluster (one for each core/thread)
+				cl <- makeCluster(cpu_thread_number)
+				clusterEvalQ(cl, {library(MALDIquant)})
+				# Pass the variables to the cluster for running the function
+				clusterExport(cl=cl, varlist=c("smoothing_algorithm", "smoothing_half_window_size"), envir=environment())
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra_temp) smoothIntensity(spectra_temp, method=smoothing_algorithm, halfWindowSize=smoothing_half_window_size))
+				stopCluster(cl)
+			}
+		} else {
+			spectra_temp <- lapply(spectra_temp, FUN=function (spectra_temp) smoothIntensity(spectra_temp, method=smoothing_algorithm, halfWindowSize=smoothing_half_window_size))
+		}
+		########## Baseline correction
+		if (multicore_processing == TRUE) {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+				if (baseline_subtraction_algorithm == "TopHat") {
+					spectra_temp <- mclapply(spectra_temp, FUN = function (spectra_temp) removeBaseline(spectra_temp, method=baseline_subtraction_algorithm), mc.cores=cpu_thread_number)
+				} else if (baseline_subtraction_algorithm == "SNIP") {
+					spectra_temp <- mclapply(spectra_temp, FUN = function (spectra_temp) removeBaseline(spectra_temp, method=baseline_subtraction_algorithm, iterations=baseline_subtraction_iterations), mc.cores=cpu_thread_number)
+				}
+			} else if (Sys.info()[1] == "Windows") {
+				# Make the cluster (one for each core/thread)
+				cl <- makeCluster(cpu_thread_number)
+				clusterEvalQ(cl, {library(MALDIquant)})
+				if (baseline_subtraction_algorithm == "TopHat") {
+					# Pass the variables to the cluster for running the function
+					clusterExport(cl=cl, varlist="baseline_subtraction_algorithm", envir=environment())
+					spectra_temp <- parLapply(cl, spectra_temp, fun= function (spectra_temp) removeBaseline(spectra_temp, method=baseline_subtraction_algorithm))
+				} else if (baseline_subtraction_algorithm == "SNIP") {
+					# Pass the variables to the cluster for running the function
+					clusterExport(cl=cl, varlist=c("baseline_subtraction_algorithm", "baseline_subtraction_iterations"), envir=environment())
+					spectra_temp <-parLapply(cl, spectra_temp, fun= function (spectra_temp) removeBaseline(spectra_temp, method=baseline_subtraction_algorithm, iterations=baseline_subtraction_iterations))
+				}
+				stopCluster(cl)
+			}
+		} else {
+			if (baseline_subtraction_algorithm == "TopHat") {
+				spectra_temp <- lapply(spectra_temp, FUN = function (spectra_temp) removeBaseline(spectra_temp, method=baseline_subtraction_algorithm))
+			} else if (baseline_subtraction_algorithm == "SNIP") {
+				spectra_temp <- lapply(spectra_temp, FUN = function (spectra_temp) removeBaseline(spectra_temp, method=baseline_subtraction_algorithm, iterations=baseline_subtraction_iterations))
+			}
+		}
+		########## Normalization (TIC)
+		if (multicore_processing == TRUE) {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+				if (!is.null(normalization_mass_range) && normalization_algorithm == "TIC") {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) calibrateIntensity(spectra_temp, method=normalization_algorithm, range=normalization_mass_range), mc.cores=cpu_thread_number)
+				} else {
+					spectra_temp <- mclapply(spectra_temp, FUN=function (spectra_temp) calibrateIntensity(spectra_temp, method=normalization_algorithm), mc.cores=cpu_thread_number)
+				}
+			} else if (Sys.info()[1] == "Windows") {
+				# Make the cluster (one for each core/thread)
+				cl <- makeCluster(cpu_thread_number)
+				clusterEvalQ(cl, {library(MALDIquant)})
+				if (!is.null(normalization_mass_range) && normalization_algorithm == "TIC") {
+					# Pass the variables to the cluster for running the function
+					clusterExport(cl=cl, varlist=c("normalization_algorithm", "normalization_mass_range"), envir=environment())
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra_temp) calibrateIntensity(spectra_temp, method=normalization_algorithm, range=normalization_mass_range))
+				} else {
+					# Pass the variables to the cluster for running the function
+					clusterExport(cl=cl, varlist="normalization_algorithm", envir=environment())
+					spectra_temp <- parLapply(cl, spectra_temp, fun=function (spectra_temp) calibrateIntensity(spectra_temp, method=normalization_algorithm))
+				}
+				stopCluster(cl)
+			}
+		} else {
+			if (!is.null(normalization_mass_range) && normalization_algorithm == "TIC") {
+				spectra_temp <- lapply(spectra_temp, FUN=function (spectra_temp) calibrateIntensity(spectra_temp, method=normalization_algorithm, range=normalization_mass_range))
+			} else {
+				spectra_temp <- lapply(spectra_temp, FUN=function (spectra_temp) calibrateIntensity(spectra_temp, method=normalization_algorithm))
+			}
+		}
+	########## Add to the final preprocessed spectral dataset
+	preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
+	}
+}
+######################################### Single spectra
+if (!isMassSpectrumList(spectra)) {
+	########## Remove flat spectra
+	#spectra <- removeEmptyMassObjects (spectra)
+	########## Trimming
+	if (crop_spectra == TRUE) {
+		if (!is.null(mass_range)) {
+			spectra_temp <- trim_spectra(spectra, range=mass_range)
+		} else {
+			spectra_temp <- trim_spectra(spectra)
+		}
+	}
+	########### Transformation
+	if (data_transformation == TRUE) {
+		spectra_temp <- transformIntensity(spectra, method=transformation_algorithm)
+	}
+	########## Smoothing
+	spectra_temp <- smoothIntensity(spectra_temp, method=smoothing_algorithm, halfWindowSize=smoothing_half_window_size)
+	########## Baseline correction
+	if (baseline_subtraction_algorithm == "TopHat") {
+		spectra_temp <- removeBaseline(spectra_temp, method=baseline_subtraction_algorithm)
+	} else if (baseline_subtraction_algorithm == "SNIP") {
+		spectra_temp <- removeBaseline(spectra_temp, method=baseline_subtraction_algorithm, iterations=baseline_subtraction_iterations)
+	}
+	########## Normalization (TIC)
+	if (!is.null(normalization_mass_range) && normalization_algorithm == "TIC") {
+		spectra_temp <- calibrateIntensity(spectra_temp, method=normalization_algorithm, range=normalization_mass_range)
+	} else {
+		spectra_temp <- calibrateIntensity(spectra_temp, method=normalization_algorithm)
+	}
+	########## Add to the final preprocessed spectral dataset
+	preprocessed_spectra <- spectra_temp
+}
+######################################### SPECTRAL ALIGNMENT
+if (align_spectra == TRUE) {
+	if (isMassSpectrumList(preprocessed_spectra)) {
+		if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+			half_window_alignment <- 20
+			tolerance_ppm <- 2000
+		} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+			half_window_alignment <- 5
+			tolerance_ppm <- 200
+		}
+		preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize=half_window_alignment, SNR=3, tolerance=(tolerance_ppm/10^6), warpingMethod=spectra_alignment_method)
+	}
+}
+return (preprocessed_spectra)
+}
+
+
+
+
+
+###############################################################################
+
+
+
+
+
+######################################################## SPECTRA PRE-PROCESSING
+# The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalization). The function can be applied both to a spectra list or a single spectrum, allowing parallel computation.
+# The function allows to select some additional parameters of the preprocessing.
+# This version of the function whould be faster because each element of the spectral list is subjected to all the preprocessing step.
+preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parameters=list(crop_spectra=FALSE, mass_range=NULL, data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), process_in_packages_of=length(spectra), align_spectra=FALSE, spectra_alignment_method="cubic", multicore_processing=TRUE) {
+##### Load the required libraries
+install_and_load_required_packages(c("MALDIquant", "parallel"))
+##### Rename the trim function
+trim_spectra <- get(x="trim", pos="package:MALDIquant")
+##### Extract the parameters from the input list
+crop_spectra <- preprocessing_parameters$crop_spectra
+mass_range <- preprocessing_parameters$mass_range
+data_transformation <- preprocessing_parameters$data_transformation
+transformation_algorithm <- preprocessing_parameters$transformation_algorithm
+smoothing_algorithm <- preprocessing_parameters$smoothing_algorithm
+smoothing_strength <- preprocessing_parameters$smoothing_strength
+baseline_subtraction_algorithm <- preprocessing_parameters$baseline_subtraction_algorithm
+baseline_subtraction_iterations <- preprocessing_parameters$baseline_subtraction_iterations
+normalization_algorithm <- preprocessing_parameters$normalization_algorithm
+normalization_mass_range <- preprocessing_parameters$normalization_mass_range
+##### Define the smoothing half wondow size
+if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+	if (smoothing_strength == "small") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 5
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 1
+		}
+	} else if (smoothing_strength == "medium") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 10
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 2
+		}
+	} else if (smoothing_strength == "strong") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 20
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 4
+		}
+	} else if (smoothing_strength == "stronger") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 30
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 6
+		}
+	}
+} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+	if (smoothing_strength == "small") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 1
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 0.2
+		}
+	} else if (smoothing_strength == "medium") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 3
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 0.6
+		}
+	} else if (smoothing_strength == "strong") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 6
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 1.2
+		}
+	} else if (smoothing_strength == "stronger") {
+		if (smoothing_algorithm == "SavitzkyGolay") {
+			smoothing_half_window_size <- 9
+		} else if (smoothing_algorithm == "MovingAverage") {
+			smoothing_half_window_size <- 1.8
+		}
+	}
+}
+######################################### Multiple spectra
+if (isMassSpectrumList(spectra)) {
+	### Trimming (same mass range for all the dataset)
+	if (crop_spectra == TRUE && is.null(mass_range)) {
+			spectra <- trim_spectra(spectra)
+	}
+	##### Generate the preprocessing function to be applied to every element of the spectra_temp list (x = spectrum)
+	preprocessing_subfunction <- function(x, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range) {
+		### Remove flat spectra
+		# x <- removeEmptyMassObjects (x)
+		### Trimming
+		if (crop_spectra == TRUE) {
+			# Mass range specified
+			if (!is.null(mass_range)) {
+				x <- trim_spectra(x, range=mass_range)
+			}
+		}
+		### Transformation
+		if (data_transformation == TRUE) {
+			x <- transformIntensity(x, method=transformation_algorithm)
+		}
+		### Smoothing
+		x <- smoothIntensity(x, method=smoothing_algorithm, halfWindowSize=smoothing_half_window_size)
+		### Baseline removal
+		if (baseline_subtraction_algorithm == "TopHat") {
+			x <- removeBaseline(x, method=baseline_subtraction_algorithm)
+		} else if (baseline_subtraction_algorithm == "SNIP") {
+			x <- removeBaseline(x, method=baseline_subtraction_algorithm, iterations=baseline_subtraction_iterations)
+		}
+		### Normalization
+		if (!is.null(normalization_mass_range) && normalization_algorithm == "TIC") {
+			x <- calibrateIntensity(x, method=normalization_algorithm, range=normalization_mass_range)
+		} else {
+			x <- calibrateIntensity(x, method=normalization_algorithm)
+		}
+		### Return the preprocessed spectrum (x)
+		return (x)
+	}
+	##### Detect the number of cores
+	cpu_thread_number <- detectCores(logical=TRUE)
+	##### Packages of preprocessing
+	if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
+		process_in_packages_of <- length(spectra)
+	}
+	##### Create the list containing the processed spectra
+	preprocessed_spectra <- list()
+	index1 <- 1
+	index2 <- process_in_packages_of
+	spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
+	for (p in 1:spectra_packages) {
+		## If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
+		if (index2 < length(spectra)) {
+			spectra_temp <- spectra [index1:index2]
+		} else {spectra_temp <- spectra [index1:length(spectra)]}
+		## Fix the indexes at every cycle
+		index1 <- index2 + 1
+		index2 <- index2 + process_in_packages_of
+		##################### Process the selected spectra (spectra_temp)
+		##### Apply the function to the list of spectra_temp
+		if (multicore_processing == TRUE) {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+				spectra_temp <- mclapply(spectra_temp, FUN=function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra=crop_spectra, mass_range=mass_range, data_transformation=data_transformation, transformation_algorithm=transformation_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_half_window_size=smoothing_half_window_size, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range), mc.cores=cpu_thread_number)
+			} else if (Sys.info()[1] == "Windows") {
+				cl <- makeCluster(cpu_thread_number)
+				clusterEvalQ(cl, {library(MALDIquant)})
+				clusterExport(cl=cl, varlist=c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range"), envir=environment())
+				spectra_temp <- parLapply(cl, spectra_temp, fun=function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra=crop_spectra, mass_range=mass_range, data_transformation=data_transformation, transformation_algorithm=transformation_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_half_window_size=smoothing_half_window_size, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range))
+				stopCluster(cl)
+			}
+		} else {
+				spectra_temp <- lapply(spectra_temp, FUN=function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra=crop_spectra, mass_range=mass_range, data_transformation=data_transformation, transformation_algorithm=transformation_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_half_window_size=smoothing_half_window_size, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range))
+		}
+		########## Add to the final preprocessed spectral dataset
+		preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
+	}
+}
+######################################### Single spectra
+if (!isMassSpectrumList(spectra)) {
+	########## Remove flat spectra
+	#spectra <- removeEmptyMassObjects (spectra)
+	########## Trimming
+	if (crop_spectra == TRUE) {
+		if (!is.null(mass_range)) {
+			spectra_temp <- trim_spectra(spectra, range=mass_range)
+		} else {
+			spectra_temp <- trim_spectra(spectra)
+		}
+	}
+	########### Transformation
+	if (data_transformation == TRUE) {
+		spectra_temp <- transformIntensity(spectra, method=transformation_algorithm)
+	}
+	########## Smoothing
+	spectra_temp <- smoothIntensity(spectra_temp, method=smoothing_algorithm, halfWindowSize=smoothing_half_window_size)
+	########## Baseline correction
+	if (baseline_subtraction_algorithm == "TopHat") {
+		spectra_temp <- removeBaseline(spectra_temp, method=baseline_subtraction_algorithm)
+	} else if (baseline_subtraction_algorithm == "SNIP") {
+		spectra_temp <- removeBaseline(spectra_temp, method=baseline_subtraction_algorithm, iterations=baseline_subtraction_iterations)
+	}
+	########## Normalization (TIC)
+	if (!is.null(normalization_mass_range) && normalization_algorithm == "TIC") {
+		spectra_temp <- calibrateIntensity(spectra_temp, method=normalization_algorithm, range=normalization_mass_range)
+	} else {
+		spectra_temp <- calibrateIntensity(spectra_temp, method=normalization_algorithm)
+	}
+	########## Add to the final preprocessed spectral dataset
 	preprocessed_spectra <- spectra_temp
 }
 ######################################### SPECTRAL ALIGNMENT
@@ -2372,11 +2897,13 @@ if (isMassPeaksList(peaks)) {
 	if (multicore_processing == TRUE) {
 		# Detect the number of cores
 		cpu_thread_number <- detectCores(logical=TRUE)
-		if (Sys.info()[1] == "Linux") {
+		if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 			most_intense_peaks <- mclapply(peaks, FUN = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take), mc.cores=cpu_thread_number)
-		} else {
+		} else if (Sys.info()[1] == "Windows") {
 			# Make the CPU cluster for parallelisation
 			cl <- makeCluster(cpu_thread_number)
+			# Pass the variables to the cluster for running the function
+			clusterExport(cl=cl, varlist="signals_to_take", envir=environment())
 			most_intense_peaks <- parLapply(cl, peaks, fun = function(peaks) picking_subfunction(peaks, signals_to_take=signals_to_take))
 			stopCluster(cl)
 		}
@@ -2616,12 +3143,13 @@ peak_picking <- function(spectra, peak_picking_algorithm="SuperSmoother", tof_mo
 		# Peak detection
 		peaks <- list()
 		if (multicore_processing == TRUE) {
-			if (Sys.info()[1] == "Linux") {
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 				peaks <- mclapply(spectra, FUN=function (spectra) detectPeaks(spectra, method=peak_picking_algorithm, halfWindowSize=half_window_size, SNR=SNR), mc.cores=cpu_thread_number)
-			} else {
+			} else if (Sys.info()[1] == "Windows") {
 				# Make the cluster (one for each core/thread)
 				cl <- makeCluster(cpu_thread_number)
 				clusterEvalQ(cl, {library(MALDIquant)})
+				clusterExport(cl=cl, varlist=c("peak_picking_algorithm", "half_window_size", "SNR"), envir=environment())
 				peaks <- parLapply(cl, spectra, fun=function (spectra) detectPeaks(spectra, method=peak_picking_algorithm, halfWindowSize=half_window_size, SNR=SNR))
 				stopCluster(cl)
 			}
@@ -2706,12 +3234,14 @@ if (isMassPeaksList(peaks)) {
 			if (multicore_processing == TRUE) {
 				# Detect the number of cores
 				cpu_thread_number <- detectCores(logical=TRUE)
-				if (Sys.info()[1] == "Linux") {
+				if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 					peaks_aligned <- mclapply(peaks_aligned, FUN=function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm), mc.cores=cpu_thread_number)
-				} else {
+				} else if (Sys.info()[1] == "Windows") {
 					# Make the CPU cluster for parallelisation
 					cl <- makeCluster(cpu_thread_number)
 					# Apply the multicore function
+					# Pass the variables to the cluster for running the function
+					clusterExport(cl=cl, varlist=c("reference_peaklist", "tolerance_ppm"), envir=environment())
 					peaks_aligned <- parLapply(cl, peaks_aligned, fun=function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm))
 					stopCluster(cl)
 				}
@@ -2762,14 +3292,20 @@ if (tof_mode == "reflectron" || tof_mode == "reflector") {
 }
 if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 	### Load the spectra
-	spectra <- importBrukerFlex(filepath_database)
+	if (!is.null(mass_range)) {
+		spectra <- importBrukerFlex(filepath_database, massRange=mass_range)
+	} else {
+		spectra <- importBrukerFlex(filepath_database)
+	}
 }
 if (spectra_format == "imzml" | spectra_format == "imzML") {
 	### Load the spectra
-	spectra <- importImzMl(filepath_database)
+	if (!is.null(mass_range)) {
+		spectra <- importImzMl(filepath_database, massRange=mass_range)
+	} else {
+		spectra <- importImzMl(filepath_database)
+	}
 }
-### Truncation
-spectra <- trim_spectra(spectra, range = mass_range)
 ### Average the replicates
 if (average_replicates == TRUE) {
 	spectra <- average_replicates_by_folder(spectra, filepath_database, spectra_format=spectra_format)
@@ -3229,23 +3765,13 @@ for (p in 1:length(filepath_test_imzml)) {
 ##### SPECTRA IMPORT AND PROCESSING
 if(!isMassSpectrumList(spectra_path)) {
 	## Import the spectra (one imzML at a time)
-	sample_spectra <- importImzMl(filepath_test_imzml[p])
+	if (!is.null(mass_range)) {
+		sample_spectra <- importImzMl(filepath_test_imzml[p], massRange=mass_range)
+	} else {
+		sample_spectra <- importImzMl(filepath_test_imzml[p])
+	}
 }
 sample_spectra <- replace_sample_name(sample_spectra)
-## Trim the spectra
-if (mass_range[1] == 0 && mass_range[2] == 0) {
-	sample_spectra <- trim_spectra(sample_spectra)
-}
-if (mass_range[1] == 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] == 0) {
-	mass_range[2] <- Inf
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
 ########## CLASSIFICATION OF AVERAGES
 sample_spectra_avg <- averageMassSpectra(sample_spectra, method="mean")
 sample_spectra_avg <- smoothIntensity(sample_spectra_avg, method="SavitzkyGolay")
@@ -3457,23 +3983,13 @@ for (p in 1:length(filepath_test_imzml)) {
 ################ SPECTRA IMPORT AND PROCESSING
 if(!isMassSpectrumList(spectra_path)) {
 	# Import the spectra (one imzML at a time)
-	sample_spectra <- importImzMl(filepath_test_imzml[p])
+	if (!is.null(mass_range)) {
+		sample_spectra <- importImzMl(filepath_test_imzml[p], massRange=mass_range)
+	} else {
+		sample_spectra <- importImzMl(filepath_test_imzml[p])
+	}
 }
 sample_spectra <- replace_sample_name(sample_spectra)
-# Trim the spectra
-if (mass_range[1] == 0 && mass_range[2] == 0) {
-	sample_spectra <- trim_spectra(sample_spectra)
-}
-if (mass_range[1] == 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] == 0) {
-	mass_range[2] <- Inf
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
 ################################################# PIXEL BY PIXEL CLASSIFICATION
 if (preprocessing == TRUE) {
 	sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
@@ -3646,23 +4162,13 @@ for (p in 1:length(filepath_test_imzml)) {
 ################ SPECTRA IMPORT AND PROCESSING
 if(!isMassSpectrumList(spectra_path)) {
 	# Import the spectra (one imzML at a time)
-	sample_spectra <- importImzMl(filepath_test_imzml[p])
+	if (!is.null(mass_range)) {
+		sample_spectra <- importImzMl(filepath_test_imzml[p], massRange=mass_range)
+	} else {
+		sample_spectra <- importImzMl(filepath_test_imzml[p])
+	}
 }
 sample_spectra <- replace_sample_name(sample_spectra)
-# Trim the spectra
-if (mass_range[1] == 0 && mass_range[2] == 0) {
-	sample_spectra <- trim_spectra(sample_spectra)
-}
-if (mass_range[1] == 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] == 0) {
-	mass_range[2] <- Inf
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
 #################################################### CLASSIFICATION OF AVERAGES
 sample_spectra_avg <- averageMassSpectra(sample_spectra, method="mean")
 sample_spectra_avg <- smoothIntensity(sample_spectra_avg, method="SavitzkyGolay")
@@ -3857,23 +4363,13 @@ for (p in 1:length(filepath_test_imzml)) {
 ################ SPECTRA IMPORT AND PROCESSING
 if(!isMassSpectrumList(spectra_path)) {
 	# Import the spectra (one imzML at a time)
-	sample_spectra <- importImzMl(filepath_test_imzml[p])
+	if (!is.null(mass_range)) {
+		sample_spectra <- importImzMl(filepath_test_imzml[p], massRange=mass_range)
+	} else {
+		sample_spectra <- importImzMl(filepath_test_imzml[p])
+	}
 }
 sample_spectra <- replace_sample_name(sample_spectra)
-# Trim the spectra
-if (mass_range[1] == 0 && mass_range[2] == 0) {
-	sample_spectra <- trim_spectra(sample_spectra)
-}
-if (mass_range[1] == 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] == 0) {
-	mass_range[2] <- Inf
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
 ################################################# PIXEL BY PIXEL CLASSIFICATION
 if (preprocessing == TRUE) {
 	sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
@@ -4041,23 +4537,13 @@ for (p in 1:length(filepath_test_imzml)) {
 ################ SPECTRA IMPORT AND PROCESSING
 if(!isMassSpectrumList(spectra_path)) {
 	# Import the spectra (one imzML at a time)
-	sample_spectra <- importImzMl(filepath_test_imzml[p])
+	if (!is.null(mass_range)) {
+		sample_spectra <- importImzMl(filepath_test_imzml[p], massRange=mass_range)
+	} else {
+		sample_spectra <- importImzMl(filepath_test_imzml[p])
+	}
 }
 sample_spectra <- replace_sample_name(sample_spectra)
-# Trim the spectra
-if (mass_range[1] == 0 && mass_range[2] == 0) {
-	sample_spectra <- trim_spectra(sample_spectra)
-}
-if (mass_range[1] == 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] == 0) {
-	mass_range[2] <- Inf
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
 #################################################### CLASSIFICATION OF AVERAGES
 sample_spectra_avg <- averageMassSpectra(sample_spectra, method="mean")
 sample_spectra_avg <- smoothIntensity(sample_spectra_avg, method="SavitzkyGolay")
@@ -4251,23 +4737,13 @@ for (p in 1:length(filepath_test_imzml)) {
 ################ SPECTRA IMPORT AND PROCESSING
 if(!isMassSpectrumList(spectra_path)) {
 	# Import the spectra (one imzML at a time)
-	sample_spectra <- importImzMl(filepath_test_imzml[p])
+	if (!is.null(mass_range)) {
+		sample_spectra <- importImzMl(filepath_test_imzml[p], massRange=mass_range)
+	} else {
+		sample_spectra <- importImzMl(filepath_test_imzml[p])
+	}
 }
 sample_spectra <- replace_sample_name(sample_spectra)
-# Trim the spectra
-if (mass_range[1] == 0 && mass_range[2] == 0) {
-	sample_spectra <- trim_spectra(sample_spectra)
-}
-if (mass_range[1] == 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] == 0) {
-	mass_range[2] <- Inf
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
-if (mass_range[1] != 0 && mass_range[2] != 0) {
-	sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-}
 ################################################# PIXEL BY PIXEL CLASSIFICATION
 if (preprocessing == TRUE) {
 	sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
@@ -4448,25 +4924,15 @@ for (f in 1:length(filepath_test_imzml)) {
 	classification_ensemble_vote_patient <- NULL
 	# Import and preprocess spectra
 	if (!is.list(spectra_path)) {
-		sample_spectra <- importImzMl(filepath_test_imzml[f])
+		if (!is.null(mass_range)) {
+			sample_spectra <- importImzMl(filepath_test_imzml[f], massRange=mass_range)
+		} else {
+			sample_spectra <- importImzMl(filepath_test_imzml[f])
+		}
 	} else {
 		sample_spectra <- spectra_path
 	}
 	sample_spectra <- replace_sample_name(sample_spectra)
-	# Trim the spectra
-	if (mass_range[1] == 0 && mass_range[2] == 0) {
-		sample_spectra <- trim_spectra(sample_spectra)
-	}
-	if (mass_range[1] == 0 && mass_range[2] != 0) {
-		sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-	}
-	if (mass_range[1] != 0 && mass_range[2] == 0) {
-		mass_range[2] <- Inf
-		sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-	}
-	if (mass_range[1] != 0 && mass_range[2] != 0) {
-		sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-	}
 	if (preprocessing == TRUE) {
 		sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
 	}
@@ -4618,25 +5084,15 @@ for (f in 1:length(filepath_test_imzml)) {
 	classification_ensemble_vote_patient_pixel_by_pixel <- NULL
 	# Import and preprocess spectra
 	if (!is.list(spectra_path)) {
-		sample_spectra <- importImzMl(filepath_test_imzml[f])
+		if (!is.null(mass_range)) {
+			sample_spectra <- importImzMl(filepath_test_imzml[f], massRange=mass_range)
+		} else {
+			sample_spectra <- importImzMl(filepath_test_imzml[f])
+		}
 	} else {
 		sample_spectra <- spectra_path
 	}
 	sample_spectra <- replace_sample_name(sample_spectra)
-	# Trim the spectra
-	if (mass_range[1] == 0 && mass_range[2] == 0) {
-		sample_spectra <- trim_spectra(sample_spectra)
-	}
-	if (mass_range[1] == 0 && mass_range[2] != 0) {
-		sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-	}
-	if (mass_range[1] != 0 && mass_range[2] == 0) {
-		mass_range[2] <- Inf
-		sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-	}
-	if (mass_range[1] != 0 && mass_range[2] != 0) {
-		sample_spectra <- trim_spectra(sample_spectra, range=mass_range)
-	}
 	if (preprocessing == TRUE) {
 		sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
 	}
@@ -8066,13 +8522,14 @@ comparison_sample_db_subfunction_correlation <- function(x) {
 if (multicore_processing == TRUE) {
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	if (Sys.info()[1] == "Linux") {
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 		output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_correlation(global_list), mc.cores=cpu_thread_number)
-	} else {
+	} else if (Sys.info()[1] == "Windows") {
 		# Make the CPU cluster for parallelisation
 		cls <- makeCluster(cpu_thread_number)
 		# Make the cluster use the custom functions and the package functions along with their parameters
 		clusterEvalQ(cls, {library(MALDIquant)})
+		# Pass the variables to the cluster for running the function
 		clusterExport(cl=cls, varlist=c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue"), envir=environment())
 		output_list <- parLapply(cls, global_list, fun=function(global_list) comparison_sample_db_subfunction_correlation(global_list))
 		stopCluster(cls)
@@ -8378,9 +8835,9 @@ comparison_sample_db_subfunction_intensity <- function(x) {
 if (multicore_processing == TRUE) {
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	if (Sys.info()[1] == "Linux") {
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 		output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_intensity(global_list), mc.cores=cpu_thread_number)
-	} else {
+	} else if (Sys.info()[1] == "Windows") {
 		# Make the CPU cluster for parallelisation
 		cls <- makeCluster(cpu_thread_number)
 		# Make the cluster use the custom functions and the package functions along with their parameters
@@ -8656,9 +9113,9 @@ comparison_sample_db_subfunction_similarity_index <- function(x) {
 if (multicore_processing == TRUE) {
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	if (Sys.info()[1] == "Linux") {
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
 		output_list <- mclapply(global_list, FUN=function(global_list) comparison_sample_db_subfunction_similarity_index(global_list), mc.cores=cpu_thread_number)
-	} else {
+	} else if (Sys.info()[1] == "Windows") {
 		# Make the CPU cluster for parallelisation
 		cls <- makeCluster(cpu_thread_number)
 		# Make the cluster use the custom functions and the package functions along with their parameters
