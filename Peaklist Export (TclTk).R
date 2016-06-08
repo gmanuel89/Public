@@ -1,4 +1,4 @@
-############################ PEAKLIST EXPORT 2016.06.01
+############################ PEAKLIST EXPORT 2016.06.08
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
@@ -161,14 +161,22 @@ import_spectra_function <- function() {
 	# Generate the list of spectra (library and test)
 	if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 		### Load the spectra
-		spectra <- importBrukerFlex(filepath_import)
+		if (!is.null(mass_range)) {
+			spectra <- importBrukerFlex(filepath_import, massRange=mass_range)
+		} else {
+			spectra <- importBrukerFlex(filepath_import)
+		}
 	}
 	if (spectra_format == "imzml" | spectra_format == "imzML") {
 		### Load the spectra
-		spectra <- importImzMl(filepath_import)
+		if (!is.null(mass_range)) {
+			spectra <- importImzMl(filepath_import, massRange=mass_range)
+		} else {
+			spectra <- importImzMl(filepath_import)
+		}
 	}
 	### Preprocessing
-	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, smoothing_strength="medium", process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm, crop_spectra=TRUE, mass_range=mass_range)
+	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=NULL, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm, smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE, spectra_alignment_method="cubic")
 	# Exit the function and put the variable into the R workspace
 	.GlobalEnv$spectra <- spectra
 	.GlobalEnv$mass_range_value <- mass_range_value
