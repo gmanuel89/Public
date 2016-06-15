@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.06.14
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.06.15
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -765,7 +765,6 @@ peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm=
 	} else if (exclude_spectra_without_peak == TRUE) {
 		signal_matrix <- intensityMatrix(peaks)
 	}
-	
 	# Peak vector
 	#peak_vector <- as.numeric(names(signal_matrix))
 	############################################################## ONE CLASS
@@ -773,9 +772,9 @@ peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm=
 		################################# FUNCTION for matrix APPLY (it will applied for each matrix column, for each peak)
 		peak_statistcs_function <- function (signal_matrix_column, signal_matrix, remove_outliers) {
 			# Generate the output matrix row
-			peak_stat_matrix_row <- matrix (0, nrow=1, ncol=8)
+			peak_stat_matrix_row <- matrix (0, nrow=1, ncol=7)
 			rownames(peak_stat_matrix_row) <- as.numeric(colnames(signal_matrix_column))
-			colnames(peak_stat_matrix_row) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter")
+			colnames(peak_stat_matrix_row) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles")
 			# Start the calculation
 			intensity_vector <- as.numeric(signal_matrix_column)
 			if (remove_outliers == TRUE) {
@@ -805,7 +804,6 @@ peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm=
 			first_quartile <- summary_intensity_vector [2]
 			third_quartile <- summary_intensity_vector [5]
 			inter_quartile_range <- third_quartile - first_quartile
-			spectra_counter <- length(intensity_vector[!is.na(intensity_vector)])
 			# Fill the matrix with the values
 			peak_stat_matrix_row [,1] <- distribution_type
 			peak_stat_matrix_row [,2] <- as.numeric(mean_intensity)
@@ -814,20 +812,27 @@ peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm=
 			peak_stat_matrix_row [,5] <- as.numeric(median_intensityensity)
 			peak_stat_matrix_row [,6] <- as.numeric(inter_quartile_range)
 			peak_stat_matrix_row [,7] <- paste("1st quartile", first_quartile, "; 3rd quartile", third_quartile)
-			peak_stat_matrix_row [,8] <- as.numeric(spectra_counter)
 			return (peak_stat_matrix_row)
 		}
 		###############
 		# Fix the signal_matrix (Add the sample column)
 		signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, spectra_format=spectra_format, sample_output=TRUE, class_output=FALSE)
 		# Output matrix
-		peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-1), ncol=9)
+		peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-1), ncol=8)
 		rownames(peak_stat_matrix) <- as.numeric(colnames(signal_matrix)[1:(ncol(signal_matrix)-1)])
-		colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter", "Sample")
+		colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Sample")
 		# Only peaks
 		signal_matrix_peaks <- signal_matrix [,1:(ncol(signal_matrix)-1)]
 		# Apply the function (transpose the result matrix)
 		peak_stat_matrix <- t(apply(signal_matrix_peaks, MARGIN=2, FUN=function(x) peak_statistcs_function(x, signal_matrix, remove_outliers=remove_outliers)))
+		# Generate the intensity matrix with NA if the peak is not present in the spectra
+		intensity_matrix_with_na <- intensityMatrix(peaks)
+		spectra_counter_vector <- numeric()
+		for (pk in 1:ncol(intensity_matrix_with_na)) {
+			intensity_vector <- intensity_matrix_with_na[,pk]
+			spectra_counter_vector <- append(spectra_counter_vector, length(intensity_vector[!is.na(intensity_vector)]))
+		}
+		peak_stat_matrix <- cbind(peak_stat_matrix, spectra_counter_vector)
 		# Fix the column names
 		colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter")
 	}
@@ -2146,13 +2151,13 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 	normalization_mass_range <- preprocessing_parameters$normalization_mass_range
 	##### Define the smoothing half wondow size
 	if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-		if (smoothing_strength == "small") {
-			if (smoothing_algorithm == "SavitzkyGolay") {
-				smoothing_half_window_size <- 5
-			} else if (smoothing_algorithm == "MovingAverage") {
-				smoothing_half_window_size <- 1
-			}
-		} else if (smoothing_strength == "medium") {
+		#if (smoothing_strength == "small") {
+		#if (smoothing_algorithm == "SavitzkyGolay") {
+		#smoothing_half_window_size <- 5
+		#} else if (smoothing_algorithm == "MovingAverage") {
+		#smoothing_half_window_size <- 1
+		#}
+		if (smoothing_strength == "medium") {
 			if (smoothing_algorithm == "SavitzkyGolay") {
 				smoothing_half_window_size <- 10
 			} else if (smoothing_algorithm == "MovingAverage") {
@@ -2172,13 +2177,13 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 			}
 		}
 	} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-		if (smoothing_strength == "small") {
-			if (smoothing_algorithm == "SavitzkyGolay") {
-				smoothing_half_window_size <- 1
-			} else if (smoothing_algorithm == "MovingAverage") {
-				smoothing_half_window_size <- 0.2
-			}
-		} else if (smoothing_strength == "medium") {
+		#if (smoothing_strength == "small") {
+		#if (smoothing_algorithm == "SavitzkyGolay") {
+		#smoothing_half_window_size <- 1
+		#} else if (smoothing_algorithm == "MovingAverage") {
+		#smoothing_half_window_size <- 0.2
+		#}
+		if (smoothing_strength == "medium") {
 			if (smoothing_algorithm == "SavitzkyGolay") {
 				smoothing_half_window_size <- 3
 			} else if (smoothing_algorithm == "MovingAverage") {
@@ -2263,7 +2268,7 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 				} else if (Sys.info()[1] == "Windows") {
 					cl <- makeCluster(cpu_thread_number)
 					clusterEvalQ(cl, {library(MALDIquant)})
-					clusterExport(cl=cl, varlist=c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range"), envir=environment())
+					clusterExport(cl=cl, varlist=c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range", "preprocessing_subfunction"), envir=environment())
 					spectra_temp <- parLapply(cl, spectra_temp, fun=function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra=crop_spectra, mass_range=mass_range, data_transformation=data_transformation, transformation_algorithm=transformation_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_half_window_size=smoothing_half_window_size, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range))
 					stopCluster(cl)
 				}
@@ -9225,7 +9230,7 @@ spectral_typer_score_similarity_index <- function(spectra_database, spectra_test
 
 #################################################### ADJACENCY MATRIX GENERATION
 # The function generates an adjacency matrix from a peak list matrix, in order to generate a graph. The matrix is computed first by generating a correlation matrix and then replacing the correlation coefficients with 0 or 1 according to a threshold value.
-generate_adjacency_matrix <- function(peaklist_matrix, correlation_method="pearson", correlation_threshold=0.8) {
+generate_adjacency_matrix <- function(peaklist_matrix, correlation_method="pearson", correlation_threshold=0.8, pvalue_threshold=0.05) {
 	##### Install the required packages
 	install_and_load_required_packages("stats")
 	##### Transpose the peaklist matrix to compute the correlation between observations and not features
@@ -9266,7 +9271,16 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method="pears
 
 
 
-#############################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
+
+
+
+
+
+
+
+
+
+##########################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
 
 
@@ -9288,7 +9302,19 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method="pears
 
 
 
-################ SPECTRAL TYPER PROGRAM 2016.06.08
+
+
+
+
+
+
+
+
+
+
+
+
+################ SPECTRAL TYPER PROGRAM 2016.06.15
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 install_and_load_required_packages(c("tcltk", "xlsx", "ggplot2"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
@@ -9319,7 +9345,7 @@ spectra_format <- "brukerflex"
 score_only <- FALSE
 spectra_path_output <- TRUE
 peak_picking_mode <- "all"
-peak_picking_algorithm <- "MAD"
+peak_picking_algorithm <- "SuperSmoother"
 similarity_criteria <- "correlation"
 signal_intensity_evaluation <- "intensity percentage"
 file_type_export <- "xlsx"
@@ -9327,12 +9353,28 @@ spectra_database <- NULL
 spectra_test <- NULL
 peaks_database <- NULL
 peaks_test <- NULL
+multicore_processing <- TRUE
+transform_data <- FALSE
+transform_data_algorithm <- NULL
+smoothing <- TRUE
+smoothing_algorithm <- "SavitzkyGolay"
+smoothing_strength <- "medium"
+baseline_subtraction <- TRUE
+baseline_subtraction_algorithm <- "SNIP"
+baseline_subtraction_iterations <- 200
+normalization <- TRUE
+normalization_algorithm <- "TIC"
+normalization_mass_range <- NULL
+preprocess_spectra_in_packages_of <- 200
+mass_range <- c(3000,15000)
+
 
 
 
 
 
 ################## Values of the variables (for displaying and dumping purposes)
+tof_mode_value <- "linear"
 average_replicates_in_database_value <- "NO"
 average_replicates_in_test_value <- "NO"
 peaks_filtering_value <- "NO"
@@ -9340,16 +9382,273 @@ low_intensity_peaks_removal_value <- "NO"
 score_only_value <- "NO"
 spectra_path_output_value <- "YES"
 similarity_criteria_value <- "correlation"
-peak_picking_algorithm_value <- "        MAD        "
+peak_picking_algorithm_value <- "   SuperSmoother   "
 peak_picking_mode_value <- "all"
-tof_mode_value <- "linear"
 intensity_threshold_method_value <- "element-wise"
 spectra_format_value <- "Xmass"
+multicore_processing_value <- "YES"
+transform_data_value <- "    NO    "
+smoothing_value <- "YES ( SavitzkyGolay , medium)"
+baseline_subtraction_value <- "YES (SNIP , iterations: 200)"
+normalization_value <- "YES (TIC , mass range: )"
+mass_range_value <- "3000 , 15000"
+
+
 
 
 
 
 ##################################################### DEFINE WHAT THE BUTTONS DO
+
+##### Preprocessing window
+preprocessing_window_function <- function() {
+	##### Functions
+	# Transform the data
+	transform_data_choice <- function() {
+		# Catch the value from the menu
+		transform_data <- select.list(c("YES","NO"), title="Choose")
+		# Default
+		if (transform_data == "YES") {
+			transform_data <- TRUE
+			# Ask for the algorithm
+			transform_data_algorithm <- select.list(c("sqrt","log","log2","log10"), title="Choose")
+			# Default
+			if (transform_data_algorithm == "") {
+				transform_data_algorithm <- "sqrt"
+			}
+		} else if (transform_data == "NO" || transform_data == "") {
+			transform_data <- FALSE
+		}
+		# Set the value of the displaying label
+		if (transform_data == TRUE) {
+			transform_data_value <- paste("YES", "(", transform_data_algorithm, ")")
+		} else {
+			transform_data_value <- "    NO    "
+		}
+		transform_data_value_label <- tklabel(preproc_window, text=transform_data_value)
+		tkgrid(transform_data_value_label, row=3, column=2)
+		# Escape the function
+		.GlobalEnv$transform_data <- transform_data
+		.GlobalEnv$transform_data_algorithm <- transform_data_algorithm
+		.GlobalEnv$transform_data_value <- transform_data_value
+	}
+	# Smoothing
+	smoothing_choice <- function() {
+		# Catch the value from the menu
+		smoothing <- select.list(c("YES","NO"), title="Choose")
+		# Default
+		if (smoothing == "YES" || smoothing == "") {
+			smoothing <- TRUE
+			# Ask for the algorithm
+			smoothing_algorithm <- select.list(c("SavitzkyGolay","MovingAverage"), title="Choose")
+			# Default
+			if (smoothing_algorithm == "") {
+				smoothing_algorithm <- "SavitzkyGolay"
+			}
+			# Strength
+			smoothing_strength <- select.list(c("medium","strong","stronger"), title="Choose")
+			if (smoothing_strength == "") {
+				smoothing_strength <- "medium"
+			}
+		} else if (smoothing == "NO") {
+			smoothing <- FALSE
+		}
+		# Set the value of the displaying label
+		if (smoothing == TRUE) {
+			smoothing_value <- paste("YES", "(", smoothing_algorithm, "," , smoothing_strength, ")")
+		} else {
+			smoothing_value <- "    NO    "
+		}
+		smoothing_value_label <- tklabel(preproc_window, text=smoothing_value)
+		tkgrid(smoothing_value_label, row=4, column=2)
+		# Escape the function
+		.GlobalEnv$smoothing <- smoothing
+		.GlobalEnv$smoothing_strength <- smoothing_strength
+		.GlobalEnv$smoothing_algorithm <- smoothing_algorithm
+		.GlobalEnv$smoothing_value <- smoothing_value
+	}
+	# Baseline subtraction
+	baseline_subtraction_choice <- function() {
+		# Catch the value from the menu
+		baseline_subtraction <- select.list(c("YES","NO"), title="Choose")
+		# Default
+		if (baseline_subtraction == "YES" || baseline_subtraction == "") {
+			baseline_subtraction <- TRUE
+			# Ask for the algorithm
+			baseline_subtraction_algorithm <- select.list(c("SNIP","TopHat","ConvexHull","median"), title="Choose")
+			# SNIP
+			if (baseline_subtraction_algorithm == "SNIP") {
+				baseline_subtraction_iterations <- tclvalue(baseline_subtraction_iterations2)
+				baseline_subtraction_iterations_value <- as.character(baseline_subtraction_iterations)
+				baseline_subtraction_iterations <- as.integer(baseline_subtraction_iterations)
+			}
+			# Default
+			if (baseline_subtraction_algorithm == "") {
+				baseline_subtraction_algorithm <- "SNIP"
+				baseline_subtraction_iterations <- 200
+			}
+		} else if (baseline_subtraction == "NO") {
+			baseline_subtraction <- FALSE
+		}
+		# Set the value of the displaying label
+		if (baseline_subtraction == TRUE && baseline_subtraction_algorithm != "SNIP") {
+			baseline_subtraction_value <- paste("YES", "(", baseline_subtraction_algorithm, ")")
+		} else if (baseline_subtraction == TRUE && baseline_subtraction_algorithm == "SNIP") {
+			baseline_subtraction_value <- paste("YES", "(", baseline_subtraction_algorithm, ", iterations:", baseline_subtraction_iterations, ")")
+		} else {
+			baseline_subtraction_value <- "    NO    "
+		}
+		baseline_subtraction_value_label <- tklabel(preproc_window, text=baseline_subtraction_value)
+		tkgrid(baseline_subtraction_value_label, row=5, column=3)
+		# Escape the function
+		.GlobalEnv$baseline_subtraction <- baseline_subtraction
+		.GlobalEnv$baseline_subtraction_iterations <- baseline_subtraction_iterations
+		.GlobalEnv$baseline_subtraction_algorithm <- baseline_subtraction_algorithm
+		.GlobalEnv$baseline_subtraction_value <- baseline_subtraction_value
+	}
+	# Normalization
+	normalization_choice <- function() {
+		# Catch the value from the menu
+		normalization <- select.list(c("YES","NO"), title="Choose")
+		# Default
+		if (normalization == "YES" || normalization == "") {
+			normalization <- TRUE
+			# Ask for the algorithm
+			normalization_algorithm <- select.list(c("TIC","PQN","median"), title="Choose")
+			# TIC
+			if (normalization_algorithm == "TIC") {
+				normalization_mass_range <- tclvalue(normalization_mass_range2)
+				normalization_mass_range_value <- as.character(normalization_mass_range)
+				if (normalization_mass_range != 0 && normalization_mass_range != "") {
+					normalization_mass_range <- unlist(strsplit(normalization_mass_range, ","))
+					normalization_mass_range <- as.numeric(normalization_mass_range)
+				} else if (normalization_mass_range == 0 || normalization_mass_range == "") {
+					normalization_mass_range <- NULL
+				}
+			}
+			# Default
+			if (normalization_algorithm == "") {
+				normalization_algorithm <- "TIC"
+			}
+		} else if (normalization == "NO") {
+			normalization <- FALSE
+		}
+		# Set the value of the displaying label
+		if (normalization == TRUE && normalization_algorithm != "TIC") {
+			normalization_value <- paste("YES", "(", normalization_algorithm, ")")
+		} else if (normalization == TRUE && normalization_algorithm == "TIC") {
+			normalization_value <- paste("YES", "(", normalization_algorithm, ", range:", normalization_mass_range_value, ")")
+		} else {
+			normalization_value <- "    NO    "
+		}
+		normalization_value_label <- tklabel(preproc_window, text=normalization_value)
+		tkgrid(normalization_value_label, row=6, column=3)
+		# Escape the function
+		.GlobalEnv$normalization <- normalization
+		.GlobalEnv$normalization_mass_range <- normalization_mass_range
+		.GlobalEnv$normalization_algorithm <- normalization_algorithm
+		.GlobalEnv$normalization_value <- normalization_value
+	}
+	# TOF mode
+	tof_mode_choice <- function() {
+		# Catch the value from the menu
+		tof_mode <- select.list(c("Linear","Reflector"), title="Choose")
+		# Default
+		if (tof_mode == "" || tof_mode == "Linear") {
+			tof_mode <- "linear"
+		}
+		if (tof_mode == "Reflector") {
+			tof_mode <- "reflector"
+		}
+		# Set the value of the displaying label
+		tof_mode_value <- tof_mode
+		if (tof_mode_value == "linear") {
+			tof_mode_value <- "   linear   "
+		}
+		tof_mode_value_label <- tklabel(preproc_window, text=tof_mode_value)
+		tkgrid(tof_mode_value_label, row=2, column=3)
+		# Escape the function
+		.GlobalEnv$tof_mode <- tof_mode
+		.GlobalEnv$tof_mode_value <- tof_mode_value
+	}
+	# Commit preprocessing
+	commit_preprocessing_function <- function() {
+		# Get the values (they are filled with the default anyway)
+		# Mass range
+		mass_range <- tclvalue(mass_range2)
+		mass_range_value <- as.character(mass_range)
+		mass_range <- as.numeric(unlist(strsplit(mass_range, ",")))
+		# Preprocessing
+		preprocess_spectra_in_packages_of <- tclvalue(preprocess_spectra_in_packages_of2)
+		preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)
+		preprocess_spectra_in_packages_of_value <- as.character(preprocess_spectra_in_packages_of)
+		# Escape the function
+		.GlobalEnv$mass_range <- mass_range
+		.GlobalEnv$mass_range_value <- mass_range_value
+		.GlobalEnv$preprocess_spectra_in_packages_of <- preprocess_spectra_in_packages_of
+		.GlobalEnv$preprocess_spectra_in_packages_of_value <- preprocess_spectra_in_packages_of_value
+		# Destroy the window upon committing
+		tkdestroy(preproc_window)
+	}
+	##### List of variables, whose values are taken from the entries in the GUI (create new variables for the sub window, that will replace the ones in the global environment, only if the default are changed)
+	mass_range2 <- tclVar("")
+	preprocess_spectra_in_packages_of2 <- tclVar("")
+	baseline_subtraction_iterations2 <- tclVar("")
+	normalization_mass_range2 <- tclVar("")
+	##### Window
+	preproc_window <- tktoplevel()
+	tktitle(preproc_window) <- "Spectra preprocessing parameters"
+	# Mass range
+	mass_range_label <- tklabel(preproc_window, text="Mass range")
+	mass_range_entry <- tkentry(preproc_window, width=15, textvariable=mass_range2)
+	tkinsert(mass_range_entry, "end", as.character(paste(mass_range[1],",",mass_range[2])))
+	# Preprocessing (in packages of)
+	preprocess_spectra_in_packages_of_label <- tklabel(preproc_window, text="Preprocess spectra\nin packages of")
+	preprocess_spectra_in_packages_of_entry <- tkentry(preproc_window, width=10, textvariable=preprocess_spectra_in_packages_of2)
+	tkinsert(preprocess_spectra_in_packages_of_entry, "end", as.character(preprocess_spectra_in_packages_of))
+	# Tof mode
+	tof_mode_label <- tklabel(preproc_window, text="Select the TOF mode")
+	tof_mode_entry <- tkbutton(preproc_window, text="Choose the TOF mode", command=tof_mode_choice)
+	# Transform the data
+	transform_data_button <- tkbutton(preproc_window, text="Transform the data", command=transform_data_choice)
+	# Smoothing
+	smoothing_button <- tkbutton(preproc_window, text="Smoothing", command=smoothing_choice)
+	# Baseline subtraction
+	baseline_subtraction_button <- tkbutton(preproc_window, text="Baseline subtraction", command=baseline_subtraction_choice)
+	baseline_subtraction_iterations_entry <- tkentry(preproc_window, width=15, textvariable=baseline_subtraction_iterations2)
+	tkinsert(baseline_subtraction_iterations_entry, "end", as.character(baseline_subtraction_iterations))
+	# Normalization
+	normalization_button <- tkbutton(preproc_window, text="Normalization", command=normalization_choice)
+	normalization_mass_range_entry <- tkentry(preproc_window, width=15, textvariable=normalization_mass_range2)
+	tkinsert(normalization_mass_range_entry, "end", as.character(normalization_mass_range))
+	# Commit preprocessing
+	commit_preprocessing_button <- tkbutton(preproc_window, text="Commit preprocessing", command=commit_preprocessing_function)
+	##### Displaying labels
+	tof_mode_value_label <- tklabel(preproc_window, text=tof_mode_value)
+	transform_data_value_label <- tklabel(preproc_window, text=transform_data_value)
+	smoothing_value_label <- tklabel(preproc_window, text=smoothing_value)
+	baseline_subtraction_value_label <- tklabel(preproc_window, text=baseline_subtraction_value)
+	normalization_value_label <- tklabel(preproc_window, text=normalization_value)
+	#### Geometry manager
+	tkgrid(mass_range_label, row=1, column=1)
+	tkgrid(mass_range_entry, row=1, column=2)
+	tkgrid(tof_mode_label, row=2, column=1)
+	tkgrid(tof_mode_entry, row=2, column=2)
+	tkgrid(tof_mode_value_label, row=2, column=3)
+	tkgrid(transform_data_button, row=3, column=1)
+	tkgrid(transform_data_value_label, row=3, column=2)
+	tkgrid(smoothing_button, row=4, column=1)
+	tkgrid(smoothing_value_label, row=4, column=2)
+	tkgrid(baseline_subtraction_button, row=5, column=1)
+	tkgrid(baseline_subtraction_iterations_entry, row=5, column=2)
+	tkgrid(baseline_subtraction_value_label, row=5, column=3)
+	tkgrid(normalization_button, row=6, column=1)
+	tkgrid(normalization_mass_range_entry, row=6, column=2)
+	tkgrid(normalization_value_label, row=6, column=3)
+	tkgrid(preprocess_spectra_in_packages_of_label, row=7, column=1)
+	tkgrid(preprocess_spectra_in_packages_of_entry, row=7, column=2)
+	tkgrid(commit_preprocessing_button, row=8, column=1)
+}
 
 ##### File type (export)
 file_type_export_choice <- function() {
@@ -9363,17 +9662,17 @@ file_type_export_choice <- function() {
 	#.GlobalEnv$file_type_export <- file_type_export
 	# Set the value of the displaying label
 	file_type_export_value_label <- tklabel(window, text=file_type_export)
-	tkgrid(file_type_export_value_label, row=13, column=4)
+	tkgrid(file_type_export_value_label, row=12, column=6)
 }
 
 ##### Dump the peaklist of the database
 database_peaklist_dump_function <- function() {
-	peaklist_database_matrix <- NULL
 	############### If there is a peaklist to be dumped
 	if (!is.null(peaks_database)) {
 		########## File name
 		##### Catch the filename from the menu
 		filename_peaklist <- tclvalue(file_name)
+		filename_peaklist <- as.character(filename_peaklist)
 		##### Generate the output filename (based upon the filename)
 		filename_peaklist <- paste(filename_peaklist, " - ", "Database peaklist", sep="")
 		##### Add the extension if it is not present in the filename
@@ -9381,13 +9680,11 @@ database_peaklist_dump_function <- function() {
 			if (length(grep(".csv", filename_peaklist, fixed=TRUE)) == 1) {
 				filename_peaklist <- filename_peaklist
 			}	else {filename_peaklist <- paste(filename_peaklist, ".csv", sep="")}
-		}
-		if (file_type_export == "xlsx") {
+		} else if (file_type_export == "xlsx") {
 			if (length(grep(".xlsx", filename_peaklist, fixed=TRUE)) == 1) {
 				filename_peaklist <- filename_peaklist
 			}	else {filename_peaklist <- paste(filename_peaklist, ".xlsx", sep="")}
-		}
-		if (file_type_export == "xls") {
+		} else if (file_type_export == "xls") {
 			if (length(grep(".xls", filename_peaklist, fixed=TRUE)) == 1) {
 				filename_peaklist <- filename_peaklist
 			}	else {filename_peaklist <- paste(filename_peaklist, ".xls", sep="")}
@@ -9407,7 +9704,7 @@ database_peaklist_dump_function <- function() {
 		##### Find out the longest peaklist to define the final matrix boundary
 		highest_peak_number <- NULL
 		for (p in 1:database_size) {
-			if (is.null(highest_peak_number) || length(peaks_database[[p]]@mass > highest_peak_number)) {
+			if (is.null(highest_peak_number) || (length(peaks_database[[p]]@mass) > highest_peak_number)) {
 				highest_peak_number <- length(peaks_database[[p]]@mass)
 			}
 		}
@@ -9442,7 +9739,7 @@ database_peaklist_dump_function <- function() {
 				unique_row_names <- make.names(rownames(peaklist_database_matrix), unique=TRUE)
 				rownames(peaklist_database_matrix) <- unique_row_names
 				# Export
-				write.xlsx(x=peaklist_database_matrix, file=filename_peaklist, sheetName="Database peaklist", row.names=TRUE)
+				write.xlsx(x=peaklist_database_matrix, file=filename_peaklist, sheetName="Database peaklist", row.names=TRUE, col.names=FALSE)
 			}
 			##### Message box
 			tkmessageBox(title = "Peaklist dumped", message = "The database peaklist file has been dumped.", icon = "info")
@@ -9538,15 +9835,6 @@ import_spectra_function <- function() {
 	if (!is.null(filepath_database) && !is.null(filepath_test)) {
 		# Load the required libraries
 		install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
-		###### Get the values
-		## Mass range
-		mass_range <- tclvalue(mass_range)
-		mass_range_value <- as.character(mass_range)
-		mass_range <- as.numeric(unlist(strsplit(mass_range, ",")))
-		# Preprocessing
-		preprocess_spectra_in_packages_of <- tclvalue(preprocess_spectra_in_packages_of)
-		preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)
-		preprocess_spectra_in_packages_of_value <- as.character(preprocess_spectra_in_packages_of)
 		# Generate the list of spectra (library and test)
 		if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 			### Load the spectra
@@ -9581,8 +9869,8 @@ import_spectra_function <- function() {
 		### Spectra grouping (class for database)
 		spectra_database <- group_spectra_class(spectra_database, class_list=database_folder_list, spectra_format=spectra_format, class_in_file_name=TRUE)
 		### Preprocessing
-		spectra_database <- preprocess_spectra(spectra_database, tof_mode=tof_mode, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=NULL, data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), process_in_packages_of=preprocess_spectra_in_packages_of, align_spectra=FALSE, spectra_alignment_method="cubic", multicore_processing=TRUE)
-		spectra_test <- preprocess_spectra(spectra_test, tof_mode=tof_mode, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=NULL, data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), process_in_packages_of=preprocess_spectra_in_packages_of, align_spectra=FALSE, spectra_alignment_method="cubic", multicore_processing=TRUE)
+		spectra_database <- preprocess_spectra(spectra_database, tof_mode=tof_mode, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=NULL, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_strength=smoothing_strength, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range), process_in_packages_of=preprocess_spectra_in_packages_of, align_spectra=FALSE, spectra_alignment_method="cubic", multicore_processing=multicore_processing)
+		spectra_test <- preprocess_spectra(spectra_test, tof_mode=tof_mode, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=NULL, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_strength=smoothing_strength, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range), process_in_packages_of=preprocess_spectra_in_packages_of, align_spectra=FALSE, spectra_alignment_method="cubic", multicore_processing=multicore_processing)
 		# Number of samples
 		if (isMassSpectrumList(spectra_test)) {
 			number_of_samples <- length(spectra_test)
@@ -9592,8 +9880,6 @@ import_spectra_function <- function() {
 		# Exit the function and put the variable into the R workspace
 		.GlobalEnv$spectra_database <- spectra_database
 		.GlobalEnv$spectra_test <- spectra_test
-		.GlobalEnv$mass_range_value <- mass_range_value
-		.GlobalEnv$preprocess_spectra_in_packages_of_value <- preprocess_spectra_in_packages_of_value
 		.GlobalEnv$database_folder_list <- database_folder_list
 		.GlobalEnv$test_folder_list <- test_folder_list
 		.GlobalEnv$number_of_samples <- number_of_samples
@@ -9692,16 +9978,16 @@ run_spectral_typer_function <- function() {
 		score_si_matrix <- NULL
 		############### CORRELATION
 		if (similarity_criteria == "correlation") {
-			score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_correction_coefficient=intensity_correction_coefficient, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only)
+			score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_correction_coefficient=intensity_correction_coefficient, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, multicore_processing=multicore_processing)
 		} else if (similarity_criteria == "hca") {
 			############### HIERARCHICAL CLUSTERING ANALYSIS
-			score_hca <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, spectra_path_output=spectra_path_output, score_only=score_only, spectra_format=spectra_format, normalise_distances=TRUE, normalisation_method="sum")
+			score_hca <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, spectra_path_output=spectra_path_output, score_only=score_only, spectra_format=spectra_format, normalise_distances=TRUE, normalisation_method="sum", multicore_processing=multicore_processing)
 		} else if (similarity_criteria == "similarity index") {
 			############### SIMILARITY INDEX
-			score_si_matrix <- spectral_typer_score_similarity_index(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only)
+			score_si_matrix <- spectral_typer_score_similarity_index(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library=database_folder_list, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, multicore_processing=multicore_processing)
 		} else if (similarity_criteria == "signal intensity") {
 			############### INTENSITY
-			score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, comparison=signal_intensity_evaluation, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_tolerance_percent_threshold=intensity_tolerance_percent, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1)
+			score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library=database_folder_list, comparison=signal_intensity_evaluation, peaks_filtering=peaks_filtering, peaks_filtering_percentage_threshold=peaks_filtering_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, low_intensity_percentage_threshold=intensity_percentage_threshold, low_intensity_threshold_method=intensity_threshold_method, tolerance_ppm=tolerance_ppm, intensity_tolerance_percent_threshold=intensity_tolerance_percent, spectra_format=spectra_format, spectra_path_output=spectra_path_output, score_only=score_only, number_of_st_dev=1, multicore_processing=multicore_processing)
 		}
 		### Parameters matrices
 		# Parameters vector
@@ -9855,7 +10141,7 @@ similarity_criteria_choice <- function() {
 		similarity_criteria_value <- "   correlation   "
 	}
 	similarity_criteria_value_label <- tklabel(window, text=similarity_criteria_value)
-	tkgrid(similarity_criteria_value_label, row=3, column=6)
+	tkgrid(similarity_criteria_value_label, row=3, column=3)
 	# Escape the function
 	.GlobalEnv$similarity_criteria <- similarity_criteria
 	.GlobalEnv$similarity_criteria_value <- similarity_criteria_value
@@ -9892,7 +10178,7 @@ peak_picking_algorithm_choice <- function() {
 		peak_picking_algorithm_value <- "Super Smoother"
 	}
 	peak_picking_algorithm_value_label <- tklabel(window, text=peak_picking_algorithm_value)
-	#tkgrid(peak_picking_algorithm_value_label, row=6, column=6)
+	tkgrid(peak_picking_algorithm_value_label, row=3, column=5)
 	# Escape the function
 	.GlobalEnv$peak_picking_algorithm <- peak_picking_algorithm
 	.GlobalEnv$peak_picking_algorithm_value <- peak_picking_algorithm_value
@@ -9965,6 +10251,31 @@ intensity_threshold_method_choice <- function() {
 	.GlobalEnv$intensity_threshold_method <- intensity_threshold_method
 	.GlobalEnv$intensity_threshold_method_value <- intensity_threshold_method_value
 }
+
+##### Multicore processing
+multicore_processing_choice <- function() {
+	# Catch the value from the menu
+	multicore_processing <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (multicore_processing == "YES" || multicore_processing == "") {
+		multicore_processing <- TRUE
+	}
+	if (multicore_processing == "NO") {
+		multicore_processing <- FALSE
+	}
+	# Set the value of the displaying label
+	if (multicore_processing == TRUE) {
+		multicore_processing_value <- "YES"
+	} else {
+		multicore_processing_value <- "NO"
+	}
+	multicore_processing_value_label <- tklabel(window, text=multicore_processing_value)
+	tkgrid(multicore_processing_value_label, row=9, column=5)
+	# Escape the function
+	.GlobalEnv$multicore_processing <- multicore_processing
+	.GlobalEnv$multicore_processing_value <- multicore_processing_value
+}
+
 
 ##### Average replicates in database
 average_replicates_in_database_choice <- function() {
@@ -10062,29 +10373,6 @@ spectra_path_output_choice <- function() {
 	.GlobalEnv$spectra_path_output_value <- spectra_path_output_value
 }
 
-##### TOF mode
-tof_mode_choice <- function() {
-	# Catch the value from the menu
-	tof_mode <- select.list(c("Linear","Reflector"), title="Choose")
-	# Default
-	if (tof_mode == "" || tof_mode == "Linear") {
-		tof_mode <- "linear"
-	}
-	if (tof_mode == "Reflector") {
-		tof_mode <- "reflector"
-	}
-	# Set the value of the displaying label
-	tof_mode_value <- tof_mode
-	if (tof_mode_value == "linear") {
-		tof_mode_value <- "   linear   "
-	}
-	tof_mode_value_label <- tklabel(window, text=tof_mode_value)
-	tkgrid(tof_mode_value_label, row=12, column=3)
-	# Escape the function
-	.GlobalEnv$tof_mode <- tof_mode
-	.GlobalEnv$tof_mode_value <- tof_mode_value
-}
-
 ##### File format
 spectra_format_choice <- function() {
 	# Catch the value from the menu
@@ -10103,7 +10391,7 @@ spectra_format_choice <- function() {
 	.GlobalEnv$spectra_format_value <- spectra_format_value
 	# Set the value of the displaying label
 	spectra_format_value_label <- tklabel(window, text=spectra_format_value)
-	tkgrid(spectra_format_value_label, row=12, column=6)
+	tkgrid(spectra_format_value_label, row=12, column=3)
 }
 
 
@@ -10118,14 +10406,12 @@ spectra_format_choice <- function() {
 ##################################################################### WINDOW GUI
 
 ########## List of variables, whose values are taken from the entries in the GUI
-mass_range <- tclVar("")
 SNR <- tclVar("")
 intensity_correction_coefficient <- tclVar("")
 peaks_filtering_threshold_percent <- tclVar("")
 intensity_percentage_threshold <- tclVar("")
 signals_to_take <- tclVar("")
 file_name <- tclVar("")
-preprocess_spectra_in_packages_of <- tclVar("")
 intensity_tolerance_percent <- tclVar("")
 
 
@@ -10149,14 +10435,6 @@ select_samples_button <- tkbutton(window, text="Browse samples folder", command=
 select_output_label <- tklabel(window, text="Select the folder where to save all the outputs")
 browse_output_button <- tkbutton(window, text="Browse output folder", command=browse_output_function)
 #### Entries
-# Mass range
-mass_range_label <- tklabel(window, text="Mass range")
-mass_range_entry <- tkentry(window, width=15, textvariable=mass_range)
-tkinsert(mass_range_entry, "end", "3000, 15000")
-# Preprocessing (in packages of)
-preprocess_spectra_in_packages_of_label <- tklabel(window, text="Preprocess spectra\nin packages of")
-preprocess_spectra_in_packages_of_entry <- tkentry(window, width=10, textvariable=preprocess_spectra_in_packages_of)
-tkinsert(preprocess_spectra_in_packages_of_entry, "end", "200")
 # Similarity criteria
 similarity_criteria_label <- tklabel(window, text="Similarity criteria")
 similarity_criteria_entry <- tkbutton(window, text="Choose similarity\ncriteria", command=similarity_criteria_choice)
@@ -10175,8 +10453,8 @@ signal_intensity_evaluation_entry <- tkbutton(window, text="Choose signal intens
 peak_picking_mode_label <- tklabel(window, text="Peak picking mode")
 peak_picking_mode_entry <- tkbutton(window, text="Choose peak picking\nmode", command=peak_picking_mode_choice)
 # Peak picking mode
-peak_picking_algorithm_label <- tklabel(window, text="Peak picking algorithm")
-peak_picking_algorithm_entry <- tkbutton(window, text="Choose peak picking\nalgorithm", command=peak_picking_algorithm_choice)
+peak_picking_algorithm_button <- tkbutton(window, text="Choose peak picking\nalgorithm", command=peak_picking_algorithm_choice)
+peak_picking_algorithm_value_label <- tklabel(window, text=peak_picking_algorithm_value)
 # Signals to take
 signals_to_take_label <- tklabel(window, text="Most intense signals to take\n(if 'most intense' is selected)")
 signals_to_take_entry <- tkentry(window, width=10, textvariable=signals_to_take)
@@ -10214,9 +10492,6 @@ score_only_entry <- tkbutton(window, text="Choose", command=score_only_choice)
 # Spectra path output
 spectra_path_output_label <- tklabel(window, text="Spectra path in the output")
 spectra_path_output_entry <- tkbutton(window, text="Choose to display\nthe spectra path", command=spectra_path_output_choice)
-# Tof mode
-tof_mode_label <- tklabel(window, text="Select the TOF mode")
-tof_mode_entry <- tkbutton(window, text="Choose the TOF mode", command=tof_mode_choice)
 # File format
 spectra_format_label <- tklabel(window, text="Select the spectra format")
 spectra_format_entry <- tkbutton(window, text="Choose the spectra format", command=spectra_format_choice)
@@ -10229,12 +10504,16 @@ quit_button <- tkbutton(window, text="Quit", command=quit_function)
 # End session
 #end_session_label <- tklabel(window, text="Quit")
 end_session_button <- tkbutton(window, text="QUIT", command=end_session_function)
+# Multicore
+multicore_processing_button <- tkbutton(window, text="ALLOW PARALLEL\nPROCESSING", command=multicore_processing_choice)
 # Import the spectra
 import_spectra_button <- tkbutton(window, text="SPECTRA IMPORT AND\nPREPROCESSING", command=import_spectra_function)
 # Peak picking
 peak_picking_button <- tkbutton(window, text="PEAK PICKING", command=peak_picking_function)
 # Run the Spectral typer!
 run_spectral_typer_button <- tkbutton(window, text="RUN THE SPECTRAL TYPER", command=run_spectral_typer_function)
+# Spectra preprocessing button
+spectra_preprocessing_button <- tkbutton(window, text="SPECTRA PREPROCESSING\nPARAMETERS", command=preprocessing_window_function)
 # Set the file name
 set_file_name_label <- tklabel(window, text="<-- Set the file name")
 set_file_name_entry <- tkentry(window, width=30, textvariable=file_name)
@@ -10257,8 +10536,8 @@ average_replicates_in_database_value_label <- tklabel(window, text=average_repli
 average_replicates_in_test_value_label <- tklabel(window, text=average_replicates_in_test_value)
 score_only_value_label <- tklabel(window, text=score_only_value)
 spectra_path_output_value_label <- tklabel(window, text=spectra_path_output_value)
-tof_mode_value_label <- tklabel(window, text=tof_mode_value)
 spectra_format_value_label <- tklabel(window, text=spectra_format_value)
+multicore_processing_value_label <- tklabel(window, text=multicore_processing_value)
 
 
 
@@ -10275,11 +10554,11 @@ tkgrid(select_database_button, row=1, column=1)
 tkgrid(select_samples_button, row=1, column=2)
 #tkgrid(select_output_label, row=2, column=3)
 tkgrid(browse_output_button, row=1, column=3)
-tkgrid(mass_range_label, row=3, column=1)
-tkgrid(mass_range_entry, row=3, column=2)
-tkgrid(similarity_criteria_label, row=3, column=4)
-tkgrid(similarity_criteria_entry, row=3, column=5)
-tkgrid(similarity_criteria_value_label, row=3, column=6)
+tkgrid(similarity_criteria_label, row=3, column=1)
+tkgrid(similarity_criteria_entry, row=3, column=2)
+tkgrid(similarity_criteria_value_label, row=3, column=3)
+tkgrid(peak_picking_algorithm_button, row=3, column=4)
+tkgrid(peak_picking_algorithm_value_label, row=3, column=5)
 tkgrid(intensity_correction_coefficient_label, row=4, column=1)
 tkgrid(intensity_correction_coefficient_entry, row=4, column=2)
 tkgrid(signal_intensity_evaluation_label, row=4, column=4)
@@ -10290,7 +10569,6 @@ tkgrid(peak_picking_mode_entry, row=5, column=2)
 tkgrid(peak_picking_mode_value_label, row=5, column=3)
 tkgrid(signals_to_take_label, row=5, column=4)
 tkgrid(signals_to_take_entry, row=5, column=5)
-tkgrid(peak_picking_algorithm_entry, row=5, column=6)
 tkgrid(SNR_label, row=6, column=2)
 tkgrid(SNR_entry, row=6, column=3)
 tkgrid(peaks_filtering_label, row=7, column=1)
@@ -10312,30 +10590,28 @@ tkgrid(average_replicates_in_database_value_label, row=10, column=3)
 tkgrid(average_replicates_in_test_label, row=10, column=4)
 tkgrid(average_replicates_in_test_entry, row=10, column=5)
 tkgrid(average_replicates_in_test_value_label, row=10, column=6)
+tkgrid(multicore_processing_button, row=9, column=4)
+tkgrid(multicore_processing_value_label, row=9, column=5)
 tkgrid(score_only_label, row=11, column=1)
 tkgrid(score_only_entry, row=11, column=2)
 tkgrid(score_only_value_label, row=11, column=3)
 tkgrid(spectra_path_output_label, row=11, column=4)
 tkgrid(spectra_path_output_entry, row=11, column=5)
 tkgrid(spectra_path_output_value_label, row=11, column=6)
-tkgrid(tof_mode_label, row=12, column=1)
-tkgrid(tof_mode_entry, row=12, column=2)
-tkgrid(tof_mode_value_label, row=12, column=3)
-tkgrid(spectra_format_label, row=12, column=4)
-tkgrid(spectra_format_entry, row=12, column=5)
-tkgrid(spectra_format_value_label, row=12, column=6)
+tkgrid(spectra_format_label, row=12, column=1)
+tkgrid(spectra_format_entry, row=12, column=2)
+tkgrid(spectra_format_value_label, row=12, column=3)
 tkgrid(intensity_tolerance_percent_label, row=6, column=4)
 tkgrid(intensity_tolerance_percent_entry, row=6, column=5)
-tkgrid(preprocess_spectra_in_packages_of_label, row=9, column=4)
-tkgrid(preprocess_spectra_in_packages_of_entry, row=9, column=5)
-tkgrid(file_type_export_label, row=13, column=2)
-tkgrid(file_type_export_entry, row=13, column=3)
-tkgrid(file_type_export_value_label, row=13, column=4)
+tkgrid(file_type_export_label, row=12, column=4)
+tkgrid(file_type_export_entry, row=12, column=5)
+tkgrid(file_type_export_value_label, row=12, column=6)
 tkgrid(import_spectra_button, row=14, column=2)
 tkgrid(peak_picking_button, row=14, column=3)
 tkgrid(run_spectral_typer_button, row=14, column=4)
-tkgrid(database_peaklist_dump_button, row=14, column=6)
+tkgrid(spectra_preprocessing_button, row=14, column=5)
+tkgrid(database_peaklist_dump_button, row=15, column=3)
 #tkgrid(exit_label, row=15, column=1)
 #tkgrid(quit_button, row=15, column=2)
-tkgrid(end_session_button, row=14, column=5)
+tkgrid(end_session_button, row=15, column=4)
 #window_scrollbar
