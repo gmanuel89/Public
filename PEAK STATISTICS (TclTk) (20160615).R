@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.06.14
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.06.15
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -2151,13 +2151,13 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 	normalization_mass_range <- preprocessing_parameters$normalization_mass_range
 	##### Define the smoothing half wondow size
 	if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-		if (smoothing_strength == "small") {
-			if (smoothing_algorithm == "SavitzkyGolay") {
-				smoothing_half_window_size <- 5
-			} else if (smoothing_algorithm == "MovingAverage") {
-				smoothing_half_window_size <- 1
-			}
-		} else if (smoothing_strength == "medium") {
+		#if (smoothing_strength == "small") {
+		#if (smoothing_algorithm == "SavitzkyGolay") {
+		#smoothing_half_window_size <- 5
+		#} else if (smoothing_algorithm == "MovingAverage") {
+		#smoothing_half_window_size <- 1
+		#}
+		if (smoothing_strength == "medium") {
 			if (smoothing_algorithm == "SavitzkyGolay") {
 				smoothing_half_window_size <- 10
 			} else if (smoothing_algorithm == "MovingAverage") {
@@ -2177,13 +2177,13 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 			}
 		}
 	} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-		if (smoothing_strength == "small") {
-			if (smoothing_algorithm == "SavitzkyGolay") {
-				smoothing_half_window_size <- 1
-			} else if (smoothing_algorithm == "MovingAverage") {
-				smoothing_half_window_size <- 0.2
-			}
-		} else if (smoothing_strength == "medium") {
+		#if (smoothing_strength == "small") {
+		#if (smoothing_algorithm == "SavitzkyGolay") {
+		#smoothing_half_window_size <- 1
+		#} else if (smoothing_algorithm == "MovingAverage") {
+		#smoothing_half_window_size <- 0.2
+		#}
+		if (smoothing_strength == "medium") {
 			if (smoothing_algorithm == "SavitzkyGolay") {
 				smoothing_half_window_size <- 3
 			} else if (smoothing_algorithm == "MovingAverage") {
@@ -2268,7 +2268,7 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 				} else if (Sys.info()[1] == "Windows") {
 					cl <- makeCluster(cpu_thread_number)
 					clusterEvalQ(cl, {library(MALDIquant)})
-					clusterExport(cl=cl, varlist=c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range"), envir=environment())
+					clusterExport(cl=cl, varlist=c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range", "preprocessing_subfunction"), envir=environment())
 					spectra_temp <- parLapply(cl, spectra_temp, fun=function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra=crop_spectra, mass_range=mass_range, data_transformation=data_transformation, transformation_algorithm=transformation_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_half_window_size=smoothing_half_window_size, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range))
 					stopCluster(cl)
 				}
@@ -9281,6 +9281,7 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method="pears
 
 
 
+##########################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
 
 
@@ -9300,7 +9301,6 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method="pears
 
 
 
-#######################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
 
 
@@ -9315,43 +9315,7 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method="pears
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-############################ PEAK STATISTICS 2016.06.14
+############################ PEAK STATISTICS 2016.06.15
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
@@ -9386,6 +9350,17 @@ exclude_spectra_without_peak <- FALSE
 multicore_processing <- TRUE
 transform_data <- FALSE
 transform_data_algorithm <- NULL
+smoothing <- TRUE
+smoothing_algorithm <- "SavitzkyGolay"
+smoothing_strength <- "medium"
+baseline_subtraction <- TRUE
+baseline_subtraction_algorithm <- "SNIP"
+baseline_subtraction_iterations <- 200
+normalization <- TRUE
+normalization_algorithm <- "TIC"
+normalization_mass_range <- NULL
+preprocess_spectra_in_packages_of <- 200
+mass_range <- c(3000,15000)
 
 
 
@@ -9405,13 +9380,263 @@ remove_outliers_value <- "NO"
 exclude_spectra_without_peak_value <- "NO"
 multicore_processing_value <- "YES"
 transform_data_value <- "    NO    "
-
+smoothing_value <- "YES ( SavitzkyGolay , medium)"
+baseline_subtraction_value <- "YES (SNIP , iterations: 200)"
+normalization_value <- "YES (TIC , mass range: )"
 
 
 
 
 
 ##################################################### DEFINE WHAT THE BUTTONS DO
+
+##### Preprocessing window
+preprocessing_window_function <- function() {
+	##### Functions
+	# Transform the data
+	transform_data_choice <- function() {
+		# Catch the value from the menu
+		transform_data <- select.list(c("YES","NO"), title="Choose")
+		# Default
+		if (transform_data == "YES") {
+			transform_data <- TRUE
+			# Ask for the algorithm
+			transform_data_algorithm <- select.list(c("sqrt","log","log2","log10"), title="Choose")
+			# Default
+			if (transform_data_algorithm == "") {
+				transform_data_algorithm <- "sqrt"
+			}
+		} else if (transform_data == "NO" || transform_data == "") {
+			transform_data <- FALSE
+		}
+		# Set the value of the displaying label
+		if (transform_data == TRUE) {
+			transform_data_value <- paste("YES", "(", transform_data_algorithm, ")")
+		} else {
+			transform_data_value <- "    NO    "
+		}
+		transform_data_value_label <- tklabel(preproc_window, text=transform_data_value)
+		tkgrid(transform_data_value_label, row=3, column=2)
+		# Escape the function
+		.GlobalEnv$transform_data <- transform_data
+		.GlobalEnv$transform_data_algorithm <- transform_data_algorithm
+		.GlobalEnv$transform_data_value <- transform_data_value
+	}
+	# Smoothing
+	smoothing_choice <- function() {
+		# Catch the value from the menu
+		smoothing <- select.list(c("YES","NO"), title="Choose")
+		# Default
+		if (smoothing == "YES" || smoothing == "") {
+			smoothing <- TRUE
+			# Ask for the algorithm
+			smoothing_algorithm <- select.list(c("SavitzkyGolay","MovingAverage"), title="Choose")
+			# Default
+			if (smoothing_algorithm == "") {
+				smoothing_algorithm <- "SavitzkyGolay"
+			}
+			# Strength
+			smoothing_strength <- select.list(c("medium","strong","stronger"), title="Choose")
+			if (smoothing_strength == "") {
+				smoothing_strength <- "medium"
+			}
+		} else if (smoothing == "NO") {
+			smoothing <- FALSE
+		}
+		# Set the value of the displaying label
+		if (smoothing == TRUE) {
+			smoothing_value <- paste("YES", "(", smoothing_algorithm, "," , smoothing_strength, ")")
+		} else {
+			smoothing_value <- "    NO    "
+		}
+		smoothing_value_label <- tklabel(preproc_window, text=smoothing_value)
+		tkgrid(smoothing_value_label, row=4, column=2)
+		# Escape the function
+		.GlobalEnv$smoothing <- smoothing
+		.GlobalEnv$smoothing_strength <- smoothing_strength
+		.GlobalEnv$smoothing_algorithm <- smoothing_algorithm
+		.GlobalEnv$smoothing_value <- smoothing_value
+	}
+	# Baseline subtraction
+	baseline_subtraction_choice <- function() {
+		# Catch the value from the menu
+		baseline_subtraction <- select.list(c("YES","NO"), title="Choose")
+		# Default
+		if (baseline_subtraction == "YES" || baseline_subtraction == "") {
+			baseline_subtraction <- TRUE
+			# Ask for the algorithm
+			baseline_subtraction_algorithm <- select.list(c("SNIP","TopHat","ConvexHull","median"), title="Choose")
+			# SNIP
+			if (baseline_subtraction_algorithm == "SNIP") {
+				baseline_subtraction_iterations <- tclvalue(baseline_subtraction_iterations2)
+				baseline_subtraction_iterations_value <- as.character(baseline_subtraction_iterations)
+				baseline_subtraction_iterations <- as.integer(baseline_subtraction_iterations)
+			}
+			# Default
+			if (baseline_subtraction_algorithm == "") {
+				baseline_subtraction_algorithm <- "SNIP"
+				baseline_subtraction_iterations <- 200
+			}
+		} else if (baseline_subtraction == "NO") {
+			baseline_subtraction <- FALSE
+		}
+		# Set the value of the displaying label
+		if (baseline_subtraction == TRUE && baseline_subtraction_algorithm != "SNIP") {
+			baseline_subtraction_value <- paste("YES", "(", baseline_subtraction_algorithm, ")")
+		} else if (baseline_subtraction == TRUE && baseline_subtraction_algorithm == "SNIP") {
+			baseline_subtraction_value <- paste("YES", "(", baseline_subtraction_algorithm, ", iterations:", baseline_subtraction_iterations, ")")
+		} else {
+			baseline_subtraction_value <- "    NO    "
+		}
+		baseline_subtraction_value_label <- tklabel(preproc_window, text=baseline_subtraction_value)
+		tkgrid(baseline_subtraction_value_label, row=5, column=3)
+		# Escape the function
+		.GlobalEnv$baseline_subtraction <- baseline_subtraction
+		.GlobalEnv$baseline_subtraction_iterations <- baseline_subtraction_iterations
+		.GlobalEnv$baseline_subtraction_algorithm <- baseline_subtraction_algorithm
+		.GlobalEnv$baseline_subtraction_value <- baseline_subtraction_value
+	}
+	# Normalization
+	normalization_choice <- function() {
+		# Catch the value from the menu
+		normalization <- select.list(c("YES","NO"), title="Choose")
+		# Default
+		if (normalization == "YES" || normalization == "") {
+			normalization <- TRUE
+			# Ask for the algorithm
+			normalization_algorithm <- select.list(c("TIC","PQN","median"), title="Choose")
+			# TIC
+			if (normalization_algorithm == "TIC") {
+				normalization_mass_range <- tclvalue(normalization_mass_range2)
+				normalization_mass_range_value <- as.character(normalization_mass_range)
+				if (normalization_mass_range != 0 && normalization_mass_range != "") {
+					normalization_mass_range <- unlist(strsplit(normalization_mass_range, ","))
+					normalization_mass_range <- as.numeric(normalization_mass_range)
+				} else if (normalization_mass_range == 0 || normalization_mass_range == "") {
+					normalization_mass_range <- NULL
+				}
+			}
+			# Default
+			if (normalization_algorithm == "") {
+				normalization_algorithm <- "TIC"
+			}
+		} else if (normalization == "NO") {
+			normalization <- FALSE
+		}
+		# Set the value of the displaying label
+		if (normalization == TRUE && normalization_algorithm != "TIC") {
+			normalization_value <- paste("YES", "(", normalization_algorithm, ")")
+		} else if (normalization == TRUE && normalization_algorithm == "TIC") {
+			normalization_value <- paste("YES", "(", normalization_algorithm, ", range:", normalization_mass_range_value, ")")
+		} else {
+			normalization_value <- "    NO    "
+		}
+		normalization_value_label <- tklabel(preproc_window, text=normalization_value)
+		tkgrid(normalization_value_label, row=6, column=3)
+		# Escape the function
+		.GlobalEnv$normalization <- normalization
+		.GlobalEnv$normalization_mass_range <- normalization_mass_range
+		.GlobalEnv$normalization_algorithm <- normalization_algorithm
+		.GlobalEnv$normalization_value <- normalization_value
+	}
+	# TOF mode
+	tof_mode_choice <- function() {
+		# Catch the value from the menu
+		tof_mode <- select.list(c("Linear","Reflector"), title="Choose")
+		# Default
+		if (tof_mode == "" || tof_mode == "Linear") {
+			tof_mode <- "linear"
+		}
+		if (tof_mode == "Reflector") {
+			tof_mode <- "reflector"
+		}
+		# Set the value of the displaying label
+		tof_mode_value <- tof_mode
+		if (tof_mode_value == "linear") {
+			tof_mode_value <- "   linear   "
+		}
+		tof_mode_value_label <- tklabel(preproc_window, text=tof_mode_value)
+		tkgrid(tof_mode_value_label, row=2, column=3)
+		# Escape the function
+		.GlobalEnv$tof_mode <- tof_mode
+		.GlobalEnv$tof_mode_value <- tof_mode_value
+	}
+	# Commit preprocessing
+	commit_preprocessing_function <- function() {
+		# Get the values (they are filled with the default anyway)
+		# Mass range
+		mass_range <- tclvalue(mass_range2)
+		mass_range_value <- as.character(mass_range)
+		mass_range <- as.numeric(unlist(strsplit(mass_range, ",")))
+		# Preprocessing
+		preprocess_spectra_in_packages_of <- tclvalue(preprocess_spectra_in_packages_of2)
+		preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)
+		preprocess_spectra_in_packages_of_value <- as.character(preprocess_spectra_in_packages_of)
+		# Escape the function
+		.GlobalEnv$mass_range <- mass_range
+		.GlobalEnv$preprocess_spectra_in_packages_of <- preprocess_spectra_in_packages_of
+		# Destroy the window upon committing
+		tkdestroy(preproc_window)
+	}
+	##### List of variables, whose values are taken from the entries in the GUI (create new variables for the sub window, that will replace the ones in the global environment, only if the default are changed)
+	mass_range2 <- tclVar("")
+	preprocess_spectra_in_packages_of2 <- tclVar("")
+	baseline_subtraction_iterations2 <- tclVar("")
+	normalization_mass_range2 <- tclVar("")
+	##### Window
+	preproc_window <- tktoplevel()
+	tktitle(preproc_window) <- "Spectra preprocessing parameters"
+	# Mass range
+	mass_range_label <- tklabel(preproc_window, text="Mass range")
+	mass_range_entry <- tkentry(preproc_window, width=15, textvariable=mass_range2)
+	tkinsert(mass_range_entry, "end", as.character(paste(mass_range[1],",",mass_range[2])))
+	# Preprocessing (in packages of)
+	preprocess_spectra_in_packages_of_label <- tklabel(preproc_window, text="Preprocess spectra\nin packages of")
+	preprocess_spectra_in_packages_of_entry <- tkentry(preproc_window, width=10, textvariable=preprocess_spectra_in_packages_of2)
+	tkinsert(preprocess_spectra_in_packages_of_entry, "end", as.character(preprocess_spectra_in_packages_of))
+	# Tof mode
+	tof_mode_label <- tklabel(preproc_window, text="Select the TOF mode")
+	tof_mode_entry <- tkbutton(preproc_window, text="Choose the TOF mode", command=tof_mode_choice)
+	# Transform the data
+	transform_data_button <- tkbutton(preproc_window, text="Transform the data", command=transform_data_choice)
+	# Smoothing
+	smoothing_button <- tkbutton(preproc_window, text="Smoothing", command=smoothing_choice)
+	# Baseline subtraction
+	baseline_subtraction_button <- tkbutton(preproc_window, text="Baseline subtraction", command=baseline_subtraction_choice)
+	baseline_subtraction_iterations_entry <- tkentry(preproc_window, width=15, textvariable=baseline_subtraction_iterations2)
+	tkinsert(baseline_subtraction_iterations_entry, "end", as.character(baseline_subtraction_iterations))
+	# Normalization
+	normalization_button <- tkbutton(preproc_window, text="Normalization", command=normalization_choice)
+	normalization_mass_range_entry <- tkentry(preproc_window, width=15, textvariable=normalization_mass_range2)
+	tkinsert(normalization_mass_range_entry, "end", as.character(normalization_mass_range))
+	# Commit preprocessing
+	commit_preprocessing_button <- tkbutton(preproc_window, text="Commit preprocessing", command=commit_preprocessing_function)
+	##### Displaying labels
+	tof_mode_value_label <- tklabel(preproc_window, text=tof_mode_value)
+	transform_data_value_label <- tklabel(preproc_window, text=transform_data_value)
+	smoothing_value_label <- tklabel(preproc_window, text=smoothing_value)
+	baseline_subtraction_value_label <- tklabel(preproc_window, text=baseline_subtraction_value)
+	normalization_value_label <- tklabel(preproc_window, text=normalization_value)
+	#### Geometry manager
+	tkgrid(mass_range_label, row=1, column=1)
+	tkgrid(mass_range_entry, row=1, column=2)
+	tkgrid(tof_mode_label, row=2, column=1)
+	tkgrid(tof_mode_entry, row=2, column=2)
+	tkgrid(tof_mode_value_label, row=2, column=3)
+	tkgrid(transform_data_button, row=3, column=1)
+	tkgrid(transform_data_value_label, row=3, column=2)
+	tkgrid(smoothing_button, row=4, column=1)
+	tkgrid(smoothing_value_label, row=4, column=2)
+	tkgrid(baseline_subtraction_button, row=5, column=1)
+	tkgrid(baseline_subtraction_iterations_entry, row=5, column=2)
+	tkgrid(baseline_subtraction_value_label, row=5, column=3)
+	tkgrid(normalization_button, row=6, column=1)
+	tkgrid(normalization_mass_range_entry, row=6, column=2)
+	tkgrid(normalization_value_label, row=6, column=3)
+	tkgrid(preprocess_spectra_in_packages_of_label, row=7, column=1)
+	tkgrid(preprocess_spectra_in_packages_of_entry, row=7, column=2)
+	tkgrid(commit_preprocessing_button, row=8, column=1)
+}
 
 ##### File type (export)
 file_type_export_choice <- function() {
@@ -9506,15 +9731,6 @@ end_session_function <- function () {
 import_spectra_function <- function() {
 	# Load the required libraries
 	install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
-	###### Get the values
-	## Mass range
-	mass_range <- tclvalue(mass_range)
-	mass_range_value <- as.character(mass_range)
-	mass_range <- as.numeric(unlist(strsplit(mass_range, ",")))
-	# Preprocessing
-	preprocess_spectra_in_packages_of <- tclvalue(preprocess_spectra_in_packages_of)
-	preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)
-	preprocess_spectra_in_packages_of_value <- as.character(preprocess_spectra_in_packages_of)
 	# Generate the list of spectra (library and test)
 	if (spectra_format == "brukerflex" || spectra_format == "xmass") {
 		### Load the spectra
@@ -9533,11 +9749,9 @@ import_spectra_function <- function() {
 		}
 	}
 	### Preprocessing
-	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=NULL, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm, smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE, spectra_alignment_method="cubic")
+	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=NULL, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_strength=smoothing_strength, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range), process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE, spectra_alignment_method="cubic")
 	# Exit the function and put the variable into the R workspace
 	.GlobalEnv$spectra <- spectra
-	.GlobalEnv$mass_range_value <- mass_range_value
-	.GlobalEnv$preprocess_spectra_in_packages_of_value <- preprocess_spectra_in_packages_of_value
 	### Messagebox
 	tkmessageBox(title = "Import successful", message = "The spectra have been successfully imported and preprocessed", icon = "info")
 }
@@ -9730,35 +9944,6 @@ multicore_processing_choice <- function() {
 	.GlobalEnv$multicore_processing_value <- multicore_processing_value
 }
 
-##### Transform the data
-transform_data_choice <- function() {
-	# Catch the value from the menu
-	transform_data <- select.list(c("YES","NO"), title="Choose")
-	# Default
-	if (transform_data == "YES") {
-		transform_data <- TRUE
-		# Ask for the algorithm
-		transform_data_algorithm <- select.list(c("sqrt","log","log2","log10"), title="Choose")
-		# Default
-		if (transform_data_algorithm == "") {
-			transform_data_algorithm <- "sqrt"
-		}
-	} else if (transform_data == "NO" || transform_data == "") {
-		transform_data <- FALSE
-	}
-	# Set the value of the displaying label
-	if (transform_data == TRUE) {
-		transform_data_value <- paste("YES", "(", transform_data_algorithm, ")")
-	} else {
-		transform_data_value <- "    NO    "
-	}
-	transform_data_value_label <- tklabel(window, text=transform_data_value)
-	tkgrid(transform_data_value_label, row=12, column=5)
-	# Escape the function
-	.GlobalEnv$transform_data <- transform_data
-	.GlobalEnv$transform_data_value <- transform_data_value
-}
-
 ##### Low intensity peaks removal
 low_intensity_peaks_removal_choice <- function() {
 	# Catch the value from the menu
@@ -9850,29 +10035,6 @@ exclude_spectra_without_peak_function <- function() {
 	.GlobalEnv$exclude_spectra_without_peak_value <- exclude_spectra_without_peak_value
 }
 
-##### TOF mode
-tof_mode_choice <- function() {
-	# Catch the value from the menu
-	tof_mode <- select.list(c("Linear","Reflector"), title="Choose")
-	# Default
-	if (tof_mode == "" || tof_mode == "Linear") {
-		tof_mode <- "linear"
-	}
-	if (tof_mode == "Reflector") {
-		tof_mode <- "reflector"
-	}
-	# Set the value of the displaying label
-	tof_mode_value <- tof_mode
-	if (tof_mode_value == "linear") {
-		tof_mode_value <- "   linear   "
-	}
-	tof_mode_value_label <- tklabel(window, text=tof_mode_value)
-	tkgrid(tof_mode_value_label, row=8, column=3)
-	# Escape the function
-	.GlobalEnv$tof_mode <- tof_mode
-	.GlobalEnv$tof_mode_value <- tof_mode_value
-}
-
 ##### File format
 spectra_format_choice <- function() {
 	# Catch the value from the menu
@@ -9906,13 +10068,11 @@ spectra_format_choice <- function() {
 ##################################################################### WINDOW GUI
 
 ########## List of variables, whose values are taken from the entries in the GUI
-mass_range <- tclVar("")
 SNR <- tclVar("")
 peaks_filtering_threshold_percent <- tclVar("")
 intensity_percentage_threshold <- tclVar("")
 signals_to_take <- tclVar("")
 file_name <- tclVar("")
-preprocess_spectra_in_packages_of <- tclVar("")
 
 
 
@@ -9929,14 +10089,6 @@ select_samples_button <- tkbutton(window, text="Browse spectra...", command=sele
 select_output_label <- tklabel(window, text="Select the folder where to save all the outputs")
 browse_output_button <- tkbutton(window, text="Browse output folder", command=browse_output_function)
 #### Entries
-# Mass range
-mass_range_label <- tklabel(window, text="Mass range")
-mass_range_entry <- tkentry(window, width=15, textvariable=mass_range)
-tkinsert(mass_range_entry, "end", "3000, 15000")
-# Preprocessing (in packages of)
-preprocess_spectra_in_packages_of_label <- tklabel(window, text="Preprocess spectra\nin packages of")
-preprocess_spectra_in_packages_of_entry <- tkentry(window, width=10, textvariable=preprocess_spectra_in_packages_of)
-tkinsert(preprocess_spectra_in_packages_of_entry, "end", "200")
 # Peak picking mode
 peak_picking_mode_label <- tklabel(window, text="Peak picking mode")
 peak_picking_mode_entry <- tkbutton(window, text="Choose peak picking\nmode", command=peak_picking_mode_choice)
@@ -9971,9 +10123,6 @@ intensity_threshold_method_entry <- tkbutton(window, text="Choose the method for
 # Average replicates in database
 remove_outliers_label <- tklabel(window, text="Discard outliers in intensity evaluation")
 remove_outliers_entry <- tkbutton(window, text="Choose if outliers are to be discarded", command=remove_outliers_choice)
-# Tof mode
-tof_mode_label <- tklabel(window, text="Select the TOF mode")
-tof_mode_entry <- tkbutton(window, text="Choose the TOF mode", command=tof_mode_choice)
 # Exclude spectra without the peak
 exclude_spectra_without_peak_button <- tkbutton(window, text="Exclude spectra without\nthe peak", command=exclude_spectra_without_peak_function)
 # File format
@@ -9995,8 +10144,8 @@ run_peak_statistics_button <- tkbutton(window, text="COMPUTE THE PEAK STATISTICS
 signals_avg_and_sd_button <- tkbutton(window, text="MEAN +/- SD of number of signals", command=signals_avg_and_sd_function)
 # Multicore
 multicore_processing_button <- tkbutton(window, text="ALLOW PARALLEL\nPROCESSING", command=multicore_processing_choice)
-# Transform the data
-transform_data_button <- tkbutton(window, text="TRANSFORM THE DATA", command=transform_data_choice)
+# Spectra preprocessing button
+spectra_preprocessing_button <- tkbutton(window, text="SPECTRA PREPROCESSING\nPARAMETERS", command=preprocessing_window_function)
 # Set the file name
 set_file_name_label <- tklabel(window, text="<-- Set the file name")
 set_file_name_entry <- tkentry(window, width=30, textvariable=file_name)
@@ -10010,11 +10159,9 @@ peaks_filtering_value_label <- tklabel(window, text=peaks_filtering_value)
 low_intensity_peaks_removal_value_label <- tklabel(window, text=low_intensity_peaks_removal_value)
 intensity_threshold_method_value_label <- tklabel(window, text=intensity_threshold_method_value)
 remove_outliers_value_label <- tklabel(window, text=remove_outliers_value)
-tof_mode_value_label <- tklabel(window, text=tof_mode_value)
 spectra_format_value_label <- tklabel(window, text=spectra_format_value)
 exclude_spectra_without_peak_value_label <- tklabel(window, text=exclude_spectra_without_peak_value)
 multicore_processing_value_label <- tklabel(window, text=multicore_processing_value)
-transform_data_value_label <- tklabel(window, text=transform_data_value)
 
 #### Geometry manager
 # Scrollbar
@@ -10024,8 +10171,6 @@ tkgrid(select_samples_button, row=1, column=1)
 tkgrid(browse_output_button, row=1, column=2)
 tkgrid(set_file_name_entry, row=1, column=3)
 tkgrid(set_file_name_label, row=1, column=4)
-tkgrid(mass_range_label, row=2, column=1)
-tkgrid(mass_range_entry, row=2, column=2)
 tkgrid(peak_picking_mode_label, row=2, column=3)
 tkgrid(peak_picking_mode_entry, row=2, column=4)
 tkgrid(peak_picking_mode_value_label, row=2, column=5)
@@ -10054,23 +10199,18 @@ tkgrid(remove_outliers_entry, row=7, column=2)
 tkgrid(remove_outliers_value_label, row=7, column=3)
 tkgrid(exclude_spectra_without_peak_button, row=7, column=4)
 tkgrid(exclude_spectra_without_peak_value_label, row=7, column=5)
-tkgrid(tof_mode_label, row=8, column=1)
-tkgrid(tof_mode_entry, row=8, column=2)
-tkgrid(tof_mode_value_label, row=8, column=3)
 tkgrid(spectra_format_label, row=9, column=1)
 tkgrid(spectra_format_entry, row=9, column=2)
 tkgrid(spectra_format_value_label, row=9, column=3)
-tkgrid(preprocess_spectra_in_packages_of_label, row=9, column=4)
-tkgrid(preprocess_spectra_in_packages_of_entry, row=9, column=5)
 tkgrid(file_type_export_label, row=10, column=2)
 tkgrid(file_type_export_entry, row=10, column=3)
 tkgrid(file_type_export_value_label, row=10, column=4)
 tkgrid(multicore_processing_button, row=12, column=2)
 tkgrid(multicore_processing_value_label, row=12, column=3)
-tkgrid(transform_data_button, row=12, column=4)
-tkgrid(transform_data_value_label, row=12, column=5)
+tkgrid(spectra_preprocessing_button, row=12, column=5)
 tkgrid(import_spectra_button, row=13, column=2)
 tkgrid(peak_picking_button, row=13, column=3)
 tkgrid(run_peak_statistics_button, row=13, column=4)
 tkgrid(signals_avg_and_sd_button, row=13, column=5)
 tkgrid(end_session_button, row=14, column=3)
+
