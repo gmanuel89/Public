@@ -1,9 +1,8 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.06.15
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.07.08
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
 
-library(tcltk)
 
 ########################################################################## MISC
 
@@ -511,10 +510,10 @@ remove_low_intensity_peaks <- function (peaks, intensity_threshold_percent=0.1, 
 
 ########################################################### SPECTRA FILES READER
 # This function reads all the files from a folder and returns only the imzML files or the fid files.
-read_spectra_files <- function (folder, spectra_format="imzml", full_path=FALSE) {
+read_spectra_files <- function (folder, spectra_format="imzml", full_path=TRUE) {
 	if (spectra_format == "imzml" || spectra_format == "imzML") {
 		# Read all the files
-		folder_all_files <- list.files(folder, full.names=full_path)
+		folder_all_files <- list.files(folder, full.names=full_path, recursive=TRUE)
 		# Create the empty vector in which only the imzML files will be listed
 		spectra_files <- character()
 		# Put the imzML files in the new vector discarding the ibd files
@@ -1220,11 +1219,10 @@ average_spectrum_bars_signals_of_interest <- function (spectra, SNR=5, signals_o
 memory_efficient_import <- function (folder, tof_mode="linear", tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength="medium", crop_spectra=FALSE, mass_range=NULL, spectra_preprocessing=TRUE, multicore_processing=TRUE, data_transformation=FALSE, transformation_algorithm="sqrt", peak_picking_algorithm="SuperSmoother", process_in_packages_of=length(spectra), generate_representative_spectra=FALSE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", clustering_method_for_hca="agglomerative", discarded_nodes=1, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", spectra_format="imzml", seed=NULL, output_list=c("spectra","average","representative")) {
 	##### Load the required libraries
 	install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
-	##### Set the working directory as the folder in which there are the spectra (if it is not an imzML file)
-	if (length(grep(".imzML",folder)) == 0) {
-		setwd(folder)
-		##### Read the spectra files in the folder
-		folder_files <- read_spectra_files(folder, spectra_format=spectra_format, full_path=FALSE)
+	##### If it is not an imzML file...
+	if (length(grep(".imzML",folder, fixed=TRUE)) == 0) {
+		##### Read the spectra files in the folder and in the subfolders
+		folder_files <- read_spectra_files(folder, spectra_format=spectra_format, full_path=TRUE)
 	} else {
 		folder_files <- folder
 	}
@@ -1234,7 +1232,7 @@ memory_efficient_import <- function (folder, tof_mode="linear", tic_purification
 	} else if (tof_mode == "reflectron" || tof_mode == "reflector" || tof_mode == "R") {
 		tolerance_ppm <- 200
 	}
-	##### Output initialization
+	##### Output initialisation
 	spectra_dataset <- list ()
 	spectra_dataset_grouped <- list()
 	spectra_dataset_average <- list()
@@ -2280,37 +2278,37 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 		}
 	}
 	######################################### Single spectra
-	if (!isMassSpectrumList(spectra)) {
+	if (!isMassSpectrumList(spectra) && isMassSpectrum(spectra)) {
 		########## Remove flat spectra
 		#spectra <- removeEmptyMassObjects (spectra)
 		########## Trimming
 		if (crop_spectra == TRUE) {
 			if (!is.null(mass_range)) {
-				spectra_temp <- trim_spectra(spectra, range=mass_range)
+				spectra <- trim_spectra(spectra, range=mass_range)
 			} else {
-				spectra_temp <- trim_spectra(spectra)
+				spectra <- trim_spectra(spectra)
 			}
 		}
 		########### Transformation
 		if (data_transformation == TRUE) {
-			spectra_temp <- transformIntensity(spectra, method=transformation_algorithm)
+			spectra <- transformIntensity(spectra, method=transformation_algorithm)
 		}
 		########## Smoothing
-		spectra_temp <- smoothIntensity(spectra_temp, method=smoothing_algorithm, halfWindowSize=smoothing_half_window_size)
+		spectra <- smoothIntensity(spectra, method=smoothing_algorithm, halfWindowSize=smoothing_half_window_size)
 		########## Baseline correction
 		if (baseline_subtraction_algorithm == "TopHat") {
-			spectra_temp <- removeBaseline(spectra_temp, method=baseline_subtraction_algorithm)
+			spectra <- removeBaseline(spectra, method=baseline_subtraction_algorithm)
 		} else if (baseline_subtraction_algorithm == "SNIP") {
-			spectra_temp <- removeBaseline(spectra_temp, method=baseline_subtraction_algorithm, iterations=baseline_subtraction_iterations)
+			spectra <- removeBaseline(spectra, method=baseline_subtraction_algorithm, iterations=baseline_subtraction_iterations)
 		}
 		########## Normalization (TIC)
 		if (!is.null(normalization_mass_range) && normalization_algorithm == "TIC") {
-			spectra_temp <- calibrateIntensity(spectra_temp, method=normalization_algorithm, range=normalization_mass_range)
+			spectra <- calibrateIntensity(spectra, method=normalization_algorithm, range=normalization_mass_range)
 		} else {
-			spectra_temp <- calibrateIntensity(spectra_temp, method=normalization_algorithm)
+			spectra <- calibrateIntensity(spectra, method=normalization_algorithm)
 		}
 		########## Add to the final preprocessed spectral dataset
-		preprocessed_spectra <- spectra_temp
+		preprocessed_spectra <- spectra
 	}
 	######################################### SPECTRAL ALIGNMENT
 	if (align_spectra == TRUE) {
@@ -3712,8 +3710,9 @@ hierarchical_clustering_classification <- function (spectra_to_be_classified, sp
 
 ################################################ CLASSIFICATION VIA SVM: PROFILE
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
+# The features in the model must be aligned to the features in the dataset: mind that some (or no) features of the model can be present in the dataset!
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the SVM model itself and the average spectrum of the patients with red bars on the signals used by the SVM to classify it.
-classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_name="SVMModel", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, peak_picking_algorithm="SuperSmoother", preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
+classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_name="SVMModel", spectra_preprocessing=TRUE, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), tof_mode="linear", peak_picking_algorithm="SuperSmoother", preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE) {
 	########## Load the required packages
 	install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 	# Rename the trim function
@@ -3724,6 +3723,8 @@ classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_n
 	} else if (tof_mode == "reflectron" || tof_mode == "reflector") {
 		tolerance_ppm <- 200
 	}
+	#### Mass range
+	mass_range <- preprocessing_parameters$mass_range
 	########### List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 	## Multiple imzML file path provided (folder)
 	if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
@@ -3752,9 +3753,9 @@ classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_n
 	## Get the svm model from the workspace
 	svm_model <- get(svm_model_name, pos=temporary_environment)
 	## Class list
-	class_list <- levels(factor(svm_model$levels))
+	class_list <- levels(factor(svm_model@fitted))
 	##### Isolate the peaks used to create the model
-	features_model <- colnames(svm_model$SV)
+	features_model <- colnames(svm_model@xmatrix[[1]])
 	## Remove the X
 	for (f in 1:length(features_model)) {
 		name_splitted <- unlist(strsplit(features_model[f],""))
@@ -3776,12 +3777,14 @@ classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_n
 				sample_spectra <- importImzMl(filepath_test_imzml[p])
 			}
 		}
-		sample_spectra <- replace_sample_name(sample_spectra)
+		#sample_spectra <- replace_sample_name(sample_spectra)
 		########## CLASSIFICATION OF AVERAGES
 		sample_spectra_avg <- averageMassSpectra(sample_spectra, method="mean")
-		sample_spectra_avg <- smoothIntensity(sample_spectra_avg, method="SavitzkyGolay")
-		sample_spectra_avg <- removeBaseline(sample_spectra_avg, method="TopHat")
-		sample_spectra_avg <- calibrateIntensity(sample_spectra_avg, method="TIC")
+		if (spectra_preprocessing == TRUE) {
+			sample_spectra_avg <- preprocess_spectra(sample_spectra_avg, tof_mode=tof_mode, preprocessing_parameters=preprocessing_parameters)
+		}
+		##### Sample name
+		sample_name <- sample_spectra_avg@metaData$file[[1]]
 		## Peak picking
 		sample_peaks_avg <- peak_picking(sample_spectra_avg, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
 		##### Generate the intensity matrix for classification
@@ -3819,8 +3822,12 @@ classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_n
 			}
 		}
 		# Generate the final sample matrix (with the right column names)
-		final_sample_matrix_avg <- as.matrix(rbind(sample_matrix_avg [,features_to_keep_avg]))
-		colnames(final_sample_matrix_avg) <- adjusted_features_to_keep_avg
+		if (length(features_to_keep_avg) > 0) {
+			final_sample_matrix_avg <- as.matrix(rbind(sample_matrix_avg [,features_to_keep_avg]))
+			colnames(final_sample_matrix_avg) <- adjusted_features_to_keep_avg
+		} else {
+			final_sample_matrix_avg <- NULL
+		}
 		# Scroll the features to add (in the model but not in the sample)
 		for (f in features_to_add_avg) {
 			# Create the empty vector in which the intensity of that peak in the sample spectra will be stored
@@ -3838,8 +3845,21 @@ classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_n
 			# Generate the matrix column
 			feature_intensity_column_avg <- as.matrix(cbind(feature_intensity_vector_avg))
 			colnames(feature_intensity_column_avg) <- f
-			# Attach this to the final sample matrix
-			final_sample_matrix_avg <- cbind(final_sample_matrix_avg, feature_intensity_column_avg)
+			# Attach this to the final sample matrix (if the signal has been found)
+			if (nrow(feature_intensity_column_avg) > 0) {
+				if (is.null(final_sample_matrix_avg)) {
+					final_sample_matrix_avg <- cbind(feature_intensity_column_avg)
+				} else {
+					final_sample_matrix_avg <- cbind(final_sample_matrix_avg, feature_intensity_column_avg)
+				}
+			} else {
+				feature_intensity_column_avg <- rbind(feature_intensity_column_avg, NA)
+				if (is.null(final_sample_matrix_avg)) {
+					final_sample_matrix_avg <- cbind(feature_intensity_column_avg)
+				} else {
+					final_sample_matrix_avg <- cbind(final_sample_matrix_avg, feature_intensity_column_avg)
+				}
+			}
 		}
 		# Put the X at the beginning of the peak names
 		for (n in 1:length(colnames(final_sample_matrix_avg))) {
@@ -3931,7 +3951,7 @@ classify_patients_svm_profile <- function (spectra_path, filepath_R, svm_model_n
 ######################################### CLASSIFICATION VIA SVM: PIXEL-BY-PIXEL
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the SVM model itself.
-classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_model_name="SVMModel", peak_picking_algorithm="SuperSmoother", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000)) {
+classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_model_name="SVMModel", peak_picking_algorithm="SuperSmoother", preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), tof_mode="linear", spectra_preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE) {
 	#####
 	install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats"))
 	# Rename the trim function
@@ -3942,6 +3962,8 @@ classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_mo
 	} else if (tof_mode == "reflector" || tof_mode == "reflectron") {
 		tolerance_ppm <- 200
 	}
+	#### Mass range
+	mass_range <- preprocessing_parameters$mass_range
 	########## List the imzML files in the selected folder (if the path provided is a folder): check if its is folder, imzML file or spectra list
 	## Multiple imzML filepath (path)
 	if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed=TRUE)) == 0) {
@@ -3970,9 +3992,9 @@ classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_mo
 	# Get the svm model from the workspace
 	svm_model <- get(svm_model_name, pos=temporary_environment)
 	# Class list
-	class_list <- levels(factor(svm_model$levels))
+	class_list <- levels(factor(svm_model@fitted))
 	##################################### Isolate the peaks used to create the model
-	features_model <- colnames(svm_model$SV)
+	features_model <- colnames(svm_model@xmatrix[[1]])
 	# Remove the X
 	for (f in 1:length(features_model)) {
 		name_splitted <- unlist(strsplit(features_model[f],""))
@@ -3994,10 +4016,10 @@ classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_mo
 				sample_spectra <- importImzMl(filepath_test_imzml[p])
 			}
 		}
-		sample_spectra <- replace_sample_name(sample_spectra)
+		#sample_spectra <- replace_sample_name(sample_spectra)
 		################################################# PIXEL BY PIXEL CLASSIFICATION
-		if (preprocessing == TRUE) {
-			sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
+		if (spectra_preprocessing == TRUE) {
+			sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, preprocessing_parameters=preprocessing_parameters, process_in_packages_of=preprocess_spectra_in_packages_of, align_spectra=TRUE, spectra_alignment_method="cubic", multicore_processing=multicore_processing)
 		}
 		# Peak picking and alignment
 		sample_peaks <- peak_picking(sample_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
@@ -4034,9 +4056,13 @@ classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_mo
 				features_to_add <- append(features_to_add, feature_model)
 			}
 		}
-		# Generate the final sample matrix (with the right column names)
-		final_sample_matrix <- sample_matrix [,features_to_keep]
-		colnames(final_sample_matrix) <- adjusted_features_to_keep
+		# Generate the final sample matrix (with the right column names) (mind that there can be 0 features!!)
+		if (length(features_to_keep) > 0) {
+			final_sample_matrix <- sample_matrix [,features_to_keep]
+			colnames(final_sample_matrix) <- adjusted_features_to_keep
+		} else {
+			final_sample_matrix <- NULL
+		}
 		# Scroll the features to add (in the model but not in the sample)
 		for (f in features_to_add) {
 			# Create the empty vector in which the intensity of that peak (actually, data point) in the sample spectra will be stored
@@ -4055,10 +4081,31 @@ classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_mo
 				}
 			}
 			# Generate the matrix column
-			feature_intensity_column <- cbind(feature_intensity_vector)
+			feature_intensity_column <- as.matrix(cbind(feature_intensity_vector))
 			colnames(feature_intensity_column) <- f
-			# Attach this to the final sample matrix
-			final_sample_matrix <- cbind(final_sample_matrix, feature_intensity_column)
+			# Attach this to the final sample matrix (if the signal has been found)
+			# If the feature is in the dataset...
+			if (nrow(feature_intensity_column) > 0) {
+				# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
+				if (is.null(final_sample_matrix)) {
+					final_sample_matrix <- cbind(feature_intensity_column)
+				} else {
+					# If the final matrix exists, append the feature column to the matrix
+					final_sample_matrix <- cbind(final_sample_matrix, feature_intensity_column)
+				}
+			} else {
+				# If the feature does not exist in the dataset, its value becomes NA
+				feature_intensity_column <- cbind(rep(NA, length(sample_spectra)))
+				colnames(feature_intensity_column) <- f
+				# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
+				if (is.null(final_sample_matrix)) {
+					final_sample_matrix <- cbind(feature_intensity_column)
+				} else {
+					# If the final matrix exists, append the feature column to the matrix
+					final_sample_matrix <- cbind(final_sample_matrix, feature_intensity_column)
+				}
+			}
+			
 		}
 		# Put the X at the beginning of the peak names
 		for (n in 1:length(colnames(final_sample_matrix))) {
@@ -4070,10 +4117,11 @@ classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_mo
 		predicted_classes <- predict(svm_model, newdata = final_sample_matrix)
 		# Generate a matrix with the results
 		result_matrix <- matrix (nrow=length(predicted_classes), ncol=1)
-		sample_name <- unlist(strsplit(sample_spectra[[1]]@metaData$file[1],"/"))
-		sample_name <- sample_name[length(sample_name)]
-		sample_name <- unlist(strsplit(sample_name, ".imzML"))
-		sample_name <- sample_name[1]
+		sample_name <- sample_spectra[[1]]@metaData$file[1]
+		#sample_name <- unlist(strsplit(sample_spectra[[1]]@metaData$file[1],"/"))
+		#sample_name <- sample_name[length(sample_name)]
+		#sample_name <- unlist(strsplit(sample_name, ".imzML"))
+		#sample_name <- sample_name[1]
 		rownames(result_matrix) <- cbind(rep(sample_name, length(sample_spectra)))
 		result_matrix [,1] <- cbind(predicted_classes)
 		colnames(result_matrix) <- "Predicted Class SVM"
@@ -4871,10 +4919,16 @@ classify_patients_nbc_pixelbypixel <- function (spectra_path, filepath_R, nbc_mo
 ############################################### ENSEMBLE CLASSIFICATION: PROFILE
 # This function takes as input the folder containing the spectra to be classified (one imzML for each patient) or an imzML file or a list of MALDIquant spectra, and the folder where the R workspaces containing the models are stored (with a name resembling the model), and the model names in each workspace, along with the folder containing the spectra to be used as database for clustering classification (one representative imzML per class in the order of the class_list input, or with imzML files named according to the class). Moreover, additonal preprocessing details can be specified. Many classifiers at the same time can be chosen, and the function relies on other functions (specific for each classifier).
 # The function outputs a list containing the classification results for each classifier (see the specific functions for details) and the ensemble classificaton result.
-ensemble_classification_profile <- function (spectra_path, folder_R_models, classifiers=c("svm","pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering=NULL, nodes_in_hca=3, discarded_nodes_in_hca=1, clustering_method="agglomerative", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000, decision_method="majority", vote_weights="equal") {
+ensemble_classification_profile <- function (spectra_path, folder_R_models, classifiers=c("svm","pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering=NULL, nodes_in_hca=3, discarded_nodes_in_hca=1, clustering_method="agglomerative", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), decision_method="majority", vote_weights="equal") {
 	install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 	# Rename the trim function
 	trim_spectra <- get(x="trim", pos="package:MALDIquant")
+	##### Define the tolerance
+	if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+		tolerance_ppm <- 2000
+	} else if (tof_mode == "reflectron" || tof_mode == "reflector" || tof_mode == "R") {
+		tolerance_ppm <- 200
+	}
 	########################## Outputs (all)
 	classification_svm_final <- list()
 	classification_hca_final <- list()
@@ -4914,7 +4968,7 @@ ensemble_classification_profile <- function (spectra_path, folder_R_models, clas
 	if ("hca" %in% classifiers && (!is.null(spectra_database_folder_for_clustering) || length(spectra_database_folder_for_clustering) == 0)) {
 		######################## Database for HCA: import, trim and preprocess (memory efficient import of imzML files)
 		# Generate one spectrum (average) per patient (imzML file)
-		spectra_database_for_hca <- memory_efficient_import(spectra_database_folder, tof_mode=tof_mode, tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength=smoothing_strength_preprocessing, mass_range=mass_range, preprocess_spectra=preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of, generate_representative_spectra=TRUE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", discarded_nodes=0, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", alignment_tolerance_ppm=tolerance_ppm, spectra_format="imzml", seed=seed, output_list="average")
+		spectra_database_for_hca <- memory_efficient_import(spectra_database_folder, tof_mode=tof_mode, tic_purification=FALSE, absolute_tic_threshold=0, smoothing_strength=smoothing_strength_preprocessing, mass_range=mass_range, spectra_preprocessing=preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of, generate_representative_spectra=TRUE, spectra_per_patient=1, algorithm_for_representative_spectra="hca", discarded_nodes=0, skyline=FALSE, spectra_alignment=FALSE, spectra_alignment_method="cubic", spectra_format="imzml", seed=seed, output_list="average")
 		spectra_database_for_hca <- spectra_database_for_hca$spectra_average
 		# Generate one representative spectrum per class
 		spectra_database_for_hca <- group_spectra_class(spectra_database_for_hca, class_list=class_list_for_hca, spectra_format="imzml")
@@ -4939,7 +4993,7 @@ ensemble_classification_profile <- function (spectra_path, folder_R_models, clas
 		}
 		sample_spectra <- replace_sample_name(sample_spectra)
 		if (preprocessing == TRUE) {
-			sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, smoothing_strength=smoothing_strength_preprocessing, process_in_packages_of=preprocess_spectra_in_packages_of)
+			sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, process_in_packages_of=preprocess_spectra_in_packages_of)
 		}
 		########################################## SVM
 		if ("svm" %in% classifiers || "SVM" %in% classifiers) {
@@ -5031,10 +5085,16 @@ ensemble_classification_profile <- function (spectra_path, folder_R_models, clas
 ######################################## ENSEMBLE CLASSIFICATION: PIXEL-BY-PIXEL
 # This function takes as input the folder containing the spectra to be classified (one imzML for each patient) or an imzML file or a list of MALDIquant spectra, and the folder where the R workspaces containing the models are stored (with a name resembling the model), and the model names in each workspace, along with the folder containing the spectra to be used as database for clustering classification (one representative imzML per class in the order of the class_list input, or with imzML files named according to the class). Moreover, additonal preprocessing details can be specified. Many classifiers at the same time can be chosen, and the function relies on other functions (specific for each classifier).
 # The function outputs a list containing the classification results for each classifier (see the specific functions for details) and the ensemble classificaton result.
-ensemble_classification_pixelbypixel <- function (spectra_path, folder_R_models, classifiers=c("svm","pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering=NULL, nodes_in_hca=3, discarded_nodes_in_hca=1, clustering_method="agglomerative", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), tolerance_ppm=2000, decision_method="majority", vote_weights="equal") {
+ensemble_classification_pixelbypixel <- function (spectra_path, folder_R_models, classifiers=c("svm","pls"), model_names=list(svm="SVMModel", pls="pls_model", bayes="nbc_model"), spectra_database_folder_for_clustering=NULL, nodes_in_hca=3, discarded_nodes_in_hca=1, clustering_method="agglomerative", smoothing_strength_preprocessing="medium", tof_mode="linear", preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), mass_range=c(4000,15000), decision_method="majority", vote_weights="equal") {
 	install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
 	# Rename the trim function
 	trim_spectra <- get(x="trim", pos="package:MALDIquant")
+	##### Define the tolerance
+	if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+		tolerance_ppm <- 2000
+	} else if (tof_mode == "reflectron" || tof_mode == "reflector" || tof_mode == "R") {
+		tolerance_ppm <- 200
+	}
 	########################## Outputs (all)
 	classification_svm_final <- list()
 	classification_hca_final <- list()
@@ -5558,12 +5618,14 @@ matrix_splitting_training_test <- function (peaklist, class_list=list(), seed=NU
 # The function allows for the use of several feature selection algorithms.
 feature_selection <- function (peaklist, feature_selection_method="rfe", features_to_select=20, selection_method="pls", selection_metric="Accuracy", correlation_method="pearson", correlation_threshold=0.75, auc_threshold=0.7, cv_repeats_control=5, k_fold_cv_control=10, discriminant_attribute="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE, generate_plots=TRUE, preprocessing=c("center", "scale")) {
 	# Load the required libraries
-	install_and_load_required_packages(c("caret", "pls", "stats", "doMC", "randomForest", "pROC"))
-	##### MULTICORE
-	# Detect the number of cores
+	install_and_load_required_packages(c("caret", "pls", "stats", "randomForest", "pROC"))
+	### PARALLEL BACKEND	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	# Register the foreach backend
-	registerDoMC(cores = cpu_thread_number)
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+		install_and_load_required_packages("doMC")
+		# Register the foreach backend
+		registerDoMC(cores = cpu_thread_number)
+	}
 	# Initialization
 	feature_weights <- NULL
 	variable_importance <- NULL
@@ -5999,14 +6061,17 @@ cross_validation_svm <- function (training_dataset, seed=NULL, k_fold=10, repeat
 ###################################################### SVM TUNING AND VALIDATION
 # This function operates the tuning of the Support Vector Machine (SVM), by testing all the parameters of the SVM (choosing them from a list provided by the user) and selecting the best.
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
-svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), autotuning=TRUE, tuning_parameters=list(gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial"), k_fold_cv=10, repeats_cv=2, parameters=list(gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial"), positive_class_cv="HP", seed=NULL, pca=FALSE, numer_of_components=3) {
+svm_tuning_and_validation2 <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), autotuning=TRUE, tuning_parameters=list(gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial"), k_fold_cv=10, repeats_cv=2, parameters=list(gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial"), positive_class_cv="HP", seed=NULL, pca=FALSE, numer_of_components=3) {
 	# Load the required libraries
-	install_and_load_required_packages(c("caret", "kernlab", "e1071", "doMC", "pROC"))
-	##### MULTICORE
+	install_and_load_required_packages(c("caret", "kernlab", "e1071", "pROC"))
+	### PARALLEL BACKEND
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	# Register the foreach backend
-	registerDoMC(cores = cpu_thread_number)
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+		install_and_load_required_packages("doMC")
+		# Register the foreach backend
+		registerDoMC(cores = cpu_thread_number)
+	}
 	######################################## PCA
 	if (pca == TRUE) {
 		# Compute the PCs
@@ -6156,14 +6221,18 @@ svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, no
 ###################################################### SVM TUNING AND VALIDATION
 # This function operates the tuning of the Support Vector Machine (SVM), by testing all the parameters of the SVM (choosing them from a list provided by the user) and selecting the best.
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
-svm_tuning_and_validation2 <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), autotuning=TRUE, tuning_parameters=list(sigma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, scale=1, kernel="radial"), k_fold_cv=10, repeats_cv=2, preprocessing=c("scale","center"), parameters=list(sigma=0.001, scale=1, gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial"), positive_class_cv="HP", seed=NULL, evaluation_method="Accuracy") {
+#This function uses the functions from CARET only
+svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), autotuning=TRUE, tuning_parameters=list(sigma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, scale=1, kernel="radial"), k_fold_cv=10, repeats_cv=2, preprocessing=c("scale","center"), parameters=list(sigma=0.001, scale=1, gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial"), positive_class_cv="HP", seed=NULL, evaluation_method="Accuracy") {
 	# Load the required libraries
-	install_and_load_required_packages(c("caret", "kernlab", "e1071", "doMC", "pROC"))
-	##### MULTICORE
+	install_and_load_required_packages(c("caret", "pROC", "kernlab"))
+	### PARALLEL BACKEND
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	# Register the foreach backend
-	registerDoMC(cores = cpu_thread_number)
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+		install_and_load_required_packages("doMC")
+		# Register the foreach backend
+		registerDoMC(cores = cpu_thread_number)
+	}
 	################# FEATURES
 	if (autotuning == TRUE) {
 		# Find the best tuning parameters for the SVM
@@ -6314,12 +6383,15 @@ svm_tuning_and_validation2 <- function (peaklist_training, peaklist_test=NULL, n
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
 pls_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(ncomp=1:5), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximize_selection_criteria_values=TRUE) {
 	# Load the required libraries
-	install_and_load_required_packages(c("caret", "e1071", "doMC"))
-	##### MULTICORE
+	install_and_load_required_packages(c("caret", "e1071"))
+	### PARALLEL BACKEND
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	# Register the foreach backend
-	registerDoMC(cores = cpu_thread_number)
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+		install_and_load_required_packages("doMC")
+		# Register the foreach backend
+		registerDoMC(cores = cpu_thread_number)
+	}
 	################ Tuning
 	# A tune grid has to be generated and passed to the tuning algorithm
 	if (is.null(tuning_parameters) || is.null(tuning_parameters$ncomp)) {
@@ -6397,12 +6469,15 @@ pls_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, no
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
 nbc_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(fL=NULL,usekernel=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximize_selection_criteria_values=TRUE) {
 	# Load the required libraries
-	install_and_load_required_packages(c("caret", "e1071", "doMC", "klaR", "MASS"))
-	##### MULTICORE
+	install_and_load_required_packages(c("caret", "e1071", "klaR", "MASS"))
+	### PARALLEL BACKEND
 	# Detect the number of cores
 	cpu_thread_number <- detectCores(logical=TRUE)
-	# Register the foreach backend
-	registerDoMC(cores = cpu_thread_number)
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+		install_and_load_required_packages("doMC")
+		# Register the foreach backend
+		registerDoMC(cores = cpu_thread_number)
+	}
 	# Fit the model with the features and tune it with cross-validation
 	train_control_nbc <- trainControl(method="repeatedcv", number=k_fold_cv, repeats=repeats_cv)
 	################ Tuning
@@ -9237,20 +9312,49 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method="pears
 	peaklist_matrix_t <- t(peaklist_matrix)
 	##### Generate the correlation matrix
 	correlation_matrix <- cor(peaklist_matrix_t, method=correlation_method)
-	##### Generate the function to apply to the matrix
-	matrix_replacement_subfunction <- function(matrix_entry, threshold) {
-		if (abs(matrix_entry) >= threshold) {
-			matrix_entry <- 1
-		} else {
-			matrix_entry <- 0
+	### If the p-value is not considered...
+	if (pvalue_threshold == 0 || is.null(pvalue_threshold)) {
+		##### Generate the function to apply to the matrix (x = matrix entry)
+		matrix_replacement_subfunction <- function(x, threshold) {
+			if (abs(x) >= threshold) {
+				x <- 1
+			} else {
+				x <- 0
+			}
 		}
+		##### Generate the final adjacency matrix
+		adjacency_matrix <- apply(correlation_matrix, MARGIN=c(1,2), FUN=function(x) matrix_replacement_subfunction(x, threshold=correlation_threshold))
+	} else {
+		##### Install the required packages
+		install_and_load_required_packages("psych")
+		##### Generate the correlation matrix
+		# Generate unique row and column names for the corr.test function
+		rownames(peaklist_matrix_t) <- seq(1:nrow(peaklist_matrix_t))
+		colnames(peaklist_matrix_t) <- seq(1:ncol(peaklist_matrix_t))
+		correlation_matrix_pvalue <- corr.test(peaklist_matrix_t, adjust="none", ci=FALSE)$p
+		##### Generate a global matrix (each entry displays "coefficient, pvalue")
+		global_matrix <- matrix("", nrow=nrow(correlation_matrix_pvalue), ncol=ncol(correlation_matrix_pvalue))
+		for (rw in 1:nrow(correlation_matrix_pvalue)) {
+			for (cl in 1:ncol(correlation_matrix_pvalue)) {
+				global_matrix[rw,cl] <- paste(correlation_matrix[rw,cl], correlation_matrix_pvalue[rw,cl], sep=",")
+			}
+		}
+		##### Generate the function to apply to the matrix (x = matrix entry)
+		matrix_replacement_subfunction2 <- function(x, coeff_threshold, p_threshold) {
+			# Split the entry
+			splitted_x <- as.numeric(unlist(strsplit(x, ",")))
+			if (abs(splitted_x[1]) >= coeff_threshold && abs(splitted_x[2]) <= p_threshold) {
+				x <- 1
+			} else {
+				x <- 0
+			}
+		}
+		##### Generate the final adjacency matrix
+		adjacency_matrix <- apply(global_matrix, MARGIN=c(1,2), FUN=function(x) matrix_replacement_subfunction2(x, coeff_threshold=correlation_threshold, p_threshold=pvalue_threshold))
 	}
-	##### Generate the final adjacency matrix
-	adjacency_matrix <- apply(correlation_matrix, MARGIN=c(1,2), FUN=function(x) matrix_replacement_subfunction(x, threshold=correlation_threshold))
 	##### Return the matrix
 	return(adjacency_matrix)
 }
-
 
 
 
@@ -9357,6 +9461,7 @@ normalization_algorithm <- "TIC"
 normalization_mass_range <- NULL
 preprocess_spectra_in_packages_of <- 200
 mass_range <- c(3000,15000)
+average_replicates <- TRUE
 
 
 
@@ -9377,6 +9482,7 @@ transform_data_value <- "    NO    "
 smoothing_value <- "YES ( SavitzkyGolay , medium)"
 baseline_subtraction_value <- "YES (SNIP, iterations: 200)"
 normalization_value <- "YES (TIC)"
+average_replicates_value <- "YES"
 
 
 
@@ -9746,6 +9852,12 @@ import_spectra_function <- function() {
 	}
 	### Preprocessing
 	spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=NULL, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_strength=smoothing_strength, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range), process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE, spectra_alignment_method="cubic")
+	### Average the replicates
+	if (average_replicates == TRUE) {
+		spectra <- average_replicates_by_folder(spectra, filepath_import, spectra_format=spectra_format)
+		### Preprocessing
+		spectra <- preprocess_spectra(spectra, tof_mode=tof_mode, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=NULL, data_transformation=transform_data, transformation_algorithm=transform_data_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_strength=smoothing_strength, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalization_algorithm=normalization_algorithm, normalization_mass_range=normalization_mass_range), process_in_packages_of=preprocess_spectra_in_packages_of, multicore_processing=multicore_processing, align_spectra=TRUE, spectra_alignment_method="cubic")
+	}
 	# Exit the function and put the variable into the R workspace
 	.GlobalEnv$spectra <- spectra
 	### Messagebox
@@ -9923,6 +10035,30 @@ peaks_filtering_choice <- function() {
 	.GlobalEnv$peaks_filtering_value <- peaks_filtering_value
 }
 
+##### Average replicates
+average_replicates_choice <- function() {
+	# Catch the value from the menu
+	average_replicates <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (average_replicates == "YES" || average_replicates == "") {
+		average_replicates <- TRUE
+	}
+	if (average_replicates == "NO") {
+		average_replicates <- FALSE
+	}
+	# Set the value of the displaying label
+	if (average_replicates == TRUE) {
+		average_replicates_value <- "YES"
+	} else {
+		average_replicates_value <- "NO"
+	}
+	average_replicates_value_label <- tklabel(window, text=average_replicates_value)
+	tkgrid(average_replicates_value_label, row=2, column=2)
+	# Escape the function
+	.GlobalEnv$average_replicates <- average_replicates
+	.GlobalEnv$average_replicates_value <- average_replicates_value
+}
+
 ##### Multicore processing
 multicore_processing_choice <- function() {
 	# Catch the value from the menu
@@ -10042,6 +10178,8 @@ tktitle(window) <- "Peaklist export"
 # Library
 select_samples_label <- tklabel(window, text="Select the file/folder containing the spectra")
 select_samples_button <- tkbutton(window, text="Browse spectra...", command=select_samples_function)
+# Average replicates
+average_replicates_button <- tkbutton(window, text="Average the replicates", command=average_replicates_choice)
 # Output
 select_output_label <- tklabel(window, text="Select the folder where to save all the outputs")
 browse_output_button <- tkbutton(window, text="Browse output folder", command=browse_output_function)
@@ -10114,6 +10252,7 @@ tof_mode_value_label <- tklabel(window, text=tof_mode_value)
 spectra_format_value_label <- tklabel(window, text=spectra_format_value)
 multicore_processing_value_label <- tklabel(window, text=multicore_processing_value)
 transform_data_value_label <- tklabel(window, text=transform_data_value)
+average_replicates_value_label <- tklabel(window, text=average_replicates_value)
 
 #### Geometry manager
 # Scrollbar
@@ -10123,6 +10262,8 @@ tkgrid(select_samples_button, row=1, column=1)
 tkgrid(browse_output_button, row=1, column=2)
 tkgrid(set_file_name_entry, row=1, column=3)
 tkgrid(set_file_name_label, row=1, column=4)
+tkgrid(average_replicates_button, row=2, column=1)
+tkgrid(average_replicates_value_label, row=2, column=2)
 tkgrid(peak_picking_mode_label, row=2, column=3)
 tkgrid(peak_picking_mode_entry, row=2, column=4)
 tkgrid(peak_picking_mode_value_label, row=2, column=5)
