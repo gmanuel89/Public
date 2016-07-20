@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.07.19
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.07.20
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -39,6 +39,114 @@ for (i in 1:length(required_packages)) {
 
 
 ###############################################################################
+
+
+
+
+
+############################### ADD CUSTOM FEATURES TO THE PEAKLIST INTENSITY MATRIX
+# The function takes a list of spectra and a vector of custom features to be included in the generation of the final peaklist intensity matrix. If a matrix is specified as input, the columns corresponding to the features to be searched for are appended to the matrix itself. The input matrix must have the number of spectra as the number of rows.
+custom_peaklist_intensity_matrix2 <- function (spectra, features_to_add, final_sample_matrix=NULL, multicore_processing=TRUE, tolerance_ppm=2000) {
+	## Function to apply for each feature to search for to each spectrum (x) of the list
+	feature_finder <- function(x, feature_mass, tolerance_ppm) {
+		# Initialise the output
+		x_intensity <- NA
+		# Scroll the mass list of each spectrum
+		for (m in 1:length(x@mass)) {
+			# If there is a match
+			if (abs(x@mass[m]-as.numeric(feature_mass))*10^6/as.numeric(feature_mass) <= tolerance_ppm) {
+				# Store the corresponding intensity
+				x_intensity <- x@intensity[m]
+			}
+		}
+		return(x_intensity)
+	}
+	# Scroll the features to add (in the model but not in the sample)
+	for (f in 1:length(features_to_add)) {
+		if (multicore_processing == TRUE) {
+			# Detect the number of cores
+			cpu_thread_number <- detectCores(logical=TRUE)
+			# Return for each spectrum the intensity value of the peak to be searched for
+			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+				feature_intensity_vector_list <- mclapply(spectra, FUN=function(spectra) feature_finder(spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm), mc.cores=cpu_thread_number)
+			} else if (Sys.info()[1] == "Windows") {
+				# Make the CPU cluster for parallelisation
+				#cls <- makeCluster(cpu_thread_number)
+				# Make the cluster use the custom functions and the package functions along with their parameters
+				#clusterEvalQ(cls, {library(MALDIquant)})
+				# Pass the variables to the cluster for running the function
+				#clusterExport(cl=cls, varlist=c("features_to_add[f]", "tolerance_ppm"), envir=environment())
+				#feature_intensity_vector_list <- parLapply(cls, spectra, fun=function(spectra) feature_finder(spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
+				#stopCluster(cls)
+				feature_intensity_vector_list <- lapply(spectra, FUN=function(spectra) feature_finder(spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
+			}
+		} else {
+			feature_intensity_vector_list <- lapply(spectra, FUN=function(spectra) feature_finder(spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
+		}
+		# Unlist to a numeric vector
+		feature_intensity_vector <- unlist(feature_intensity_vector_list)
+		# Generate the matrix column
+		feature_intensity_column <- as.matrix(cbind(feature_intensity_vector))
+		colnames(feature_intensity_column) <- features_to_add[f]
+		## Attach this to the final sample matrix (if the signal has been found)
+		# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
+		if (is.null(final_sample_matrix)) {
+			final_sample_matrix <- cbind(feature_intensity_column)
+		} else {
+			# If the final matrix exists, append the feature column to the matrix
+			final_sample_matrix <- cbind(final_sample_matrix, feature_intensity_column)
+		}
+	}
+	##### Return the final matrix with the custom features (plus the original ones if a matrix is specified as input)
+	return(final_sample_matrix)
+}
+
+
+
+
+
+###############################################################################
+
+
+
+
+
+############################### ADD CUSTOM FEATURES TO THE PEAKLIST INTENSITY MATRIX
+# The function takes a list of spectra and a vector of custom features to be included in the generation of the final peaklist intensity matrix. If a matrix is specified as input, the columns corresponding to the features to be searched for are appended to the matrix itself. The input matrix must have the number of spectra as the number of rows.
+custom_peaklist_intensity_matrix <- function (spectra, features_to_add, final_sample_matrix=NULL, multicore_processing=TRUE, tolerance_ppm=2000) {
+	## Install the required packages
+	install_and_load_required_packages("MALDIquant")
+	## Generate a fake spectrum and a fake peaklist with the features to add
+	fake_spectrum <- createMassSpectrum(mass=spectra[[1]]@mass, intensity=spectra[[1]]@intensity, metaData=list(name="Fake spectrum"))
+	fake_peaks <- createMassPeaks(mass=as.numeric(features_to_add), intensity=rep(1, length(features_to_add)), snr=rep(3, length(features_to_add)), metaData=list(name="Fake peaklist"))
+	## Detect the peaks in the spectra
+	peaks <- detectPeaks(spectra, method="SuperSmoother", SNR=3)
+	## Append the fake spectrum and the fake peaklist to he original lists
+	spectra_all <- append(spectra, fake_spectrum)
+	peaks_all <- append(peaks, fake_peaks)
+	## Generate the intensity matrix
+	intensity_matrix_all <- intensityMatrix(peaks_all, spectra_all)
+	## Remove the last row (corresponding to the fake spectrum)
+	intensity_matrix_all <- intensity_matrix_all[1:(nrow(intensity_matrix_all)-1),]
+	## Keep only the columns that are corresponding to the desired features
+	final_intensity_matrix <- intensity_matrix_all[,features_to_add]
+	# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
+	if (is.null(final_sample_matrix)) {
+		final_sample_matrix <- final_intensity_matrix
+	} else {
+		# If the final matrix exists, append the feature column to the matrix
+		final_sample_matrix <- cbind(final_sample_matrix, final_intensity_matrix)
+	}
+	##### Return the final matrix with the custom features (plus the original ones if a matrix is specified as input)
+	return(final_sample_matrix)
+}
+
+
+
+
+
+###############################################################################
+
 
 
 
@@ -3738,7 +3846,7 @@ return (list(classification_hca_results_avg=classification_hca_results_avg, clas
 
 
 
-################################################ CLASSIFICATION VIA SVM: PROFILE
+################################################ CLASSIFICATION VIA SVM: PROFILE - DEPRECATED
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The features in the model must be aligned to the features in the dataset: mind that some (or no) features of the model can be present in the dataset!
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the SVM model itself and the average spectrum of the patients with red bars on the signals used by the SVM to classify it.
@@ -3978,7 +4086,7 @@ return (list(patient_classification_matrix=final_result_matrix_avg, average_spec
 
 
 
-######################################### CLASSIFICATION VIA SVM: PIXEL-BY-PIXEL
+######################################### CLASSIFICATION VIA SVM: PIXEL-BY-PIXEL - DEPRECATED
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the SVM model itself.
 classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_model_name="SVMModel", peak_picking_algorithm="SuperSmoother", preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), tof_mode="linear", spectra_preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE) {
@@ -4186,7 +4294,7 @@ return (list(pixel_by_pixel_classification=final_result_matrix, pixel_by_pixel_c
 
 
 
-######################################### CLASSIFICATION VIA SVM: PIXEL-BY-PIXEL (MULTICORE)
+######################################### CLASSIFICATION VIA SVM: PIXEL-BY-PIXEL (MULTICORE) - DEPRECATED
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the SVM model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the SVM model itself.
 # Parallel computation implemented
@@ -4420,9 +4528,9 @@ classify_patients_svm_pixelbypixel <- function (spectra_path, filepath_R, svm_mo
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the models with the name of the model objects in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the SVM model itself.
 # Parallel computation implemented
-classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_names=c("RSVM_model","pls_model","nbc_model"), peak_picking_algorithm="SuperSmoother", preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), tof_mode="linear", spectra_preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE, decision_method_ensemble="majority", vote_weights_ensemble="equal") {
+classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_names=c("RSVM_model","pls_model","nbc_model"), peak_picking_algorithm="SuperSmoother", preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), tof_mode="linear", spectra_preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE, decision_method_ensemble="majority", vote_weights_ensemble="equal", pixel_grouping=c("single","moving window average","graph","hca")) {
 	# Install and load the required packages
-	install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel"))
+	install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls"))
 	# Rename the trim function
 	trim_spectra <- get(x="trim", pos="package:MALDIquant")
 	##### TOF-MODE
@@ -4561,87 +4669,42 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 				} else {
 					final_sample_matrix <- NULL
 				}
-				## Function to apply for each feature to search for to each spectrum of the list
-				feature_finder <- function(spectrum, feature_mass, tolerance_ppm) {
-					# Initialise the output
-					spectrum_intensity <- NA
-					# Scroll the mass list of each spectrum
-					for (m in 1:length(spectrum@mass)) {
-						# If there is a match
-						if (abs(spectrum@mass[m]-as.numeric(feature_mass))*10^6/as.numeric(feature_mass) <= tolerance_ppm) {
-							# Store the corresponding intensity
-							spectrum_intensity <- spectrum@intensity[m]
-						}
-					}
-					return(spectrum_intensity)
-				}
-				# Scroll the features to add (in the model but not in the sample)
-				for (f in 1:length(features_to_add)) {
-					if (multicore_processing == TRUE) {
-						# Detect the number of cores
-						cpu_thread_number <- detectCores(logical=TRUE)
-						# Return for each spectrum the intensity value of the peak to be searched for
-						if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-							feature_intensity_vector_list <- mclapply(sample_spectra, FUN=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm), mc.cores=cpu_thread_number)
-						} else if (Sys.info()[1] == "Windows") {
-							# Make the CPU cluster for parallelisation
-							#cls <- makeCluster(cpu_thread_number)
-							# Make the cluster use the custom functions and the package functions along with their parameters
-							#clusterEvalQ(cls, {library(MALDIquant)})
-							# Pass the variables to the cluster for running the function
-							#clusterExport(cl=cls, varlist=c("tolerance_ppm"), envir=environment())
-							#feature_intensity_vector_list <- parLapply(cls, sample_spectra, fun=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
-							#stopCluster(cls)
-							feature_intensity_vector_list <- lapply(sample_spectra, FUN=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
-						}
-					} else {
-						feature_intensity_vector_list <- lapply(sample_spectra, FUN=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
-					}
-					# Unlist to a numeric vector
-					feature_intensity_vector <- unlist(feature_intensity_vector_list)
-					# Generate the matrix column
-					feature_intensity_column <- as.matrix(cbind(feature_intensity_vector))
-					colnames(feature_intensity_column) <- features_to_add[f]
-					## Attach this to the final sample matrix (if the signal has been found)
-					# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
-					if (is.null(final_sample_matrix)) {
-						final_sample_matrix <- cbind(feature_intensity_column)
-					} else {
-						# If the final matrix exists, append the feature column to the matrix
-						final_sample_matrix <- cbind(final_sample_matrix, feature_intensity_column)
-					}
-				}
+				## Add the missing features to the final matrix (the one that were in the model but not in the peaklist)
+				final_sample_matrix <- custom_peaklist_intensity_matrix(sample_spectra, features_to_add=features_to_add, final_sample_matrix=final_sample_matrix, multicore_processing=multicore_processing, tolerance_ppm=tolerance_ppm)
 				# Put the X at the beginning of the peak names
 				for (n in 1:length(colnames(final_sample_matrix))) {
 					name <- paste("X", colnames(final_sample_matrix)[n], sep="")
 					colnames(final_sample_matrix)[n] <- name
 				}
-				##### Predictions (spectra by spectra)
-				predicted_classes <- predict(svm_model, newdata = final_sample_matrix)
-				# Generate a matrix with the results
-				result_matrix_svm <- matrix (nrow=length(predicted_classes), ncol=1)
-				sample_name <- sample_spectra[[1]]@metaData$file[1]
-				rownames(result_matrix_svm) <- cbind(rep(sample_name, length(sample_spectra)))
-				result_matrix_svm [,1] <- cbind(as.character(predicted_classes))
-				colnames(result_matrix_svm) <- "Predicted Class SVM"
-				##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
-				if (is.null(final_result_matrix)) {
-					final_result_matrix <- result_matrix_svm
-				} else {
-					final_result_matrix <- cbind(final_result_matrix, result_matrix_svm)
+				########## SINGLE PIXEL CLASSIFICATION
+				if (pixel_grouping == "single") {
+					##### Predictions (spectra by spectra)
+					predicted_classes <- predict(svm_model, newdata = final_sample_matrix)
+					# Generate a matrix with the results
+					result_matrix_svm <- matrix (nrow=length(predicted_classes), ncol=1)
+					sample_name <- sample_spectra[[1]]@metaData$file[1]
+					rownames(result_matrix_svm) <- cbind(rep(sample_name, length(sample_spectra)))
+					result_matrix_svm [,1] <- cbind(as.character(predicted_classes))
+					colnames(result_matrix_svm) <- "Predicted Class SVM"
+					##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
+					if (is.null(final_result_matrix)) {
+						final_result_matrix <- result_matrix_svm
+					} else {
+						final_result_matrix <- cbind(final_result_matrix, result_matrix_svm)
+					}
+					########## Generate a molecular image of the classification
+					# Replace the spectra intensities with the class number for plotting purposes
+					class_as_number <- as.numeric(predicted_classes)
+					spectra_for_plotting <- sample_spectra
+					for (s in 1:length(spectra_for_plotting)) {
+						spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+					}
+					plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
+					legend(x="bottomright", legend=class_list, fill=c("red","green"))
+					legend(x="topright", legend=sample_name)
+					# Store the plot into the list of images (for SVM)
+					classification_msi_svm[[md]] <- recordPlot()
 				}
-				########## Generate a molecular image of the classification
-				# Replace the spectra intensities with the class number for plotting purposes
-				class_as_number <- as.numeric(predicted_classes)
-				spectra_for_plotting <- sample_spectra
-				for (s in 1:length(spectra_for_plotting)) {
-					spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
-				}
-				plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
-				legend(x="bottomright", legend=class_list, fill=c("red","green"))
-				legend(x="topright", legend=sample_name)
-				# Store the plot into the list of images (for SVM)
-				classification_msi_svm[[md]] <- recordPlot()
 			}
 			# Append the classification image list to the final list (SVM)
 			classification_msi_patient <- append (classification_msi_patient, classification_msi_svm)
@@ -4717,82 +4780,37 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 				} else {
 					final_sample_matrix <- NULL
 				}
-				## Function to apply for each feature to search for to each spectrum of the list
-				feature_finder <- function(spectrum, feature_mass, tolerance_ppm) {
-					# Initialise the output
-					spectrum_intensity <- NA
-					# Scroll the mass list of each spectrum
-					for (m in 1:length(spectrum@mass)) {
-						# If there is a match
-						if (abs(spectrum@mass[m]-as.numeric(feature_mass))*10^6/as.numeric(feature_mass) <= tolerance_ppm) {
-							# Store the corresponding intensity
-							spectrum_intensity <- spectrum@intensity[m]
-						}
-					}
-					return(spectrum_intensity)
-				}
-				# Scroll the features to add (in the model but not in the sample)
-				for (f in 1:length(features_to_add)) {
-					if (multicore_processing == TRUE) {
-						# Detect the number of cores
-						cpu_thread_number <- detectCores(logical=TRUE)
-						# Return for each spectrum the intensity value of the peak to be searched for
-						if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-							feature_intensity_vector_list <- mclapply(sample_spectra, FUN=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm), mc.cores=cpu_thread_number)
-						} else if (Sys.info()[1] == "Windows") {
-							# Make the CPU cluster for parallelisation
-							#cls <- makeCluster(cpu_thread_number)
-							# Make the cluster use the custom functions and the package functions along with their parameters
-							#clusterEvalQ(cls, {library(MALDIquant)})
-							# Pass the variables to the cluster for running the function
-							#clusterExport(cl=cls, varlist=c("tolerance_ppm"), envir=environment())
-							#feature_intensity_vector_list <- parLapply(cls, sample_spectra, fun=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
-							#stopCluster(cls)
-							feature_intensity_vector_list <- lapply(sample_spectra, FUN=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
-						}
+				## Add the missing features to the final matrix (the one that were in the model but not in the peaklist)
+				final_sample_matrix <- custom_peaklist_intensity_matrix(sample_spectra, features_to_add=features_to_add, final_sample_matrix=final_sample_matrix, multicore_processing=multicore_processing, tolerance_ppm=tolerance_ppm)
+				########## SINGLE PIXEL CLASSIFICATION
+				if (pixel_grouping == "single") {
+					##### Predictions (spectra by spectra)
+					predicted_classes <- predict(pls_model, newdata = final_sample_matrix)
+					# Generate a matrix with the results
+					result_matrix_pls <- matrix (nrow=length(predicted_classes), ncol=1)
+					sample_name <- sample_spectra[[1]]@metaData$file[1]
+					rownames(result_matrix_pls) <- cbind(rep(sample_name, length(sample_spectra)))
+					result_matrix_pls [,1] <- cbind(as.character(predicted_classes))
+					colnames(result_matrix_pls) <- "Predicted Class PLS"
+					##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
+					if (is.null(final_result_matrix)) {
+						final_result_matrix <- result_matrix_pls
 					} else {
-						feature_intensity_vector_list <- lapply(sample_spectra, FUN=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
+						final_result_matrix <- cbind(final_result_matrix, result_matrix_pls)
 					}
-					# Unlist to a numeric vector
-					feature_intensity_vector <- unlist(feature_intensity_vector_list)
-					# Generate the matrix column
-					feature_intensity_column <- as.matrix(cbind(feature_intensity_vector))
-					colnames(feature_intensity_column) <- features_to_add[f]
-					## Attach this to the final sample matrix (if the signal has been found)
-					# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
-					if (is.null(final_sample_matrix)) {
-						final_sample_matrix <- cbind(feature_intensity_column)
-					} else {
-						# If the final matrix exists, append the feature column to the matrix
-						final_sample_matrix <- cbind(final_sample_matrix, feature_intensity_column)
+					########## Generate a molecular image of the classification
+					# Replace the spectra intensities with the class number for plotting purposes
+					class_as_number <- as.numeric(predicted_classes)
+					spectra_for_plotting <- sample_spectra
+					for (s in 1:length(spectra_for_plotting)) {
+						spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
 					}
+					plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
+					legend(x="bottomright", legend=class_list, fill=c("red","green"))
+					legend(x="topright", legend=sample_name)
+					# Store the plot into the list of images
+					classification_msi_pls[[md]] <- recordPlot()
 				}
-				##### Predictions (spectra by spectra)
-				predicted_classes <- predict(pls_model, newdata = final_sample_matrix)
-				# Generate a matrix with the results
-				result_matrix_pls <- matrix (nrow=length(predicted_classes), ncol=1)
-				sample_name <- sample_spectra[[1]]@metaData$file[1]
-				rownames(result_matrix_pls) <- cbind(rep(sample_name, length(sample_spectra)))
-				result_matrix_pls [,1] <- cbind(as.character(predicted_classes))
-				colnames(result_matrix_pls) <- "Predicted Class PLS"
-				##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
-				if (is.null(final_result_matrix)) {
-					final_result_matrix <- result_matrix_pls
-				} else {
-					final_result_matrix <- cbind(final_result_matrix, result_matrix_pls)
-				}
-				########## Generate a molecular image of the classification
-				# Replace the spectra intensities with the class number for plotting purposes
-				class_as_number <- as.numeric(predicted_classes)
-				spectra_for_plotting <- sample_spectra
-				for (s in 1:length(spectra_for_plotting)) {
-					spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
-				}
-				plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
-				legend(x="bottomright", legend=class_list, fill=c("red","green"))
-				legend(x="topright", legend=sample_name)
-				# Store the plot into the list of images
-				classification_msi_pls[[md]] <- recordPlot()
 			}
 			# Append the classification image list to the final list (PLS)
 			classification_msi_patient <- append(classification_msi_patient, classification_msi_pls)
@@ -4868,96 +4886,37 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 				} else {
 					final_sample_matrix <- NULL
 				}
-				## Function to apply for each feature to search for to each spectrum of the list
-				feature_finder <- function(spectrum, feature_mass, tolerance_ppm) {
-					# Initialise the output
-					spectrum_intensity <- NA
-					# Scroll the mass list of each spectrum
-					for (m in 1:length(spectrum@mass)) {
-						# If there is a match
-						if (abs(spectrum@mass[m]-as.numeric(feature_mass))*10^6/as.numeric(feature_mass) <= tolerance_ppm) {
-							# Store the corresponding intensity
-							spectrum_intensity <- spectrum@intensity[m]
-						}
-					}
-					return(spectrum_intensity)
-				}
-				# Scroll the features to add (in the model but not in the sample)
-				for (f in 1:length(features_to_add)) {
-					if (multicore_processing == TRUE) {
-						# Detect the number of cores
-						cpu_thread_number <- detectCores(logical=TRUE)
-						# Return for each spectrum the intensity value of the peak to be searched for
-						if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-							feature_intensity_vector_list <- mclapply(sample_spectra, FUN=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm), mc.cores=cpu_thread_number)
-						} else if (Sys.info()[1] == "Windows") {
-							# Make the CPU cluster for parallelisation
-							#cls <- makeCluster(cpu_thread_number)
-							# Make the cluster use the custom functions and the package functions along with their parameters
-							#clusterEvalQ(cls, {library(MALDIquant)})
-							# Pass the variables to the cluster for running the function
-							#clusterExport(cl=cls, varlist=c("tolerance_ppm"), envir=environment())
-							#feature_intensity_vector_list <- parLapply(cls, sample_spectra, fun=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
-							#stopCluster(cls)
-							feature_intensity_vector_list <- lapply(sample_spectra, FUN=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
-						}
+				## Add the missing features to the final matrix (the one that were in the model but not in the peaklist)
+				final_sample_matrix <- custom_peaklist_intensity_matrix(sample_spectra, features_to_add=features_to_add, final_sample_matrix=final_sample_matrix, multicore_processing=multicore_processing, tolerance_ppm=tolerance_ppm)
+				########## SINGLE PIXEL CLASSIFICATION
+				if (pixel_grouping == "single") {
+					##### Predictions (spectra by spectra)
+					predicted_classes <- predict(nbc_model, newdata = final_sample_matrix)
+					# Generate a matrix with the results
+					result_matrix_nbc <- matrix (nrow=length(predicted_classes), ncol=1)
+					sample_name <- sample_spectra[[1]]@metaData$file[1]
+					rownames(result_matrix_nbc) <- cbind(rep(sample_name, length(sample_spectra)))
+					result_matrix_nbc [,1] <- cbind(as.character(predicted_classes))
+					colnames(result_matrix_nbc) <- "Predicted Class Bayes"
+					##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
+					if (is.null(final_result_matrix)) {
+						final_result_matrix <- result_matrix_nbc
 					} else {
-						feature_intensity_vector_list <- lapply(sample_spectra, FUN=function(sample_spectra) feature_finder(sample_spectra, feature_mass=features_to_add[f], tolerance_ppm=tolerance_ppm))
+						final_result_matrix <- cbind(final_result_matrix, result_matrix_nbc)
 					}
-					# Unlist to a numeric vector
-					feature_intensity_vector <- unlist(feature_intensity_vector_list)
-					# Generate the matrix column
-					feature_intensity_column <- as.matrix(cbind(feature_intensity_vector))
-					colnames(feature_intensity_column) <- features_to_add[f]
-					## Attach this to the final sample matrix (if the signal has been found)
-					# If the feature is in the dataset...
-					if (nrow(feature_intensity_column) > 0) {
-						# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
-						if (is.null(final_sample_matrix)) {
-							final_sample_matrix <- cbind(feature_intensity_column)
-						} else {
-							# If the final matrix exists, append the feature column to the matrix
-							final_sample_matrix <- cbind(final_sample_matrix, feature_intensity_column)
-						}
-					} else {
-						# If the feature does not exist in the dataset, its value becomes NA
-						feature_intensity_column <- cbind(rep(NA, length(sample_spectra)))
-						colnames(feature_intensity_column) <- features_to_add[f]
-						# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
-						if (is.null(final_sample_matrix)) {
-							final_sample_matrix <- cbind(feature_intensity_column)
-						} else {
-							# If the final matrix exists, append the feature column to the matrix
-							final_sample_matrix <- cbind(final_sample_matrix, feature_intensity_column)
-						}
+					########## Generate a molecular image of the classification
+					# Replace the spectra intensities with the class number for plotting purposes
+					class_as_number <- as.numeric(predicted_classes)
+					spectra_for_plotting <- sample_spectra
+					for (s in 1:length(spectra_for_plotting)) {
+						spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
 					}
+					plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
+					legend(x="bottomright", legend=class_list, fill=c("red", "green"))
+					legend(x="topright", legend=sample_name)
+					# Store the plot into the list of images
+					classification_msi_nbc[[md]] <- recordPlot()
 				}
-				##### Predictions (spectra by spectra)
-				predicted_classes <- predict(nbc_model, newdata = final_sample_matrix)
-				# Generate a matrix with the results
-				result_matrix_nbc <- matrix (nrow=length(predicted_classes), ncol=1)
-				sample_name <- sample_spectra[[1]]@metaData$file[1]
-				rownames(result_matrix_nbc) <- cbind(rep(sample_name, length(sample_spectra)))
-				result_matrix_nbc [,1] <- cbind(as.character(predicted_classes))
-				colnames(result_matrix_nbc) <- "Predicted Class Bayes"
-				##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
-				if (is.null(final_result_matrix)) {
-					final_result_matrix <- result_matrix_nbc
-				} else {
-					final_result_matrix <- cbind(final_result_matrix, result_matrix_nbc)
-				}
-				########## Generate a molecular image of the classification
-				# Replace the spectra intensities with the class number for plotting purposes
-				class_as_number <- as.numeric(predicted_classes)
-				spectra_for_plotting <- sample_spectra
-				for (s in 1:length(spectra_for_plotting)) {
-					spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
-				}
-				plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
-				legend(x="bottomright", legend=class_list, fill=c("red", "green"))
-				legend(x="topright", legend=sample_name)
-				# Store the plot into the list of images
-				classification_msi_nbc[[md]] <- recordPlot()
 			}
 			# Append the classification image list to the final list (SVM)
 			classification_msi_patient <- append(classification_msi_patient, classification_msi_nbc)
@@ -5026,7 +4985,7 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 
 
 
-################################################ CLASSIFICATION VIA PLS: PROFILE
+################################################ CLASSIFICATION VIA PLS: PROFILE - DEPRECATED
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the PLS model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel and the patient's average spectrum), MS images with the pixel-by-pixel classification, the PLS model itself and the average spectrum of the patients with red bars on the signals used by the PLS to classify it.
 classify_patients_pls_profile <- function (spectra_path, filepath_R, pls_model_name="pls_model", spectra_preprocessing=TRUE, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), tof_mode="linear", peak_picking_algorithm="SuperSmoother", preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE) {
@@ -5251,7 +5210,7 @@ return (list(patient_classification_matrix=final_result_matrix_avg, average_spec
 
 
 
-######################################### CLASSIFICATION VIA PLS: PIXEL-BY-PIXEL
+######################################### CLASSIFICATION VIA PLS: PIXEL-BY-PIXEL - DEPRECATED
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the PLS model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the PLS model itself.
 classify_patients_pls_pixelbypixel <- function (spectra_path, filepath_R, pls_model_name="pls_model", peak_picking_algorithm="SuperSmoother", preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), tof_mode="linear", spectra_preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE) {
@@ -5444,7 +5403,7 @@ return (list(pixel_by_pixel_classification=final_result_matrix, pixel_by_pixel_c
 
 
 
-############################# CLASSIFICATION VIA NAIVE BAYES CLASSIFIER: PROFILE
+############################# CLASSIFICATION VIA NAIVE BAYES CLASSIFIER: PROFILE - DEPRECATED
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the Naive Bayes Classifier (NBC) model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the NBC model itself and the average spectrum of the patients with red bars on the signals used by the NBC to classify it.
 classify_patients_nbc_profile <- function (spectra_path, filepath_R, nbc_model_name="nbc_model", spectra_preprocessing=TRUE, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), tof_mode="linear", peak_picking_algorithm="SuperSmoother", preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE) {
@@ -5669,7 +5628,7 @@ return (list(patient_classification_matrix=final_result_matrix_avg, average_spec
 
 
 
-###################### CLASSIFICATION VIA NAIVE BAYES CLASSIFIER: PIXEL-BY-PIXEL
+###################### CLASSIFICATION VIA NAIVE BAYES CLASSIFIER: PIXEL-BY-PIXEL - DEPRECATED
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the Naive Bayes Classifier (NBC) model with the name of the model object in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the NBC model itself.
 classify_patients_nbc_pixelbypixel <- function (spectra_path, filepath_R, nbc_model_name="nbc_model", peak_picking_algorithm="SuperSmoother", preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalization_algorithm="TIC", normalization_mass_range=NULL), tof_mode="linear", spectra_preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE) {
