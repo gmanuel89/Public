@@ -4521,10 +4521,11 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 					class_as_number <- as.numeric(predicted_classes)
 					spectra_for_plotting <- sample_spectra
 					for (s in 1:length(spectra_for_plotting)) {
-						spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+						spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s]/2, length(spectra_for_plotting[[s]]@intensity))
 					}
-					plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
-					legend(x="bottomright", legend=class_list, fill=c("red","green"))
+					slices <- msiSlices(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=1, adjust=TRUE, method="median")
+					plotMsiSlice(slices, legend=FALSE, scale=F)
+					legend(x="bottomright", legend=class_list, fill=c("green","red"))
 					legend(x="topright", legend=sample_name)
 					# Store the plot into the list of images (for SVM)
 					classification_msi_svm[[md]] <- recordPlot()
@@ -4627,10 +4628,11 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 					class_as_number <- as.numeric(predicted_classes)
 					spectra_for_plotting <- sample_spectra
 					for (s in 1:length(spectra_for_plotting)) {
-						spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+						spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s]/2, length(spectra_for_plotting[[s]]@intensity))
 					}
-					plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
-					legend(x="bottomright", legend=class_list, fill=c("red","green"))
+					slices <- msiSlices(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=1, adjust=TRUE, method="median")
+					plotMsiSlice(slices, legend=FALSE, scale=F)
+					legend(x="bottomright", legend=class_list, fill=c("green","red"))
 					legend(x="topright", legend=sample_name)
 					# Store the plot into the list of images
 					classification_msi_pls[[md]] <- recordPlot()
@@ -4733,10 +4735,11 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 					class_as_number <- as.numeric(predicted_classes)
 					spectra_for_plotting <- sample_spectra
 					for (s in 1:length(spectra_for_plotting)) {
-						spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+						spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s]/2, length(spectra_for_plotting[[s]]@intensity))
 					}
-					plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
-					legend(x="bottomright", legend=class_list, fill=c("red", "green"))
+					slices <- msiSlices(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=1, adjust=TRUE, method="median")
+					plotMsiSlice(slices, legend=FALSE, scale=F)
+					legend(x="bottomright", legend=class_list, fill=c("green", "red"))
 					legend(x="topright", legend=sample_name)
 					# Store the plot into the list of images
 					classification_msi_nbc[[md]] <- recordPlot()
@@ -4784,10 +4787,11 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 				class_as_number <- as.numeric(predicted_classes)
 				spectra_for_plotting <- sample_spectra
 				for (s in 1:length(spectra_for_plotting)) {
-					spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+					spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s]/2, length(spectra_for_plotting[[s]]@intensity))
 				}
-				plotMsiSlice(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=10, legend=FALSE)
-				legend(x="bottomright", legend=class_list, fill=c("red", "green"))
+				slices <- msiSlices(spectra_for_plotting, center=spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance=1, adjust=TRUE, method="median")
+				plotMsiSlice(slices, legend=FALSE, scale=F)
+				legend(x="bottomright", legend=class_list, fill=c("green", "red"))
 				legend(x="topright", legend=sample_name)
 				# Store the plot into the list of images
 				classification_ensemble_msi_list[[p]] <- recordPlot()
