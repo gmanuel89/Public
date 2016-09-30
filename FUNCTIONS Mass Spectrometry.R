@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.09.13
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.09.23
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -3290,7 +3290,7 @@ return (list(classification_hca_results_avg=classification_hca_results_avg, clas
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the models with the name of the model objects in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The features in the model must be aligned to the features in the dataset.
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the model list and the average spectrum of the patients with red bars on the signals used by the models to classify it, a matrix with the ensemble classification (patient's average spectrum).
-classify_patients_profile <- function (spectra_path, filepath_R, model_names=c("RSVM_model","pls_model","nbc_model"), spectra_preprocessing=TRUE, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalisation_algorithm="TIC", normalisation_mass_range=NULL), tof_mode="linear", peak_picking_algorithm="SuperSmoother", preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE, decision_method_ensemble="majority", vote_weights_ensemble="equal") {
+spectral_classification_profile <- function (spectra_path, filepath_R, model_names=c("RSVM_model","pls_model","nbc_model"), spectra_preprocessing=TRUE, preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalisation_algorithm="TIC", normalisation_mass_range=NULL), spectral_alignment=FALSE, tof_mode="linear", peak_picking_algorithm="SuperSmoother", preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE, decision_method_ensemble="majority", vote_weights_ensemble="equal") {
 ########## Load the required packages
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls"))
 # Rename the trim function
@@ -3347,7 +3347,7 @@ for (p in 1:length(filepath_test_imzml)) {
 	sample_name <- sample_spectra@metaData$file[[1]]
 	## Preprocess spectra
 	if (spectra_preprocessing == TRUE) {
-		sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, preprocessing_parameters=preprocessing_parameters, process_in_packages_of=preprocess_spectra_in_packages_of, align_spectra=FALSE, spectra_alignment_method="cubic", multicore_processing=multicore_processing)
+		sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, preprocessing_parameters=preprocessing_parameters, process_in_packages_of=preprocess_spectra_in_packages_of, align_spectra=spectral_alignment, spectra_alignment_method="cubic", multicore_processing=multicore_processing)
 	}
 	## Peak picking
 	sample_peaks <- peak_picking(sample_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
@@ -3546,6 +3546,15 @@ for (p in 1:length(filepath_test_imzml)) {
 			class_list <- levels(factor(colnames(pls_model$finalModel$model$y)))
 			##### Isolate the peaks used to create the model
 			features_model <- pls_model$finalModel$xNames
+			# Remove the X
+			for (f in 1:length(features_model)) {
+				name_splitted <- unlist(strsplit(features_model[f],""))
+				feature_def <- name_splitted [2]
+				for (i in 3:length(name_splitted)) {
+					feature_def <- paste(feature_def, name_splitted[i], sep="")
+				}
+				features_model[f] <- feature_def
+			}
 			##### Check if the model features and the dataset features are compatible
 			## Sort the numeric features
 			sample_features_sorted <- sort(as.numeric(colnames(sample_matrix)))
@@ -3691,6 +3700,15 @@ for (p in 1:length(filepath_test_imzml)) {
 			class_list <- levels(factor(nbc_model$finalModel$levels))
 			##### Isolate the peaks used to create the model
 			features_model <- nbc_model$finalModel$xNames
+			# Remove the X
+			for (f in 1:length(features_model)) {
+				name_splitted <- unlist(strsplit(features_model[f],""))
+				feature_def <- name_splitted [2]
+				for (i in 3:length(name_splitted)) {
+					feature_def <- paste(feature_def, name_splitted[i], sep="")
+				}
+				features_model[f] <- feature_def
+			}
 			##### Check if the model features and the dataset features are compatible
 			## Sort the numeric features
 			sample_features_sorted <- sort(as.numeric(colnames(sample_matrix)))
@@ -3862,7 +3880,7 @@ return (list(final_result_matrix_all=final_result_matrix_all, average_spectra_wi
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the models with the name of the model objects in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the model list, a matrix with the ensemble classification (pixel-by-pixel) and MS images with the pixel-by-pixel ensemble classification.
 # Parallel computation implemented
-classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_names=c("RSVM_model","pls_model","nbc_model"), peak_picking_algorithm="SuperSmoother", preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalisation_algorithm="TIC", normalisation_mass_range=NULL), tof_mode="linear", spectra_preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE, decision_method_ensemble="majority", vote_weights_ensemble="equal", pixel_grouping=c("single","moving window average","graph","hca")) {
+spectral_classification_pixelbypixel <- function (spectra_path, filepath_R, model_names=c("RSVM_model","pls_model","nbc_model"), peak_picking_algorithm="SuperSmoother", preprocessing_parameters=list(crop_spectra=TRUE, mass_range=c(4000,15000), data_transformation=FALSE, transformation_algorithm="sqrt", smoothing_algorithm="SavitzkyGolay", smoothing_strength="medium", baseline_subtraction_algorithm="SNIP", baseline_subtraction_iterations=100, normalisation_algorithm="TIC", normalisation_mass_range=NULL), spectral_alignment=FALSE, tof_mode="linear", spectra_preprocessing=TRUE, preprocess_spectra_in_packages_of=length(sample_spectra), multicore_processing=TRUE, decision_method_ensemble="majority", vote_weights_ensemble="equal", pixel_grouping=c("single","moving window average","graph","hca")) {
 	# Install and load the required packages
 	install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls"))
 	# Rename the trim function
@@ -3916,7 +3934,7 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 		sample_spectra <- replace_sample_name(sample_spectra)
 		## Preprocess spectra
 		if (spectra_preprocessing == TRUE) {
-			sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, preprocessing_parameters=preprocessing_parameters, process_in_packages_of=preprocess_spectra_in_packages_of, align_spectra=TRUE, spectra_alignment_method="cubic", multicore_processing=multicore_processing)
+			sample_spectra <- preprocess_spectra(sample_spectra, tof_mode=tof_mode, preprocessing_parameters=preprocessing_parameters, process_in_packages_of=preprocess_spectra_in_packages_of, align_spectra=spectral_alignment, spectra_alignment_method="cubic", multicore_processing=multicore_processing)
 		}
 		## Peak picking and alignment
 		sample_peaks <- peak_picking(sample_spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=5)
@@ -4088,6 +4106,15 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 				class_list <- levels(factor(colnames(pls_model$finalModel$model$y)))
 				##### Isolate the peaks used to create the model
 				features_model <- pls_model$finalModel$xNames
+				# Remove the X
+				for (f in 1:length(features_model)) {
+					name_splitted <- unlist(strsplit(features_model[f],""))
+					feature_def <- name_splitted [2]
+					for (i in 3:length(name_splitted)) {
+						feature_def <- paste(feature_def, name_splitted[i], sep="")
+					}
+					features_model[f] <- feature_def
+				}
 				##### Check if the model features and the dataset features are compatible
 				## Sort the numeric features
 				sample_features_sorted <- sort(as.numeric(colnames(sample_matrix)))
@@ -4205,6 +4232,15 @@ classify_patients_pixelbypixel <- function (spectra_path, filepath_R, model_name
 				class_list <- levels(factor(nbc_model$finalModel$levels))
 				##### Isolate the peaks used to create the model
 				features_model <- nbc_model$finalModel$xNames
+				# Remove the X
+				for (f in 1:length(features_model)) {
+					name_splitted <- unlist(strsplit(features_model[f],""))
+					feature_def <- name_splitted [2]
+					for (i in 3:length(name_splitted)) {
+						feature_def <- paste(feature_def, name_splitted[i], sep="")
+					}
+					features_model[f] <- feature_def
+				}
 				##### Check if the model features and the dataset features are compatible
 				## Sort the numeric features
 				sample_features_sorted <- sort(as.numeric(colnames(sample_matrix)))
@@ -4707,7 +4743,7 @@ return (list(training_dataset = training_dataset, testDataset = test_dataset))
 ############################################################## FEATURE SELECTION
 # This function runs the feature selection algorithm onto the peaklist matrix, returning the peaklist without the redundant/non-informative features, the original peaklist and the list of selected features.
 # The function allows for the use of several feature selection algorithms.
-feature_selection <- function (peaklist, feature_selection_method="rfe", features_to_select=20, selection_method="pls", selection_metric="Accuracy", correlation_method="pearson", correlation_threshold=0.75, auc_threshold=0.7, cv_repeats_control=5, k_fold_cv_control=10, discriminant_attribute="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE, generate_plots=TRUE, preprocessing=c("center", "scale")) {
+feature_selection <- function (peaklist, feature_selection_method="rfe", features_to_select=20, selection_method="pls", selection_metric="Accuracy", correlation_method="pearson", correlation_threshold=0.75, auc_threshold=0.7, cv_repeats_control=5, k_fold_cv_control=10, discriminant_attribute="Class", non_features=c("Sample", "Class", "THY"), seed=NULL, automatically_select_features=FALSE, generate_plots=TRUE, preprocessing=c("center","scale"), multicore_processing=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "pls", "stats", "randomForest", "pROC"))
 ### PARALLEL BACKEND	# Detect the number of cores
@@ -4726,17 +4762,17 @@ if (feature_selection_method == "rfe" || feature_selection_method == "recursive 
 	if (automatically_select_features == TRUE) {
 		if (selection_method != "") {
 			# Define the feature subset sizes
-			subset_sizes <- seq(2, features_to_select, by=1)
+			subset_sizes <- seq(2, features_to_select, by = 1)
 			# Set the seeds (for each resampling iteration in the cv)
-			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
-			seeds <- vector(mode = "list", length=number_of_iterations)
+			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
+			seeds <- vector(mode = "list", length = number_of_iterations)
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
 				# Make the randomness reproducible
 				set.seed(seed)
 			}
-			for (s in 1:(number_of_iterations-1)) {
-				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace=TRUE)
+			for (s in 1:(number_of_iterations - 1)) {
+				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
 			}
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
@@ -4745,26 +4781,26 @@ if (feature_selection_method == "rfe" || feature_selection_method == "recursive 
 			}
 			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
 			# Define the control function of the RFE
-			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails=TRUE)
+			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails=TRUE, allowParallel = multicore_processing)
 			# Run the RFE
-			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess=preprocessing)
+			rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess = preprocessing)
 			# Variable importance
 			variable_importance <- varImp(rfe_model$fit)
 			# Feature weights
 			feature_weights <- rfe_model$fit
 		} else {
 			# Define the feature subset sizes
-			subset_sizes <- seq(2, features_to_select, by=1)
+			subset_sizes <- seq(2, features_to_select, by = 1)
 			# Set the seeds (for each resampling iteration in the cv)
 			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
-			seeds <- vector(mode = "list", length=number_of_iterations)
+			seeds <- vector(mode = "list", length = number_of_iterations)
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
 				# Make the randomness reproducible
 				set.seed(seed)
 			}
-			for (s in 1:(number_of_iterations-1)) {
-				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace=TRUE)
+			for (s in 1:(number_of_iterations - 1)) {
+				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
 			}
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
@@ -4773,9 +4809,9 @@ if (feature_selection_method == "rfe" || feature_selection_method == "recursive 
 			}
 			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
 			# Define the control function of the RFE
-			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails=TRUE)
+			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails = TRUE, allowParallel = multicore_processing)
 			# Run the RFE
-			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess=preprocessing)
+			rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess = preprocessing)
 			# Variable importance
 			variable_importance <- varImp(rfe_model$fit)
 			# Feature weights
@@ -4789,15 +4825,15 @@ if (feature_selection_method == "rfe" || feature_selection_method == "recursive 
 			# Define the feature subset sizes
 			subset_sizes <- features_to_select
 			# Set the seeds (for each resampling iteration in the cv)
-			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
-			seeds <- vector(mode = "list", length=number_of_iterations)
+			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
+			seeds <- vector(mode = "list", length = number_of_iterations)
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
 				# Make the randomness reproducible
 				set.seed(seed)
 			}
-			for (s in 1:(number_of_iterations-1)) {
-				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace=TRUE)
+			for (s in 1:(number_of_iterations - 1)) {
+				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
 			}
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
@@ -4806,9 +4842,9 @@ if (feature_selection_method == "rfe" || feature_selection_method == "recursive 
 			}
 			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
 			# Define the control function of the RFE
-			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails=TRUE)
+			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = multicore_processing)
 			# Run the RFE
-			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess=preprocessing)
+			rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess = preprocessing)
 			# Variable importance
 			variable_importance <- varImp(rfe_model$fit)
 			# Feature weights
@@ -4817,15 +4853,15 @@ if (feature_selection_method == "rfe" || feature_selection_method == "recursive 
 			# Define the feature subset sizes
 			subset_sizes <- features_to_select
 			# Set the seeds (for each resampling iteration in the cv)
-			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
-			seeds <- vector(mode = "list", length=number_of_iterations)
+			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
+			seeds <- vector(mode = "list", length = number_of_iterations)
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
 				# Make the randomness reproducible
 				set.seed(seed)
 			}
-			for (s in 1:(number_of_iterations-1)) {
-				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace=TRUE)
+			for (s in 1:(number_of_iterations - 1)) {
+				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
 			}
 			# Plant the seed only if a specified value is entered
 			if (!is.null(seed)) {
@@ -4834,16 +4870,16 @@ if (feature_selection_method == "rfe" || feature_selection_method == "recursive 
 			}
 			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
 			# Define the control function of the RFE
-			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds=seeds, saveDetails=TRUE)
+			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = multicore_processing)
 			# Run the RFE
-			rfe_model <- rfe(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess=preprocessing)
+			rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess = preprocessing)
 			# Variable importance
 			variable_importance <- varImp(rfe_model$fit)
 			# Feature weights
 			feature_weights <- rfe_model$fit
 		}
 		# Output the best predictors after the RFE
-		predictors_rfe <- predictors (rfe_model) [1:features_to_select]
+		predictors_rfe <- predictors(rfe_model) [1:features_to_select]
 	}
 	# Predictors
 	predictors_feature_selection <- predictors_rfe
@@ -4897,9 +4933,9 @@ if (feature_selection_method == "correlation") {
 	# Output the highly correlated features
 	highly_correlated <- findCorrelation(feature_correlation, correlation_threshold)
 	# List the highly correlated features
-	highly_correlated_features <- names (peaklist_features [,highly_correlated])
+	highly_correlated_features <- names(peaklist_features[,highly_correlated])
 	# Features to keep
-	low_correlation_features <- names (peaklist_features [,-highly_correlated])
+	low_correlation_features <- names(peaklist_features[,-highly_correlated])
 	print(paste("The number of selected features is", length(low_correlation_features), "out of", length(peaklist_features)))
 	# Predictors
 	predictors_feature_selection <- low_correlation_features
@@ -5313,7 +5349,7 @@ if (pca == TRUE) {
 # This function operates the tuning of the Support Vector Machine (SVM), by testing all the parameters of the SVM (choosing them from a list provided by the user) and selecting the best.
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
 #This function uses the functions from CARET only
-svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), autotuning=TRUE, tuning_parameters=list(sigma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, scale=1, kernel="radial"), k_fold_cv=10, repeats_cv=2, preprocessing=c("scale","center"), parameters=list(sigma=0.001, scale=1, gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial"), positive_class_cv="HP", seed=NULL, evaluation_method="Accuracy") {
+svm_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), autotuning=TRUE, tuning_parameters=list(sigma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, scale=1, kernel="radial"), k_fold_cv=10, repeats_cv=2, preprocessing=c("center","scale"), parameters=list(sigma=0.001, scale=1, gamma=0.1, cost=10, epsilon=0.1, degree=3, kernel="radial"), positive_class_cv="HP", seed=NULL, evaluation_method="Accuracy") {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "pROC", "kernlab"))
 ### PARALLEL BACKEND
@@ -5472,7 +5508,7 @@ if (is.matrix(peaklist_test) || is.data.frame(peaklist_test)) {
 ###################################################### PLS TUNING AND VALIDATION
 # This function operates the training of a Partial Least Squares (PLS) model, by testing all the parameters of the PLS and selecting the best (in terms of accuracy). The tuning is performed via cross-validation onto the training dataset.
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
-pls_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(ncomp=1:5), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximise_selection_criteria_values=TRUE) {
+pls_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(ncomp=1:5), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("center","scale"), selection_criteria="Accuracy", maximise_selection_criteria_values=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "e1071"))
 ### PARALLEL BACKEND
@@ -5558,7 +5594,7 @@ return (list(model=pls_model, classification_results=classification_results_pls,
 ################################### NAIVE BAYES CLASSIFIER TUNING AND VALIDATION
 # This function operates the training of a Naive Bayes Classifier (NBC) model, by testing all the parameters of the NBC and selecting the best (in terms of accuracy). The tuning is performed via cross-validation onto the training dataset.
 # It returns the best model in terms of classification performances, along with its parameters and its performances (cross-validation or external validation, according to if an external dataset is provided).
-nbc_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(fL=NULL,usekernel=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria="Accuracy", maximise_selection_criteria_values=TRUE) {
+nbc_tuning_and_validation <- function (peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), tuning_parameters=data.frame(fL=NULL,usekernel=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("center","scale"), selection_criteria="Accuracy", maximise_selection_criteria_values=TRUE) {
 # Load the required libraries
 install_and_load_required_packages(c("caret", "e1071", "klaR", "MASS"))
 ### PARALLEL BACKEND
@@ -5644,7 +5680,7 @@ return (list(model=nbc_model, classification_results=classification_results_nbc,
 ################################################# ENSEMBLE TUNING AND VALIDATION
 # This function operates the tuning of the ensemble classifier, by relying upon other functions to train, tune and validate the individual classifiers.
 # It returns the best models in terms of classification performances, along with their parameters and performances (cross-validation or external validation, according to if an external dataset is provided).
-ensemble_tuning_and_validation <- function(peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), classifiers=c("svm","pls","bayes"), autotuning=TRUE,  classifier_parameters=list(svm=list(gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial"), pls=data.frame(ncomp=1:5), bayes=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("scale","center"), selection_criteria=data.frame(pls="Accuracy",bayes="Accuracy"), maximise_selection_criteria_values=data.frame(pls=TRUE,bayes=TRUE)) {
+ensemble_tuning_and_validation <- function(peaklist_training, peaklist_test=NULL, non_features=c("Sample","Class","THY"), classifiers=c("svm","pls","bayes"), autotuning=TRUE,  classifier_parameters=list(svm=list(gamma=10^(-5:5), cost=10^(-5:5), epsilon=seq(1,2,by=1), degree=1:5, kernel="radial"), pls=data.frame(ncomp=1:5), bayes=NULL), k_fold_cv=10, repeats_cv=2, positive_class_cv="HP", seed=NULL, preprocessing=c("center","scale"), selection_criteria=data.frame(pls="Accuracy",bayes="Accuracy"), maximise_selection_criteria_values=data.frame(pls=TRUE,bayes=TRUE)) {
 	if ("svm" %in% classifiers || "SVM" %in% classifiers) {
 		svm_classifier <- svm_tuning_and_validation(peaklist_training=peaklist_training, peaklist_test=peaklist_test, non_features=non_features, autotuning=autotuning, tuning_parameters=classifier_parameters$svm, k_fold_cv=k_fold_cv, repeats_cv=repeats_cv, parameters=classifier_parameters$svm, positive_class_cv=positive_class_cv, seed=seed, pca=FALSE, numer_of_components=3)
 	}
@@ -8396,7 +8432,7 @@ return (output)
 
 #################################################### ADJACENCY MATRIX GENERATION
 # The function generates an adjacency matrix from a peak list matrix, in order to generate a graph. The matrix is computed first by generating a correlation matrix and then replacing the correlation coefficients with 0 or 1 according to a threshold value.
-generate_adjacency_matrix <- function(peaklist_matrix, correlation_method="pearson", correlation_threshold=0.8, pvalue_threshold=0.05) {
+generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "pearson", correlation_threshold=0.8, pvalue_threshold=0.05) {
 ##### Install the required packages
 install_and_load_required_packages("stats")
 ##### Transpose the peaklist matrix to compute the correlation between observations and not features
