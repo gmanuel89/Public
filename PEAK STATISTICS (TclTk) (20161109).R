@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2016.10.03
+###################### FUNCTIONS - MASS SPECTROMETRY 2016.11.09
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -927,12 +927,12 @@ peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm=
 			# Scroll the peaklists and Add the peak intensity to a vector(one for each class)
 			for (l in 1:length(class_list)) {
 				# Allocate in the intensity vector the rows for that peak belonging to the certain class
-				intensity_vector [[l]] <- as.numeric(signal_matrix [signal_matrix[,ncol(signal_matrix)] == class_list[l],p])
+				intensity_vector[[l]] <- as.numeric(signal_matrix [signal_matrix[,ncol(signal_matrix)] == class_list[l],p])
 			}
 			if (remove_outliers == TRUE) {
 				for (i in 1:length(intensity_vector)) {
-					intensity_vector[[l]] <- outliers_removal(intensity_vector[[l]])
-					intensity_vector[[l]] <- intensity_vector[[l]]$vector
+					intensity_vector[[i]] <- outliers_removal(intensity_vector[[i]])
+					intensity_vector[[i]] <- intensity_vector[[i]]$vector
 				}
 			}
 			######################## STATISTICAL PARAMETERS
@@ -940,7 +940,7 @@ peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm=
 			shapiro_test <- list()
 			distribution_type <- list()
 			for (l in 1:length(class_list)) {
-				if (length(intensity_vector[[l]]) >= 3 && length(intensity_vector[[l]]) <=5000) {
+				if (length(intensity_vector[[l]]) >= 3 && length(intensity_vector[[l]]) <= 5000) {
 					shapiro_test[[l]] <- shapiro.test(intensity_vector[[l]])
 					if (shapiro_test[[l]]$p.value < 0.05) {
 						distribution_type[[l]] <- "Non-normal"
@@ -1070,7 +1070,7 @@ peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm=
 				if (is.null(spectra_counter_name)) {
 					spectra_counter_name <- paste(spectra_counter[[l]], " - ", class_list[l], sep="")
 				} else {
-					spectra_counter_name <- paste(inter_quartile_range_name, " , ", spectra_counter[[l]], " - ", class_list[l], sep="")
+					spectra_counter_name <- paste(spectra_counter_name, " , ", spectra_counter[[l]], " - ", class_list[l], sep="")
 				}
 			}
 			peak_stat_matrix [p,7] <- spectra_counter_name
@@ -1078,23 +1078,21 @@ peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm=
 			class_name <- NULL
 			for (l in 1:length(class_list)) {
 				if (is.null(class_name)) {
-					class_name <- paste(class_list[[l]], " - ", class_list[l], sep="")
+					class_name <- class_list[l]
 				} else {
-					class_name <- paste(class_name, " , ", class_list[[l]], " - ", class_list[l], sep="")
+					class_name <- paste(class_name, " - ", class_list[l], sep="")
 				}
 			}
 			peak_stat_matrix [p,8] <- class_name
 			# Homoscedasticity (Parametric)
 			if (variance_test_parametric$p.value < 0.05) {
 				homoscedasticity_parametric <- paste("Non homoscedastic data", "(p-value:", variance_test_parametric$p.value, ")")
-			}
-			if (variance_test_parametric$p.value >= 0.05) {
+			} else if (variance_test_parametric$p.value >= 0.05) {
 				homoscedasticity_parametric <- paste("Homoscedastic data", "(p-value:", variance_test_parametric$p.value, ")")
 			}
 			if (variance_test_non_parametric$p.value < 0.05) {
 				homoscedasticity_non_parametric <- paste("Non homoscedastic data", "(p-value:", variance_test_non_parametric$p.value, ")")
-			}
-			if (variance_test_non_parametric$p.value >= 0.05) {
+			} else if (variance_test_non_parametric$p.value >= 0.05) {
 				homoscedasticity_non_parametric <- paste("Homoscedastic data", "(p-value:", variance_test_non_parametric$p.value, ")")
 			}
 			peak_stat_matrix [p,9] <- homoscedasticity_parametric
@@ -1836,7 +1834,7 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 			x <- calibrateIntensity(x, method=normalisation_algorithm)
 		}
 		### Return the preprocessed spectrum (x)
-		return (x)
+		return(x)
 	}
 	######################################### Multiple spectra
 	if (isMassSpectrumList(spectra)) {
@@ -1876,7 +1874,7 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 					stopCluster(cl)
 				}
 			} else {
-				spectra_temp <- lapply(spectra_temp, FUN=function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra=crop_spectra, mass_range=mass_range, data_transformation=data_transformation, transformation_algorithm=transformation_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_half_window_size=smoothing_half_window_size, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalisation_algorithm=normalisation_algorithm, normalisation_mass_range=normalisation_mass_range))
+				spectra_temp <- preprocessing_subfunction(spectra_temp, crop_spectra=crop_spectra, mass_range=mass_range, data_transformation=data_transformation, transformation_algorithm=transformation_algorithm, smoothing_algorithm=smoothing_algorithm, smoothing_half_window_size=smoothing_half_window_size, baseline_subtraction_algorithm=baseline_subtraction_algorithm, baseline_subtraction_iterations=baseline_subtraction_iterations, normalisation_algorithm=normalisation_algorithm, normalisation_mass_range=normalisation_mass_range)
 			}
 			########## Add to the final preprocessed spectral dataset
 			preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
@@ -1884,7 +1882,7 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 	}
 	######################################### Single spectra
 	if (!isMassSpectrumList(spectra) && isMassSpectrum(spectra)) {
-		spectra <- preprocessing_subfunction (spectra, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalisation_algorithm, normalisation_mass_range)
+		spectra <- preprocessing_subfunction(spectra, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalisation_algorithm, normalisation_mass_range)
 		########## Add to the final preprocessed spectral dataset
 		preprocessed_spectra <- spectra
 	}
@@ -1919,7 +1917,7 @@ preprocess_spectra <- function (spectra, tof_mode="linear", preprocessing_parame
 # It is advisable to use a list of spectra coming from one patient (one imzML)
 # Spectra_per_patient = 1 returns the average spectrum of the spectra dataset.
 # The function returns a list of elements: representative spectra, MS images of pixels under the same nodes coloured the same way, list of spectra under the discarded nodes (with their average spectrum), list of spectra grouped according to the node they belong to.
-group_spectra <- function (spectra, spectra_per_patient=1, spectra_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", clustering_method="agglomerative", discarded_nodes=1, balanced=TRUE, method="mean", peak_picking_algorithm="SuperSmoother") {
+group_spectra <- function(spectra, spectra_per_patient=1, spectra_format="imzml", tof_mode="linear", seed=NULL, algorithm="random", clustering_method="agglomerative", discarded_nodes=1, balanced=TRUE, method="mean", peak_picking_algorithm="SuperSmoother") {
 	# Load the required libraries
 	install_and_load_required_packages (c("MALDIquant", "caret", "stats"))
 	# Rename the trim function
@@ -2735,7 +2733,7 @@ peak_picking <- function(spectra, peak_picking_algorithm="SuperSmoother", tof_mo
 				stopCluster(cl)
 			}
 		} else {
-			peaks <- lapply(spectra, FUN=function (spectra) detectPeaks(spectra, method=peak_picking_algorithm, halfWindowSize=half_window_size, SNR=SNR))
+			peaks <- detectPeaks(spectra, method=peak_picking_algorithm, halfWindowSize=half_window_size, SNR=SNR)
 		}
 		
 	}
@@ -8585,7 +8583,7 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "pea
 
 
 
-############################ PEAK STATISTICS 2016.10.26
+############################ PEAK STATISTICS 2016.11.09
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
@@ -8617,7 +8615,7 @@ spectra <- NULL
 peaks <- NULL
 remove_outliers <- FALSE
 exclude_spectra_without_peak <- FALSE
-multicore_processing <- TRUE
+multicore_processing <- FALSE
 transform_data <- FALSE
 transform_data_algorithm <- NULL
 smoothing <- TRUE
@@ -8651,7 +8649,7 @@ intensity_threshold_method_value <- "element-wise"
 spectra_format_value <- "imzML"
 remove_outliers_value <- "NO"
 exclude_spectra_without_peak_value <- "NO"
-multicore_processing_value <- "YES"
+multicore_processing_value <- " NO "
 transform_data_value <- "    NO    "
 smoothing_value <- "YES ( SavitzkyGolay , medium)"
 baseline_subtraction_value <- "YES (SNIP , iterations: 200)"
@@ -9290,10 +9288,10 @@ multicore_processing_choice <- function() {
 	# Catch the value from the menu
 	multicore_processing <- select.list(c("YES","NO"), title="Choose")
 	# Default
-	if (multicore_processing == "YES" || multicore_processing == "") {
+	if (multicore_processing == "YES") {
 		multicore_processing <- TRUE
 	}
-	if (multicore_processing == "NO") {
+	if (multicore_processing == "NO" || multicore_processing == "") {
 		multicore_processing <- FALSE
 	}
 	# Set the value of the displaying label
