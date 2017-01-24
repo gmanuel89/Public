@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2017.01.18
+###################### FUNCTIONS - MASS SPECTROMETRY 2017.01.24
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -123,100 +123,117 @@ custom_peaklist_intensity_matrix <- function (spectra, features_to_add=numeric()
 ### The name of the rows will be either the sample name or the class name (depending on the function parameter).
 # If the rows are named according to the sample name, an additional column for the class is added
 matrix_add_class_and_sample <- function (signal_matrix, peaks=list(), class_list=list(), spectra_format="imzml", sample_output=TRUE, class_output=TRUE, row_labels="Sample") {
-signal_matrix <- as.matrix(signal_matrix)
-number_of_spectra <- length(peaks)
-####################################### FILE VECTOR
-# Create the empty vector
-file_vector <- character()
-# Add the file names recursively, scrolling the whole spectral dataset
-for (i in 1:length(peaks)) {
-    # Check the length(if averaged, it contains the name of all the single spectra)
-    if (spectra_format == "imzml" || spectra_format == "imzML") {
-        if (length(peaks[[i]]@metaData$file[1]) == 1) {
-            file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
-        }
-        if (length(peaks[[i]]@metaData$file[1]) > 1) {
-            file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
-        }
-    }
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
-        if (length(peaks[[i]]@metaData$sampleName) == 1) {
-            file_vector <- append(file_vector, peaks[[i]]@metaData$sampleName)
-        }
-        if (length(peaks[[i]]@metaData$sampleName) > 1) {
-            file_vector <- append(file_vector, peaks[[i]]@metaData$sampleName[1])
-        }
-    }
-}
-################################## Only the sample
-if ((class_output==FALSE && sample_output==TRUE) || (class_output==TRUE && length(class_list)==0 && sample_output==TRUE)) {
-	# Create the sample matrix column and append it to the global matrix
-    if ("sample" %in% row_labels) {
-    	rownames(signal_matrix) <- file_vector
-    } else {
-        sample_column <- matrix (0, ncol=1, nrow=number_of_spectra)
-        colnames(sample_column) <- "Sample"
-    	sample_column [,1] <- cbind(file_vector)
-    	signal_matrix <- cbind(signal_matrix, sample_column)
-    }
-}
-################################## Both the class and the sample
-if (class_output==TRUE && length(class_list)>=1 && sample_output==TRUE) {
-	# Create the sample matrix column and append it to the global matrix
-    if (row_labels == "sample") {
-        rownames(signal_matrix) <- file_vector
-    } else {
-        sample_column <- matrix (0, ncol=1, nrow=number_of_spectra)
-    	colnames(sample_column) <- "Sample"
-    	sample_column [,1] <- cbind(file_vector)
-    	signal_matrix <- cbind(signal_matrix, sample_column)
-    }
-	### Add the class column
-	class_list <- sort(class_list)
-    # Rename the classes according to the class_list vector
-    class_vector <- file_vector
-    for (p in 1:length(class_vector)) {
-        for (w in 1:length(class_list)) {
-            if (length(grep(class_list[w],class_vector[p], ignore.case=TRUE)) == 1) {
-                class_vector[p] <- class_list [w]
-            }
-        }
-    }
-    if (row_labels == "class") {
-        rownames(signal_matrix) <- class_vector
-    } else {
-        class_column <- matrix (0, ncol=1, nrow=number_of_spectra)
-    	colnames(class_column) <- "Class"
-    	# Fill in the matrix column with the file_vector classes and samples
-    	class_column [,1] <- cbind(class_vector)
-    	signal_matrix <- cbind(signal_matrix, class_column)
-    }
-}
-################################## Only the class
-if (class_output==TRUE && length(class_list)>=1 && sample_output==FALSE) {
-	class_list <- sort(class_list)
-    # Rename the classes according to the class_list vector
-	class_vector <- vector(length=0)
-	for (w in 1:length(class_list)) {
-		for (p in 1:length(file_vector)) {
-			if (length(grep(class_list[w],file_vector[p], ignore.case=TRUE)) !=0) {
-				class_vector[p] <- class_list [w]
+	# Convert the input matrix/dataframe into a matrix
+	signal_matrix <- as.matrix(signal_matrix)
+	# Determine the number of spectra/peaklists
+	if (isMassPeaksList(peaks)) {
+		number_of_spectra <- length(peaks)
+	} else if (isMassPeaks(peaks)) {
+		number_of_spectra <- 1
+	}
+	####################################### FILE VECTOR
+	# Create the empty vector
+	file_vector <- character()
+	# Add the file names recursively, scrolling the whole spectral dataset
+	if (isMassPeaksList(peaks)) {
+		for (i in 1:length(peaks)) {
+			if (spectra_format == "imzml" || spectra_format == "imzML") {
+				file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
+			} else if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+				file_vector <- append(file_vector, peaks[[i]]@metaData$sampleName[1])
 			}
 		}
+	} else if (isMassPeaks(peaks)) {
+		if (spectra_format == "imzml" || spectra_format == "imzML") {
+			file_vector <- append(file_vector, peaks@metaData$file[1])
+		} else if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+			file_vector <- append(file_vector, peaks@metaData$sampleName[1])
+		}
 	}
-    if ("class" %in% row_labels) {
-        rownames(signal_matrix) <- class_vector
-    } else {
-        ### Add the class column
-    	class_column <- matrix (0, ncol=1, nrow=number_of_spectra)
-    	colnames(class_column) <- "Class"
-    	# Fill in the matrix column with the file_vector classes and samples
-    	class_column [,1] <- cbind(class_vector)
-    	signal_matrix <- cbind(signal_matrix, class_column)
-    }
-}
-### Add these matrix columns to the peaklist matrix
-return (signal_matrix)
+	################################## Only the sample
+	if ((class_output == FALSE && sample_output == TRUE) || (class_output == TRUE && length(class_list) == 0 && sample_output == TRUE)) {
+		# Create the sample matrix column and append it to the global matrix
+		# Sample as rownames
+		if ("sample" %in% row_labels) {
+			rownames(signal_matrix) <- file_vector
+		} else {
+			sample_column <- matrix("", ncol = 1, nrow = number_of_spectra)
+			colnames(sample_column) <- "Sample"
+			sample_column[,1] <- cbind(file_vector)
+			signal_matrix <- cbind(signal_matrix, sample_column)
+		}
+	}
+	################################## Both the class and the sample
+	if (class_output == TRUE && length(class_list) >= 1 && sample_output == TRUE) {
+		# Create the sample matrix column and append it to the global matrix
+		# Sample as rownames
+		if (row_labels == "sample") {
+		rownames(signal_matrix) <- file_vector
+		} else {
+			sample_column <- matrix("", ncol = 1, nrow = number_of_spectra)
+			colnames(sample_column) <- "Sample"
+			sample_column[,1] <- cbind(file_vector)
+			signal_matrix <- cbind(signal_matrix, sample_column)
+		}
+		### Add the class column
+		class_list <- sort(class_list)
+		# Rename the classes according to the class_list vector (the match should be /class/ to avoid catching the name of the class in previous folders)
+		class_vector <- file_vector
+		for (p in 1:length(class_vector)) {
+			for (w in 1:length(class_list)) {
+				if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+					if (length(grep(paste("/", class_list[w], "/", sep = ""), class_vector[p], ignore.case = TRUE)) > 0) {
+						class_vector[p] <- class_list[w]
+					}
+				} else if (Sys.info()[1] == "Windows") {
+					if (length(grep(paste("\\\\", class_list[w], "\\\\", sep = ""), class_vector[p], ignore.case = TRUE)) > 0) {
+						class_vector[p] <- class_list[w]
+					}
+				}
+			}
+		}
+		# Class as rownames
+		if (row_labels == "class") {
+			rownames(signal_matrix) <- class_vector
+		} else {
+			class_column <- matrix("", ncol = 1, nrow = number_of_spectra)
+			colnames(class_column) <- "Class"
+			# Fill in the matrix column with the file_vector classes and samples
+			class_column[,1] <- cbind(class_vector)
+			signal_matrix <- cbind(signal_matrix, class_column)
+		}
+	}
+	################################## Only the class
+	if (class_output == TRUE && length(class_list) >= 1 && sample_output == FALSE) {
+		class_list <- sort(class_list)
+		# Rename the classes according to the class_list vector (the match should be /class/ to avoid catching the name of the class in previous folders)
+		class_vector <- file_vector
+		for (p in 1:length(class_vector)) {
+			for (w in 1:length(class_list)) {
+				if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+					if (length(grep(paste("/", class_list[w], "/", sep = ""), class_vector[p], ignore.case = TRUE)) > 0) {
+						class_vector[p] <- class_list[w]
+					}
+				} else if (Sys.info()[1] == "Windows") {
+					if (length(grep(paste("\\\\", class_list[w], "\\\\", sep = ""), class_vector[p], ignore.case = TRUE)) > 0) {
+						class_vector[p] <- class_list[w]
+					}
+				}
+			}
+		}
+		if ("class" %in% row_labels) {
+			rownames(signal_matrix) <- class_vector
+		} else {
+			### Add the class column
+			class_column <- matrix("", ncol = 1, nrow = number_of_spectra)
+			colnames(class_column) <- "Class"
+			# Fill in the matrix column with the file_vector classes and samples
+			class_column[,1] <- cbind(class_vector)
+			signal_matrix <- cbind(signal_matrix, class_column)
+		}
+	}
+	### Add these matrix columns to the peaklist matrix
+	return(signal_matrix)
 }
 
 
@@ -811,303 +828,307 @@ return (list (vector=v, outliers_position=outliers_position))
 ######################################### PEAK STATISTICS (on processed Spectra)
 # This function computes the peak statistics onto a selected spectra dataset (or to the provided peaks), both when the spectra belong to no (or one) class and more classes.
 peak_statistics <- function (spectra, peaks=NULL, SNR=3, peak_picking_algorithm="SuperSmoother", class_list=NULL, class_in_file_name=TRUE, tof_mode="linear", spectra_format="imzml", exclude_spectra_without_peak=FALSE, alignment_iterations=5, peaks_filtering=TRUE, frequency_threshold_percent=25, remove_outliers=TRUE, low_intensity_peaks_removal=FALSE, intensity_threshold_percent=0.1, intensity_threshold_method="element_wise") {
-########## Load the required libraries
-install_and_load_required_packages(c("MALDIquant", "stats"))
-########## Rename the trim function
-trim_spectra <- get(x="trim", pos="package:MALDIquant")
-########## Define the tolerance in PPM
-if (tof_mode =="linear" || tof_mode=="Linear" || tof_mode=="L") {
-	tolerance_ppm <- 2000
-} else if (tof_mode =="reflector" || tof_mode=="reflectron" || tof_mode=="R") {
-	tolerance_ppm <- 200
-}
-########## Determine the number of classes
-if (length(class_list) == 0 || length(class_list) == 1 || is.null(class_list)) {
-number_of_classes <- 1
-} else if (length(class_list) > 1) {
-	number_of_classes <- length(class_list)
-}
-########## Detect and Align Peaks
-if (is.null(peaks)) {
-	peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
-}
-peaks <- align_and_filter_peaks(peaks, tof_mode=tof_mode, alignment_iterations=alignment_iterations, peaks_filtering=peaks_filtering, frequency_threshold_percent=frequency_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_threshold_percent, intensity_threshold_method=intensity_threshold_method, reference_peaklist=NULL, spectra=NULL)
-# Generate the matrix (and convert it into a data frame)
-if (exclude_spectra_without_peak == FALSE) {
-	signal_matrix <- intensityMatrix(peaks, spectra)
-} else if (exclude_spectra_without_peak == TRUE) {
-	signal_matrix <- intensityMatrix(peaks)
-}
-# Peak vector
-#peak_vector <- as.numeric(names(signal_matrix))
-############################################################## ONE CLASS
-if (number_of_classes == 1) {
-	################################# FUNCTION for matrix APPLY (it will applied for each matrix column, for each peak)
-	peak_statistcs_function <- function (signal_matrix_column, signal_matrix, remove_outliers) {
-		# Generate the output matrix row
-		peak_stat_matrix_row <- matrix (0, nrow=1, ncol=7)
-		rownames(peak_stat_matrix_row) <- as.numeric(colnames(signal_matrix_column))
-		colnames(peak_stat_matrix_row) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles")
-		# Start the calculation
-		intensity_vector <- as.numeric(signal_matrix_column)
-		if (remove_outliers == TRUE) {
-			intensity_vector <- outliers_removal(intensity_vector)$vector
-		}
-		# Calculate the statistical parameters on the intensity values in the vector
-		# Normality
-		if (length(intensity_vector) >= 3 & length(intensity_vector) <= 5000) {
-			shapiro_test <- shapiro.test(intensity_vector)
-			if (shapiro_test$p.value < 0.05) {
-				distribution_type <- paste("Non-normal", "(Shapiro p-value:", round(shapiro_test$p.value,3), ")")
-			}
-			if (shapiro_test$p.value >= 0.05) {
-				distribution_type <- paste("Normal", "(Shapiro p-value:", round(shapiro_test$p.value,3), ")")
-			}
-		} else if (length(intensity_vector) < 3) {
-			distribution_type <- "Not determinable, number of samples too low"
-		} else if (length(intensity_vector) > 5000) {
-			distribution_type <- "Number of samples too high, assume it is normal"
-		}
-		# Other parameters
-		st_dev_intensity <- sd(intensity_vector, na.rm=TRUE)
-		summary_intensity_vector <- summary(intensity_vector)
-		mean_intensity <- summary_intensity_vector [4]
-		coeff_variation <- (st_dev_intensity / mean_intensity) *100
-		median_intensityensity <- summary_intensity_vector [3]
-		first_quartile <- summary_intensity_vector [2]
-		third_quartile <- summary_intensity_vector [5]
-		inter_quartile_range <- third_quartile - first_quartile
-		# Fill the matrix with the values
-		peak_stat_matrix_row [,1] <- distribution_type
-		peak_stat_matrix_row [,2] <- as.numeric(mean_intensity)
-		peak_stat_matrix_row [,3] <- as.numeric(st_dev_intensity)
-		peak_stat_matrix_row [,4] <- as.numeric(coeff_variation)
-		peak_stat_matrix_row [,5] <- as.numeric(median_intensityensity)
-		peak_stat_matrix_row [,6] <- as.numeric(inter_quartile_range)
-		peak_stat_matrix_row [,7] <- paste("1st quartile", first_quartile, "; 3rd quartile", third_quartile)
-		return (peak_stat_matrix_row)
+	########## Load the required libraries
+	install_and_load_required_packages(c("MALDIquant", "stats"))
+	########## Rename the trim function
+	trim_spectra <- get(x="trim", pos="package:MALDIquant")
+	########## Define the tolerance in PPM
+	if (tof_mode =="linear" || tof_mode=="Linear" || tof_mode=="L") {
+		tolerance_ppm <- 2000
+	} else if (tof_mode =="reflector" || tof_mode=="reflectron" || tof_mode=="R") {
+		tolerance_ppm <- 200
 	}
-	###############
-	# Fix the signal_matrix (Add the sample column)
-	signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, spectra_format=spectra_format, sample_output=TRUE, class_output=FALSE)
-	# Output matrix
-	peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-1), ncol=8)
-	rownames(peak_stat_matrix) <- as.numeric(colnames(signal_matrix)[1:(ncol(signal_matrix)-1)])
-	colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Sample")
-	# Only peaks
-	signal_matrix_peaks <- signal_matrix [,1:(ncol(signal_matrix)-1)]
-	# Apply the function (transpose the result matrix)
-	peak_stat_matrix <- t(apply(signal_matrix_peaks, MARGIN=2, FUN=function(x) peak_statistcs_function(x, signal_matrix, remove_outliers=remove_outliers)))
-	# Generate the intensity matrix with NA if the peak is not present in the spectra
-	intensity_matrix_with_na <- intensityMatrix(peaks)
-	spectra_counter_vector <- numeric()
-	for (pk in 1:ncol(intensity_matrix_with_na)) {
-		intensity_vector <- intensity_matrix_with_na[,pk]
-		spectra_counter_vector <- append(spectra_counter_vector, length(intensity_vector[!is.na(intensity_vector)]))
+	########## Determine the number of classes
+	if (length(class_list) == 0 || length(class_list) == 1 || is.null(class_list)) {
+	number_of_classes <- 1
+	} else if (length(class_list) > 1) {
+		number_of_classes <- length(class_list)
 	}
-	peak_stat_matrix <- cbind(peak_stat_matrix, spectra_counter_vector)
-	# Fix the column names
-	colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter")
-}
-############################################################ TWO OR MORE CLASSES
-# Every variable now is a list, each element of which corresponds to a certain value from a class
-# So every variable is a list with the same lengthof the class list (each element of the list
-# is referred to a class
-if (number_of_classes > 1) {
-	# Fix the signal_matrix (Add the sample column)
-	signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, class_list=class_list, spectra_format=spectra_format, sample_output=TRUE, class_output=TRUE)
-	# Output matrix
-	peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-2), ncol=14)
-	rownames(peak_stat_matrix) <- as.numeric(colnames(signal_matrix)[1:(ncol(signal_matrix)-2)])
-	colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median", "Interquartile Range (IQR)", "Spectra counter", "Class", "Homoscedasticity (parametric)", "Homoscedasticity (non-parametric)", "t-Test", "ANOVA", "Wilcoxon - Mann-Whitney test", "Kruskal-Wallis test")
-	# For each peak
-	for (p in 1:(ncol(signal_matrix)-2)) {
-		# Put the intensity of that peak into one vector per class (in a global list)
-		intensity_vector <- list()
-		# Scroll the peaklists and Add the peak intensity to a vector(one for each class)
-		for (l in 1:length(class_list)) {
-			# Allocate in the intensity vector the rows for that peak belonging to the certain class
-			intensity_vector[[l]] <- as.numeric(signal_matrix [signal_matrix[,ncol(signal_matrix)] == class_list[l],p])
-		}
-		if (remove_outliers == TRUE) {
-			for (i in 1:length(intensity_vector)) {
-				intensity_vector[[i]] <- outliers_removal(intensity_vector[[i]])
-				intensity_vector[[i]] <- intensity_vector[[i]]$vector
+	########## Detect (if not already provided) and Align Peaks
+	if (is.null(peaks)) {
+		peaks <- peak_picking(spectra, peak_picking_algorithm=peak_picking_algorithm, tof_mode=tof_mode, SNR=SNR)
+	}
+	peaks <- align_and_filter_peaks(peaks, tof_mode=tof_mode, alignment_iterations=alignment_iterations, peaks_filtering=peaks_filtering, frequency_threshold_percent=frequency_threshold_percent, low_intensity_peaks_removal=low_intensity_peaks_removal, intensity_threshold_percent=intensity_threshold_percent, intensity_threshold_method=intensity_threshold_method, reference_peaklist=NULL, spectra=spectra)
+	# Generate the matrix (and convert it into a data frame)
+	if (exclude_spectra_without_peak == FALSE) {
+		signal_matrix <- intensityMatrix(peaks, spectra)
+	} else if (exclude_spectra_without_peak == TRUE) {
+		signal_matrix <- intensityMatrix(peaks)
+	}
+	# Peak vector
+	if (is.matrix(signal_matrix)) {
+		peak_vector <- as.numeric(colnames(signal_matrix))
+	} else if (is.data.frame(signal_matrix)) {
+		peak_vector <- as.numeric(names(signal_matrix))
+	}
+	############################################################## ONE CLASS
+	if (number_of_classes == 1) {
+		################################# FUNCTION for matrix APPLY (it will applied for each matrix column, for each peak)
+		peak_statistcs_function <- function (signal_matrix_column, signal_matrix, remove_outliers) {
+			# Generate the output matrix row
+			peak_stat_matrix_row <- matrix (0, nrow=1, ncol=7)
+			rownames(peak_stat_matrix_row) <- as.numeric(colnames(signal_matrix_column))
+			colnames(peak_stat_matrix_row) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles")
+			# Start the calculation
+			intensity_vector <- as.numeric(signal_matrix_column)
+			if (remove_outliers == TRUE) {
+				intensity_vector <- outliers_removal(intensity_vector)$vector
 			}
-		}
-		######################## STATISTICAL PARAMETERS
-		############################################### Normality for each class
-		shapiro_test <- list()
-		distribution_type <- list()
-		for (l in 1:length(class_list)) {
-			if (length(intensity_vector[[l]]) >= 3 && length(intensity_vector[[l]]) <= 5000) {
-				shapiro_test[[l]] <- shapiro.test(intensity_vector[[l]])
-				if (shapiro_test[[l]]$p.value < 0.05) {
-				distribution_type[[l]] <- "Non-normal"
+			# Calculate the statistical parameters on the intensity values in the vector
+			# Normality
+			if (length(intensity_vector) >= 3 & length(intensity_vector) <= 5000) {
+				shapiro_test <- shapiro.test(intensity_vector)
+				if (shapiro_test$p.value < 0.05) {
+					distribution_type <- paste("Non-normal", "(Shapiro p-value:", round(shapiro_test$p.value,3), ")")
 				}
-				if (shapiro_test[[l]]$p.value >= 0.05) {
-				distribution_type[[l]] <- "Normal"
+				if (shapiro_test$p.value >= 0.05) {
+					distribution_type <- paste("Normal", "(Shapiro p-value:", round(shapiro_test$p.value,3), ")")
+				}
+			} else if (length(intensity_vector) < 3) {
+				distribution_type <- "Not determinable, number of samples too low"
+			} else if (length(intensity_vector) > 5000) {
+				distribution_type <- "Number of samples too high, assume it is normal"
+			}
+			# Other parameters
+			st_dev_intensity <- sd(intensity_vector, na.rm=TRUE)
+			summary_intensity_vector <- summary(intensity_vector)
+			mean_intensity <- summary_intensity_vector [4]
+			coeff_variation <- (st_dev_intensity / mean_intensity) *100
+			median_intensityensity <- summary_intensity_vector [3]
+			first_quartile <- summary_intensity_vector [2]
+			third_quartile <- summary_intensity_vector [5]
+			inter_quartile_range <- third_quartile - first_quartile
+			# Fill the matrix with the values
+			peak_stat_matrix_row [,1] <- distribution_type
+			peak_stat_matrix_row [,2] <- as.numeric(mean_intensity)
+			peak_stat_matrix_row [,3] <- as.numeric(st_dev_intensity)
+			peak_stat_matrix_row [,4] <- as.numeric(coeff_variation)
+			peak_stat_matrix_row [,5] <- as.numeric(median_intensityensity)
+			peak_stat_matrix_row [,6] <- as.numeric(inter_quartile_range)
+			peak_stat_matrix_row [,7] <- paste("1st quartile", first_quartile, "; 3rd quartile", third_quartile)
+			return (peak_stat_matrix_row)
+		}
+		###############
+		# Fix the signal_matrix (Add the sample column)
+		signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, spectra_format=spectra_format, sample_output=TRUE, class_output=FALSE)
+		# Output matrix
+		peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-1), ncol=8)
+		rownames(peak_stat_matrix) <- as.numeric(colnames(signal_matrix)[1:(ncol(signal_matrix)-1)])
+		colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Sample")
+		# Only peaks
+		signal_matrix_peaks <- signal_matrix [,1:(ncol(signal_matrix)-1)]
+		# Apply the function (transpose the result matrix)
+		peak_stat_matrix <- t(apply(signal_matrix_peaks, MARGIN=2, FUN=function(x) peak_statistcs_function(x, signal_matrix, remove_outliers=remove_outliers)))
+		# Generate the intensity matrix with NA if the peak is not present in the spectra
+		intensity_matrix_with_na <- intensityMatrix(peaks)
+		spectra_counter_vector <- numeric()
+		for (pk in 1:ncol(intensity_matrix_with_na)) {
+			intensity_vector <- intensity_matrix_with_na[,pk]
+			spectra_counter_vector <- append(spectra_counter_vector, length(intensity_vector[!is.na(intensity_vector)]))
+		}
+		peak_stat_matrix <- cbind(peak_stat_matrix, spectra_counter_vector)
+		# Fix the column names
+		colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median",  "Interquartile Range (IQR)", "Quartiles", "Spectra counter")
+	}
+	############################################################ TWO OR MORE CLASSES
+	# Every variable now is a list, each element of which corresponds to a certain value from a class
+	# So every variable is a list with the same length of the class list (each element of the list
+	# is referred to a class
+	if (number_of_classes > 1) {
+		# Fix the signal_matrix (Add the sample column)
+		signal_matrix <- matrix_add_class_and_sample(signal_matrix, peaks=peaks, class_list=class_list, spectra_format=spectra_format, sample_output=TRUE, class_output=TRUE)
+		# Output matrix
+		peak_stat_matrix <- matrix (0, nrow=(ncol(signal_matrix)-2), ncol=14)
+		rownames(peak_stat_matrix) <- as.numeric(colnames(signal_matrix)[1:(ncol(signal_matrix)-2)])
+		colnames(peak_stat_matrix) <- c("Intensity distribution type", "Mean", "Standard deviation", "Coefficient of Variation %", "Median", "Interquartile Range (IQR)", "Spectra counter", "Class", "Homoscedasticity (parametric)", "Homoscedasticity (non-parametric)", "t-Test", "ANOVA", "Wilcoxon - Mann-Whitney test", "Kruskal-Wallis test")
+		# For each peak
+		for (p in 1:(ncol(signal_matrix)-2)) {
+			# Put the intensity of that peak into one vector per class (in a global list)
+			intensity_vector <- list()
+			# Scroll the peaklists and Add the peak intensity to a vector(one for each class)
+			for (l in 1:length(class_list)) {
+				# Allocate in the intensity vector the rows for that peak belonging to the certain class
+				intensity_vector[[l]] <- as.numeric(signal_matrix [signal_matrix[,ncol(signal_matrix)] == class_list[l],p])
+			}
+			if (remove_outliers == TRUE) {
+				for (i in 1:length(intensity_vector)) {
+					intensity_vector[[i]] <- outliers_removal(intensity_vector[[i]])
+					intensity_vector[[i]] <- intensity_vector[[i]]$vector
 				}
 			}
-			if (length(intensity_vector[[l]]) < 3) {
-			distribution_type[[l]] <- "Not determinable, number of samples too low"
+			######################## STATISTICAL PARAMETERS
+			############################################### Normality for each class
+			shapiro_test <- list()
+			distribution_type <- list()
+			for (l in 1:length(class_list)) {
+				if (length(intensity_vector[[l]]) >= 3 && length(intensity_vector[[l]]) <= 5000) {
+					shapiro_test[[l]] <- shapiro.test(intensity_vector[[l]])
+					if (shapiro_test[[l]]$p.value < 0.05) {
+					distribution_type[[l]] <- "Non-normal"
+					}
+					if (shapiro_test[[l]]$p.value >= 0.05) {
+					distribution_type[[l]] <- "Normal"
+					}
+				}
+				if (length(intensity_vector[[l]]) < 3) {
+				distribution_type[[l]] <- "Not determinable, number of samples too low"
+				}
+				if (length(intensity_vector) > 5000) {
+				distribution_type[[l]] <- "Number of samples too high, assume it is normal"
+				}
 			}
-			if (length(intensity_vector) > 5000) {
-			distribution_type[[l]] <- "Number of samples too high, assume it is normal"
+			##################################################### Homoscedasticity
+			if (length(class_list) == 2) {
+				variance_test_parametric <- var.test(intensity_vector[[1]], intensity_vector[[2]])
 			}
-		}
-		##################################################### Homoscedasticity
-		if (length(class_list) == 2) {
-			variance_test_parametric <- var.test(intensity_vector[[1]], intensity_vector[[2]])
-		}
-		if (length(class_list) >= 2) {
-			variance_test_non_parametric <- bartlett.test(as.numeric(signal_matrix[,p]), g=as.factor(signal_matrix[,ncol(signal_matrix)]))
-		}
-		########################################### Other parameters (per class)
-		st_dev_intensity <- list()
-		summary_intensity_vector <- list()
-		mean_intensity <- list()
-		coeff_variation <- list()
-		median_intensityensity <- list()
-		first_quartile <- list()
-		third_quartile <- list()
-		inter_quartile_range <- list()
-		spectra_counter <- list()
-		variance <- list()
-		for (l in 1:length(class_list)) {
-			st_dev_intensity[[l]] <- sd(intensity_vector[[l]])
-			summary_intensity_vector [[l]] <- summary(intensity_vector[[l]])
-			mean_intensity[[l]] <- summary_intensity_vector[[l]] [4]
-			coeff_variation[[l]] <- (st_dev_intensity[[l]] / mean_intensity[[l]]) *100
-			median_intensityensity[[l]] <- summary_intensity_vector[[l]] [3]
-			first_quartile[[l]] <- summary_intensity_vector[[l]] [2]
-			third_quartile[[l]] <- summary_intensity_vector[[l]] [5]
-			inter_quartile_range[[l]] <- third_quartile[[l]] - first_quartile[[l]]
-			spectra_counter[[l]] <- length(intensity_vector[[l]])
-			variance[[l]] <- var(intensity_vector[[l]])
-		}
-		############################################# Parameters between classes
-		# T-test
-		if (length(class_list) == 2) {
-			t_test <- t.test(intensity_vector[[1]], intensity_vector[[2]])
-		}
-		# ANOVA TEST
-		if (length(class_list) >= 2) {
-		anova_test <- aov(signal_matrix[,p] ~ signal_matrix[,ncol(signal_matrix)])
-		}
-		# WILCOXON - MANN-WHITNEY TEST
-		if (length(class_list) == 2) {
-			wilcoxon_test <- wilcox.test(intensity_vector[[1]], intensity_vector[[2]])
-		}
-		# KRUSKAL-WALLIS TEST
-		if (length(class_list) >= 2) {
-			kruskal_wallis_test <- kruskal.test(signal_matrix[,p], g=as.factor(signal_matrix[,ncol(signal_matrix)]))
-		}
-		######################################## Fill the matrix with the values
-		# Distribution Type
-		distribution_type_name <- NULL
-		for (l in 1:length(class_list)) {
-			if (is.null(distribution_type_name)) {
-				distribution_type_name <- paste(distribution_type[[l]], " - ", class_list[l], sep="")
-			} else {
-				distribution_type_name <- paste(distribution_type_name, " , ", distribution_type[[l]], " - ", class_list[l], sep="")
+			if (length(class_list) >= 2) {
+				variance_test_non_parametric <- bartlett.test(as.numeric(signal_matrix[,p]), g=as.factor(signal_matrix[,ncol(signal_matrix)]))
 			}
-		}
-		peak_stat_matrix [p,1] <- paste(distribution_type_name)
-		# Mean
-		mean_intensity_name <- NULL
-		for (l in 1:length(class_list)) {
-			if (is.null(mean_intensity_name)) {
-				mean_intensity_name <- paste(mean_intensity[[l]], " - ", class_list[l], sep="")
-			} else {
-				mean_intensity_name <- paste(mean_intensity_name, " , ", mean_intensity[[l]], " - ", class_list[l], sep="")
+			########################################### Other parameters (per class)
+			st_dev_intensity <- list()
+			summary_intensity_vector <- list()
+			mean_intensity <- list()
+			coeff_variation <- list()
+			median_intensityensity <- list()
+			first_quartile <- list()
+			third_quartile <- list()
+			inter_quartile_range <- list()
+			spectra_counter <- list()
+			variance <- list()
+			for (l in 1:length(class_list)) {
+				st_dev_intensity[[l]] <- sd(intensity_vector[[l]])
+				summary_intensity_vector [[l]] <- summary(intensity_vector[[l]])
+				mean_intensity[[l]] <- summary_intensity_vector[[l]] [4]
+				coeff_variation[[l]] <- (st_dev_intensity[[l]] / mean_intensity[[l]]) *100
+				median_intensityensity[[l]] <- summary_intensity_vector[[l]] [3]
+				first_quartile[[l]] <- summary_intensity_vector[[l]] [2]
+				third_quartile[[l]] <- summary_intensity_vector[[l]] [5]
+				inter_quartile_range[[l]] <- third_quartile[[l]] - first_quartile[[l]]
+				spectra_counter[[l]] <- length(intensity_vector[[l]])
+				variance[[l]] <- var(intensity_vector[[l]])
 			}
-		}
-		peak_stat_matrix [p,2] <- mean_intensity_name
-		# Standard Deviation
-		st_dev_name <- NULL
-		for (l in 1:length(class_list)) {
-			if (is.null(st_dev_name)) {
-				st_dev_name <- paste(st_dev_intensity[[l]], " - ", class_list[l], sep="")
-			} else {
-				st_dev_name <- paste(st_dev_name, " , ", st_dev_intensity[[l]], " - ", class_list[l], sep="")
+			############################################# Parameters between classes
+			# T-test
+			if (length(class_list) == 2) {
+				t_test <- t.test(intensity_vector[[1]], intensity_vector[[2]])
 			}
-		}
-		peak_stat_matrix [p,3] <- st_dev_name
-		# Coefficient of Variation
-		coeff_variation_name <- NULL
-		for (l in 1:length(class_list)) {
-			if (is.null(coeff_variation_name)) {
-				coeff_variation_name <- paste(coeff_variation[[l]], " - ", class_list[l], sep="")
-			} else {
-				coeff_variation_name <- paste(coeff_variation_name, " , ", coeff_variation[[l]], " - ", class_list[l], sep="")
+			# ANOVA TEST
+			if (length(class_list) >= 2) {
+			anova_test <- aov(signal_matrix[,p] ~ signal_matrix[,ncol(signal_matrix)])
 			}
-		}
-		peak_stat_matrix [p,4] <- coeff_variation_name
-		# Median
-		median_intensityensity_name <- NULL
-		for (l in 1:length(class_list)) {
-			if (is.null(median_intensityensity_name)) {
-				median_intensityensity_name <- paste(median_intensityensity[[l]], " - ", class_list[l], sep="")
-			} else {
-				median_intensityensity_name <- paste(median_intensityensity_name, " , ", median_intensityensity[[l]], " - ", class_list[l], sep="")
+			# WILCOXON - MANN-WHITNEY TEST
+			if (length(class_list) == 2) {
+				wilcoxon_test <- wilcox.test(intensity_vector[[1]], intensity_vector[[2]])
 			}
-		}
-		peak_stat_matrix [p,5] <- median_intensityensity_name
-		# Interquartile Range (IQR)
-		inter_quartile_range_name <- NULL
-		for (l in 1:length(class_list)) {
-			if (is.null(inter_quartile_range_name)) {
-				inter_quartile_range_name <- paste(inter_quartile_range[[l]], " - ", class_list[l], sep="")
-			} else {
-				inter_quartile_range_name <- paste(inter_quartile_range_name, " , ", inter_quartile_range[[l]], " - ", class_list[l], sep="")
+			# KRUSKAL-WALLIS TEST
+			if (length(class_list) >= 2) {
+				kruskal_wallis_test <- kruskal.test(signal_matrix[,p], g=as.factor(signal_matrix[,ncol(signal_matrix)]))
 			}
-		}
-		peak_stat_matrix [p,6] <- inter_quartile_range_name
-		# Spectra counter
-		spectra_counter_name <- NULL
-		for (l in 1:length(class_list)) {
-			if (is.null(spectra_counter_name)) {
-				spectra_counter_name <- paste(spectra_counter[[l]], " - ", class_list[l], sep="")
-			} else {
-				spectra_counter_name <- paste(spectra_counter_name, " , ", spectra_counter[[l]], " - ", class_list[l], sep="")
+			######################################## Fill the matrix with the values
+			# Distribution Type
+			distribution_type_name <- NULL
+			for (l in 1:length(class_list)) {
+				if (is.null(distribution_type_name)) {
+					distribution_type_name <- paste(distribution_type[[l]], " - ", class_list[l], sep="")
+				} else {
+					distribution_type_name <- paste(distribution_type_name, " , ", distribution_type[[l]], " - ", class_list[l], sep="")
+				}
 			}
-		}
-		peak_stat_matrix [p,7] <- spectra_counter_name
-		# Class
-		class_name <- NULL
-		for (l in 1:length(class_list)) {
-			if (is.null(class_name)) {
-				class_name <- class_list[l]
-			} else {
-				class_name <- paste(class_name, " - ", class_list[l], sep="")
+			peak_stat_matrix [p,1] <- paste(distribution_type_name)
+			# Mean
+			mean_intensity_name <- NULL
+			for (l in 1:length(class_list)) {
+				if (is.null(mean_intensity_name)) {
+					mean_intensity_name <- paste(mean_intensity[[l]], " - ", class_list[l], sep="")
+				} else {
+					mean_intensity_name <- paste(mean_intensity_name, " , ", mean_intensity[[l]], " - ", class_list[l], sep="")
+				}
 			}
+			peak_stat_matrix [p,2] <- mean_intensity_name
+			# Standard Deviation
+			st_dev_name <- NULL
+			for (l in 1:length(class_list)) {
+				if (is.null(st_dev_name)) {
+					st_dev_name <- paste(st_dev_intensity[[l]], " - ", class_list[l], sep="")
+				} else {
+					st_dev_name <- paste(st_dev_name, " , ", st_dev_intensity[[l]], " - ", class_list[l], sep="")
+				}
+			}
+			peak_stat_matrix [p,3] <- st_dev_name
+			# Coefficient of Variation
+			coeff_variation_name <- NULL
+			for (l in 1:length(class_list)) {
+				if (is.null(coeff_variation_name)) {
+					coeff_variation_name <- paste(coeff_variation[[l]], " - ", class_list[l], sep="")
+				} else {
+					coeff_variation_name <- paste(coeff_variation_name, " , ", coeff_variation[[l]], " - ", class_list[l], sep="")
+				}
+			}
+			peak_stat_matrix [p,4] <- coeff_variation_name
+			# Median
+			median_intensityensity_name <- NULL
+			for (l in 1:length(class_list)) {
+				if (is.null(median_intensityensity_name)) {
+					median_intensityensity_name <- paste(median_intensityensity[[l]], " - ", class_list[l], sep="")
+				} else {
+					median_intensityensity_name <- paste(median_intensityensity_name, " , ", median_intensityensity[[l]], " - ", class_list[l], sep="")
+				}
+			}
+			peak_stat_matrix [p,5] <- median_intensityensity_name
+			# Interquartile Range (IQR)
+			inter_quartile_range_name <- NULL
+			for (l in 1:length(class_list)) {
+				if (is.null(inter_quartile_range_name)) {
+					inter_quartile_range_name <- paste(inter_quartile_range[[l]], " - ", class_list[l], sep="")
+				} else {
+					inter_quartile_range_name <- paste(inter_quartile_range_name, " , ", inter_quartile_range[[l]], " - ", class_list[l], sep="")
+				}
+			}
+			peak_stat_matrix [p,6] <- inter_quartile_range_name
+			# Spectra counter
+			spectra_counter_name <- NULL
+			for (l in 1:length(class_list)) {
+				if (is.null(spectra_counter_name)) {
+					spectra_counter_name <- paste(spectra_counter[[l]], " - ", class_list[l], sep="")
+				} else {
+					spectra_counter_name <- paste(spectra_counter_name, " , ", spectra_counter[[l]], " - ", class_list[l], sep="")
+				}
+			}
+			peak_stat_matrix [p,7] <- spectra_counter_name
+			# Class
+			class_name <- NULL
+			for (l in 1:length(class_list)) {
+				if (is.null(class_name)) {
+					class_name <- class_list[l]
+				} else {
+					class_name <- paste(class_name, " - ", class_list[l], sep="")
+				}
+			}
+			peak_stat_matrix [p,8] <- class_name
+			# Homoscedasticity (Parametric)
+			if (variance_test_parametric$p.value < 0.05) {
+			homoscedasticity_parametric <- paste("Non homoscedastic data", "(p-value:", variance_test_parametric$p.value, ")")
+			} else if (variance_test_parametric$p.value >= 0.05) {
+			homoscedasticity_parametric <- paste("Homoscedastic data", "(p-value:", variance_test_parametric$p.value, ")")
+			}
+			if (variance_test_non_parametric$p.value < 0.05) {
+			homoscedasticity_non_parametric <- paste("Non homoscedastic data", "(p-value:", variance_test_non_parametric$p.value, ")")
+			} else if (variance_test_non_parametric$p.value >= 0.05) {
+			homoscedasticity_non_parametric <- paste("Homoscedastic data", "(p-value:", variance_test_non_parametric$p.value, ")")
+			}
+			peak_stat_matrix [p,9] <- homoscedasticity_parametric
+			peak_stat_matrix [p,10] <- homoscedasticity_non_parametric
+			# t-Test
+			peak_stat_matrix [p,11] <- t_test$p.value
+			# ANOVA
+			peak_stat_matrix [p,12] <- summary(anova_test)[[1]]$"Pr(>F)"[1]
+			# Wilcoxon / Mann-Whitney test
+			peak_stat_matrix [p,13] <- wilcoxon_test$p.value
+			# Kruskal-Wallis test
+			peak_stat_matrix [p,14] <- kruskal_wallis_test$p.value
 		}
-		peak_stat_matrix [p,8] <- class_name
-		# Homoscedasticity (Parametric)
-		if (variance_test_parametric$p.value < 0.05) {
-		homoscedasticity_parametric <- paste("Non homoscedastic data", "(p-value:", variance_test_parametric$p.value, ")")
-		} else if (variance_test_parametric$p.value >= 0.05) {
-		homoscedasticity_parametric <- paste("Homoscedastic data", "(p-value:", variance_test_parametric$p.value, ")")
-		}
-		if (variance_test_non_parametric$p.value < 0.05) {
-		homoscedasticity_non_parametric <- paste("Non homoscedastic data", "(p-value:", variance_test_non_parametric$p.value, ")")
-		} else if (variance_test_non_parametric$p.value >= 0.05) {
-		homoscedasticity_non_parametric <- paste("Homoscedastic data", "(p-value:", variance_test_non_parametric$p.value, ")")
-		}
-		peak_stat_matrix [p,9] <- homoscedasticity_parametric
-		peak_stat_matrix [p,10] <- homoscedasticity_non_parametric
-		# t-Test
-		peak_stat_matrix [p,11] <- t_test$p.value
-		# ANOVA
-		peak_stat_matrix [p,12] <- summary(anova_test)[[1]]$"Pr(>F)"[1]
-		# Wilcoxon / Mann-Whitney test
-		peak_stat_matrix [p,13] <- wilcoxon_test$p.value
-		# Kruskal-Wallis test
-		peak_stat_matrix [p,14] <- kruskal_wallis_test$p.value
 	}
-}
-return (peak_stat_matrix)
+	return(peak_stat_matrix)
 }
 
 
@@ -4190,7 +4211,7 @@ spectral_classification_pixelbypixel <- function (spectra_path, filepath_R, list
 					features_model[f] <- feature_def
 				}
 				########## SINGLE PIXEL CLASSIFICATION
-				if (pixel_grouping == "single") {
+				if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(sample_spectra)) {
 					### Generate the intensity matrix with the features from the model
 					final_sample_matrix <- generate_custom_intensity_matrix(sample_spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, multicore_processing = multicore_processing)
 					# Put the X at the beginning of the peak names
@@ -4398,7 +4419,7 @@ spectral_classification_pixelbypixel <- function (spectra_path, filepath_R, list
 					features_model[f] <- feature_def
 				}
 				########## SINGLE PIXEL CLASSIFICATION
-				if (pixel_grouping == "single") {
+				if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(sample_spectra)) {
 					### Generate the intensity matrix with the features from the model
 					final_sample_matrix <- generate_custom_intensity_matrix(sample_spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, multicore_processing = multicore_processing)
 					### Put the X at the beginning of the peak names
@@ -4607,7 +4628,7 @@ spectral_classification_pixelbypixel <- function (spectra_path, filepath_R, list
 					features_model[f] <- feature_def
 				}
 				########## SINGLE PIXEL CLASSIFICATION
-				if (pixel_grouping == "single") {
+				if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(sample_spectra)) {
 					### Generate the intensity matrix with the features from the model
 					final_sample_matrix <- generate_custom_intensity_matrix(sample_spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, multicore_processing = multicore_processing)
 					# Put the X at the beginning of the peak names
@@ -4816,7 +4837,7 @@ spectral_classification_pixelbypixel <- function (spectra_path, filepath_R, list
 					features_model[f] <- feature_def
 				}
 				########## SINGLE PIXEL CLASSIFICATION
-				if (pixel_grouping == "single") {
+				if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(sample_spectra)) {
 					### Generate the intensity matrix with the features from the model
 					final_sample_matrix <- generate_custom_intensity_matrix(sample_spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, multicore_processing = multicore_processing)
 					# Put the X at the beginning of the peak names
@@ -5025,7 +5046,7 @@ spectral_classification_pixelbypixel <- function (spectra_path, filepath_R, list
 					features_model[f] <- feature_def
 				}
 				########## SINGLE PIXEL CLASSIFICATION
-				if (pixel_grouping == "single") {
+				if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(sample_spectra)) {
 					### Generate the intensity matrix with the features from the model
 					final_sample_matrix <- generate_custom_intensity_matrix(sample_spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, multicore_processing = multicore_processing)
 					# Put the X at the beginning of the peak names
@@ -5234,7 +5255,7 @@ spectral_classification_pixelbypixel <- function (spectra_path, filepath_R, list
 					features_model[f] <- feature_def
 				}
 				########## SINGLE PIXEL CLASSIFICATION
-				if (pixel_grouping == "single") {
+				if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(sample_spectra)) {
 					### Generate the intensity matrix with the features from the model
 					final_sample_matrix <- generate_custom_intensity_matrix(sample_spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, multicore_processing = multicore_processing)
 					# Put the X at the beginning of the peak names
@@ -5443,7 +5464,7 @@ spectral_classification_pixelbypixel <- function (spectra_path, filepath_R, list
 					features_model[f] <- feature_def
 				}
 				########## SINGLE PIXEL CLASSIFICATION
-				if (pixel_grouping == "single") {
+				if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(sample_spectra)) {
 					### Generate the intensity matrix with the features from the model
 					final_sample_matrix <- generate_custom_intensity_matrix(sample_spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, multicore_processing = multicore_processing)
 					# Put the X at the beginning of the peak names
