@@ -9768,7 +9768,7 @@ run_peaklist_export_function <- function() {
 		# Save the files (CSV)
 		if (file_type_export == "csv") {
 			filename <- set_file_name()
-			    write.csv(peaklist, file=filename)
+			write.csv(peaklist, file=filename, row.names = FALSE)
 		} else if (file_type_export == "xlsx" || file_type_export == "xls") {
 		# Save the files (Excel)
 			filename <- set_file_name()
