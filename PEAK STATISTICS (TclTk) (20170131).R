@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2017.01.24
+###################### FUNCTIONS - MASS SPECTROMETRY 2017.01.31
 
 # Update the packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
@@ -8714,7 +8714,9 @@ return(adjacency_matrix)
 
 ############################### GENERATE A CUSTOM INTENSITY MATRIX
 # The function takes a list of spectra and a vector of custom features to be included in the generation of the final peaklist intensity matrix. The functions takes the spectra, preprocesses the spectra according to the specified parameters, performs the peak picking and outputs the intensity matrix only for the peaks specified as input (not all of those custom peaks if they are outside of the spectral mass range).
-generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NULL, tof_mode = "linear", spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalisation_algorithm = "TIC", normalisation_mass_range = NULL), peak_picking_algorithm = "SuperSmoother", peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 10, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = length(spectra), multicore_processing = FALSE) {
+# If the range provided is too large, the function will return a NULL value, since some custom features cannot be found.
+# This function is suited for aligning the spectral features (of an unknown dataset) with the model features.
+generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NULL, tof_mode = "linear", spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalisation_algorithm = "TIC", normalisation_mass_range = NULL), peak_picking_algorithm = "SuperSmoother", peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 10, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", process_in_packages_of = 0, multicore_processing = FALSE) {
 	### Install the required packages
 	install_and_load_required_packages("MALDIquant")
 	# Rename the trim function
@@ -8743,7 +8745,6 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
 	}
 	### Run the alignment only if the vector of custom features is not null
 	if (!is.null(custom_feature_vector)) {
-		### Check the compatibility between the spectra and the provided mass list
 		# Convert the custom feature vector in numeric
 		custom_feature_vector <- as.numeric(custom_feature_vector)
 		# Retrieve the peaks in the spectral dataset
@@ -8756,104 +8757,121 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
 				custom_feature_vector_final <- append(custom_feature_vector_final, custom_feature_vector[f])
 			}
 		}
-		# Fix the original custom feature vector
-		custom_feature_vector <- as.character(custom_feature_vector_final)
-		### Determine the columns to keep and the column to add
-		features_to_keep <- numeric()
-		features_to_add <- numeric()
-		adjusted_features_to_keep <- numeric()
-		# For each feature in the custom feature vector
-		for (csft in custom_feature_vector) {
-			# Set the default presence of the signal in the sample to FALSE
-			presence <- FALSE
-			# Scroll the sample features
-			for (ft in colnames(peaklist_matrix)) {
-				# If there is a match
-				if (abs((as.numeric(csft)-as.numeric(ft))*10^6/as.numeric(csft)) <= tolerance_ppm) {
-					# Add it to the features to keep
-					features_to_keep <- append(features_to_keep, ft)
-					# Align the feature in the sample with the one in the custom feature vector
-					ft <- csft
-					# Add it to another list (it will be used to adjust the column names in the final sample peaklist)
-					adjusted_features_to_keep <- append(adjusted_features_to_keep, ft)
-					# Set the presence of the signal in the sample to TRUE
-					presence <- TRUE
-					# Avoid consecutive duplicates (once it is found there is no point in keep going)
-					break
-				}
-			}
-			# If after all the signal in the custom feature vector is not found in the sample
-			if (presence == FALSE) {
-				# Add this to the features to be added
-				features_to_add <- append(features_to_add, csft)
-			}
-		}
-		### Generate the final sample matrix (with the right column names)
-		if (length(features_to_keep) > 0) {
-			final_peaklist_matrix <- as.matrix(rbind(peaklist_matrix [,features_to_keep]))
-			colnames(final_peaklist_matrix) <- adjusted_features_to_keep
+		### Check the compatibility between the spectra and the provided mass list
+		# Isolate the dataset features (sorted)
+		spectral_dataset_features <- sort(as.numeric(colnames(peaklist_matrix)))
+		# Sort the custom features
+		custom_feature_vector_final <- sort(as.numeric(custom_feature_vector_final))
+		# Define the compatibility
+		if (spectral_dataset_features[1] <= custom_feature_vector_final[1] && spectral_dataset_features[length(spectral_dataset_features)] >= custom_feature_vector_final[length(custom_feature_vector_final)]) {
+			feature_compatibility <- TRUE
 		} else {
-			final_peaklist_matrix <- NULL
+			feature_compatibility <- FALSE
 		}
-		### Add the missing features
-		## Multiple spectra
-		if (isMassSpectrumList(spectra)) {
-			# If there are features to add...
-			if (length(features_to_add > 0)) {
-				# Generate a fake spectrum and a fake peaklist with the features to add
-				fake_spectrum <- createMassSpectrum(mass=spectra[[1]]@mass, intensity=spectra[[1]]@intensity, metaData=list(name="Fake spectrum"))
-				fake_peaks <- createMassPeaks(mass=as.numeric(features_to_add), intensity=rep(1, length(features_to_add)), snr=rep(3, length(features_to_add)), metaData=list(name="Fake peaklist"))
-				# Detect the peaks in the spectra
-				peaks <- detectPeaks(spectra, method="SuperSmoother", SNR=3)
-				# Append the fake spectrum and the fake peaklist to he original lists
-				spectra_all <- append(spectra, fake_spectrum)
-				peaks_all <- append(peaks, fake_peaks)
-				# Generate the intensity matrix
-				intensity_matrix_all <- intensityMatrix(peaks_all, spectra_all)
-				# Remove the last row (corresponding to the fake spectrum)
-				intensity_matrix_all <- intensity_matrix_all[1:(nrow(intensity_matrix_all)-1),]
-				# Keep only the columns that are corresponding to the desired features
-				final_intensity_matrix <- intensity_matrix_all[,features_to_add]
-				# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
-				if (is.null(final_peaklist_matrix)) {
-					final_peaklist_matrix <- final_peaklist_matrix
-				} else {
-					# If the final matrix exists, append the feature column to the matrix
-					final_peaklist_matrix <- cbind(final_peaklist_matrix, final_intensity_matrix)
+		### If there is feature compatibility...
+		if (feature_compatibility == TRUE) {
+			# Fix the original custom feature vector
+			custom_feature_vector <- as.character(custom_feature_vector_final)
+			### Determine the columns to keep and the column to add
+			features_to_keep <- numeric()
+			features_to_add <- numeric()
+			adjusted_features_to_keep <- numeric()
+			# For each feature in the custom feature vector
+			for (csft in custom_feature_vector) {
+				# Set the default presence of the signal in the sample to FALSE
+				presence <- FALSE
+				# Scroll the sample features
+				for (ft in colnames(peaklist_matrix)) {
+					# If there is a match
+					if (abs((as.numeric(csft)-as.numeric(ft))*10^6/as.numeric(csft)) <= tolerance_ppm) {
+						# Add it to the features to keep
+						features_to_keep <- append(features_to_keep, ft)
+						# Align the feature in the sample with the one in the custom feature vector
+						ft <- csft
+						# Add it to another list (it will be used to adjust the column names in the final sample peaklist)
+						adjusted_features_to_keep <- append(adjusted_features_to_keep, ft)
+						# Set the presence of the signal in the sample to TRUE
+						presence <- TRUE
+						# Avoid consecutive duplicates (once it is found there is no point in keep going)
+						break
+					}
+				}
+				# If after all the signal in the custom feature vector is not found in the sample
+				if (presence == FALSE) {
+					# Add this to the features to be added
+					features_to_add <- append(features_to_add, csft)
 				}
 			}
-		} else if (isMassSpectrum(spectra)) {
-			# If there are features to add...
-			if (length(features_to_add > 0)) {
-				# Scroll the features to add (in the model but not in the sample)
-				for (f in 1:length(features_to_add)) {
-					# Initialise the output
-					x_intensity <- NA
-					# Scroll the mass list of each spectrum
-					for (m in 1:length(spectra@mass)) {
-						# If there is a match
-						if (abs(spectra@mass[m]-as.numeric(features_to_add[f]))*10^6/as.numeric(features_to_add[f]) <= tolerance_ppm) {
-							# Store the corresponding intensity and generate the matrix column
-							x_intensity <- as.matrix(cbind(spectra@intensity[m]))
-							colnames(x_intensity) <- features_to_add[f]
-							# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
-							if (is.null(final_peaklist_matrix)) {
-								final_peaklist_matrix <- cbind(x_intensity)
-							} else {
-								# If the final matrix exists, append the feature column to the matrix
-								final_peaklist_matrix <- cbind(final_peaklist_matrix, x_intensity)
+			### Generate the final sample matrix (with the right column names)
+			if (length(features_to_keep) > 0) {
+				final_peaklist_matrix <- as.matrix(rbind(peaklist_matrix [,features_to_keep]))
+				colnames(final_peaklist_matrix) <- adjusted_features_to_keep
+			} else {
+				final_peaklist_matrix <- NULL
+			}
+			### Add the missing features
+			## Multiple spectra
+			if (isMassSpectrumList(spectra)) {
+				# If there are features to add...
+				if (length(features_to_add > 0)) {
+					# Generate a fake spectrum and a fake peaklist with the features to add
+					fake_spectrum <- createMassSpectrum(mass=spectra[[1]]@mass, intensity=spectra[[1]]@intensity, metaData=list(name="Fake spectrum"))
+					fake_peaks <- createMassPeaks(mass=as.numeric(features_to_add), intensity=rep(1, length(features_to_add)), snr=rep(3, length(features_to_add)), metaData=list(name="Fake peaklist"))
+					# Detect the peaks in the spectra
+					peaks <- detectPeaks(spectra, method="SuperSmoother", SNR=3)
+					# Append the fake spectrum and the fake peaklist to he original lists
+					spectra_all <- append(spectra, fake_spectrum)
+					peaks_all <- append(peaks, fake_peaks)
+					# Generate the intensity matrix
+					intensity_matrix_all <- intensityMatrix(peaks_all, spectra_all)
+					# Remove the last row (corresponding to the fake spectrum)
+					intensity_matrix_all <- intensity_matrix_all[1:(nrow(intensity_matrix_all)-1),]
+					# Keep only the columns that are corresponding to the desired features
+					final_intensity_matrix <- intensity_matrix_all[,features_to_add]
+					# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
+					if (is.null(final_peaklist_matrix)) {
+						final_peaklist_matrix <- final_peaklist_matrix
+					} else {
+						# If the final matrix exists, append the feature column to the matrix
+						final_peaklist_matrix <- cbind(final_peaklist_matrix, final_intensity_matrix)
+					}
+				}
+			} else if (isMassSpectrum(spectra)) {
+				# If there are features to add...
+				if (length(features_to_add > 0)) {
+					# Scroll the features to add (in the model but not in the sample)
+					for (f in 1:length(features_to_add)) {
+						# Initialise the output
+						x_intensity <- NA
+						# Scroll the mass list of each spectrum
+						for (m in 1:length(spectra@mass)) {
+							# If there is a match
+							if (abs(spectra@mass[m]-as.numeric(features_to_add[f]))*10^6/as.numeric(features_to_add[f]) <= tolerance_ppm) {
+								# Store the corresponding intensity and generate the matrix column
+								x_intensity <- as.matrix(cbind(spectra@intensity[m]))
+								colnames(x_intensity) <- features_to_add[f]
+								# If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
+								if (is.null(final_peaklist_matrix)) {
+									final_peaklist_matrix <- cbind(x_intensity)
+								} else {
+									# If the final matrix exists, append the feature column to the matrix
+									final_peaklist_matrix <- cbind(final_peaklist_matrix, x_intensity)
+								}
+								# Do not keep searching
+								break
 							}
-							# Do not keep searching
-							break
 						}
 					}
 				}
 			}
+			### Return the final matrix with the custom features
+			return(final_peaklist_matrix)
+		} else {
+			### Return a NULL value if features are not compatible
+			return(NULL)
 		}
-		### Return the final matrix with the custom features
-		return(final_peaklist_matrix)
 	} else {
-		### Return the simple peaklist matrix
+		### Return the simple peaklist matrix if no custom vector is provided
 		return(peaklist_matrix)
 	}
 }
@@ -8993,15 +9011,15 @@ partition_spectral_dataset <- function(spectra, partitioning_method = c("space",
 				rownames(rectangle_coordinates) <- c("min", "max")
 				colnames(rectangle_coordinates) <- c("x", "y") 
 				##### Split the dataset based upon the the WIDEST coordinate
-				if (rectangle_coordinates[2,1] >= rectangle_coordinates[2,2]) {
+				if (abs(rectangle_coordinates[2,1] - rectangle_coordinates[1,1]) >= abs(rectangle_coordinates[2,2] - rectangle_coordinates[1,2])) {
 					widest_coordinate <- "x"
-				} else if (rectangle_coordinates[2,2] > rectangle_coordinates[2,1]) {
+				} else {
 					widest_coordinate <- "y"
 				}
 				### X coordinate is the widest
 				if (widest_coordinate == "x") {
 					# Define the intervals
-					interval_width <- ceiling((rectangle_coordinates[2,1] - rectangle_coordinates[1,1])/number_of_partitions)
+					interval_width <- ceiling(abs(rectangle_coordinates[2,1] - rectangle_coordinates[1,1])/number_of_partitions)
 					# Define the separating points
 					interval_points <- seq.int(from = rectangle_coordinates[1,1], to = rectangle_coordinates[2,1], by = interval_width)
 					# Add the maximum coordinate to the interval points (if not already present)
@@ -9054,7 +9072,7 @@ partition_spectral_dataset <- function(spectra, partitioning_method = c("space",
 						# Scroll the spectra...
 						for (s in 1:length(spectra)) {
 							# Populate the list...
-							if (spectra[[s]]@metaData$imaging$pos[1] >= interval_points[p] && spectra[[s]]@metaData$imaging$pos[1] < interval_points[p + 1]) {
+							if (spectra[[s]]@metaData$imaging$pos[2] >= interval_points[p] && spectra[[s]]@metaData$imaging$pos[2] < interval_points[p + 1]) {
 								spectra_interval <- append(spectra_interval, spectra[[s]])
 							}
 						}
@@ -9063,7 +9081,7 @@ partition_spectral_dataset <- function(spectra, partitioning_method = c("space",
 							# Scroll the spectra...
 							for (s in 1:length(spectra)) {
 								# Populate the list...
-								if (spectra[[s]]@metaData$imaging$pos[1] == interval_points[p + 1]) {
+								if (spectra[[s]]@metaData$imaging$pos[2] == interval_points[p + 1]) {
 									spectra_interval <- append(spectra_interval, spectra[[s]])
 								}
 							}
@@ -9192,7 +9210,7 @@ partition_spectral_dataset <- function(spectra, partitioning_method = c("space",
 
 
 
-############################ PEAK STATISTICS 2017.01.24
+############################ PEAK STATISTICS 2017.01.31
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 
@@ -9209,7 +9227,7 @@ update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
 
 
 
-###################################### Initialize the variables (default values)
+###################################### Initialise the variables (default values)
 filepath_import <- NULL
 tof_mode <- "linear"
 filepath_export <- NULL
@@ -9298,7 +9316,7 @@ preprocessing_window_function <- function() {
 		} else {
 			transform_data_value <- "    NO    "
 		}
-		transform_data_value_label <- tklabel(preproc_window, text=transform_data_value)
+		transform_data_value_label <- tklabel(preproc_window, text=transform_data_value, font = label_font)
 		tkgrid(transform_data_value_label, row=3, column=2)
 		# Escape the function
 		.GlobalEnv$transform_data <- transform_data
@@ -9332,7 +9350,7 @@ preprocessing_window_function <- function() {
 		} else {
 			smoothing_value <- "    NO    "
 		}
-		smoothing_value_label <- tklabel(preproc_window, text=smoothing_value)
+		smoothing_value_label <- tklabel(preproc_window, text=smoothing_value, font = label_font)
 		tkgrid(smoothing_value_label, row=4, column=2)
 		# Escape the function
 		.GlobalEnv$smoothing <- smoothing
@@ -9371,7 +9389,7 @@ preprocessing_window_function <- function() {
 		} else {
 			baseline_subtraction_value <- "    NO    "
 		}
-		baseline_subtraction_value_label <- tklabel(preproc_window, text=baseline_subtraction_value)
+		baseline_subtraction_value_label <- tklabel(preproc_window, text=baseline_subtraction_value, font = label_font)
 		tkgrid(baseline_subtraction_value_label, row=5, column=3)
 		# Escape the function
 		.GlobalEnv$baseline_subtraction <- baseline_subtraction
@@ -9414,7 +9432,7 @@ preprocessing_window_function <- function() {
 		} else {
 			normalisation_value <- "    NO    "
 		}
-		normalisation_value_label <- tklabel(preproc_window, text=normalisation_value)
+		normalisation_value_label <- tklabel(preproc_window, text=normalisation_value, font = label_font)
 		tkgrid(normalisation_value_label, row=6, column=3)
 		# Escape the function
 		.GlobalEnv$normalisation <- normalisation
@@ -9444,7 +9462,7 @@ preprocessing_window_function <- function() {
 		} else {
 			spectral_alignment_value <- "   NO   "
 		}
-		spectral_alignment_value_label <- tklabel(preproc_window, text=spectral_alignment_value)
+		spectral_alignment_value_label <- tklabel(preproc_window, text=spectral_alignment_value, font = label_font)
 		tkgrid(spectral_alignment_value_label, row=8, column=2)
 		# Escape the function
 		.GlobalEnv$spectral_alignment <- spectral_alignment
@@ -9467,7 +9485,7 @@ preprocessing_window_function <- function() {
 		if (tof_mode_value == "linear") {
 			tof_mode_value <- "   linear   "
 		}
-		tof_mode_value_label <- tklabel(preproc_window, text=tof_mode_value)
+		tof_mode_value_label <- tklabel(preproc_window, text=tof_mode_value, font = label_font)
 		tkgrid(tof_mode_value_label, row=2, column=3)
 		# Escape the function
 		.GlobalEnv$tof_mode <- tof_mode
@@ -9499,39 +9517,39 @@ preprocessing_window_function <- function() {
 	preproc_window <- tktoplevel()
 	tktitle(preproc_window) <- "Spectra preprocessing parameters"
 	# Mass range
-	mass_range_label <- tklabel(preproc_window, text="Mass range")
-	mass_range_entry <- tkentry(preproc_window, width=15, textvariable=mass_range2)
+	mass_range_label <- tklabel(preproc_window, text="Mass range", font = label_font)
+	mass_range_entry <- tkentry(preproc_window, width=15, textvariable=mass_range2, font = entry_font)
 	tkinsert(mass_range_entry, "end", as.character(paste(mass_range[1],",",mass_range[2])))
 	# Preprocessing (in packages of)
-	preprocess_spectra_in_packages_of_label <- tklabel(preproc_window, text="Preprocess spectra\nin packages of")
-	preprocess_spectra_in_packages_of_entry <- tkentry(preproc_window, width=10, textvariable=preprocess_spectra_in_packages_of2)
+	preprocess_spectra_in_packages_of_label <- tklabel(preproc_window, text="Preprocess spectra\nin packages of", font = label_font)
+	preprocess_spectra_in_packages_of_entry <- tkentry(preproc_window, width=10, textvariable=preprocess_spectra_in_packages_of2, font = entry_font)
 	tkinsert(preprocess_spectra_in_packages_of_entry, "end", as.character(preprocess_spectra_in_packages_of))
 	# Tof mode
-	tof_mode_label <- tklabel(preproc_window, text="Select the TOF mode")
-	tof_mode_entry <- tkbutton(preproc_window, text="Choose the TOF mode", command=tof_mode_choice)
+	tof_mode_label <- tklabel(preproc_window, text="Select the TOF mode", font = label_font)
+	tof_mode_entry <- tkbutton(preproc_window, text="Choose the TOF mode", command=tof_mode_choice, font = button_font)
 	# Transform the data
-	transform_data_button <- tkbutton(preproc_window, text="Transform the data", command=transform_data_choice)
+	transform_data_button <- tkbutton(preproc_window, text="Transform the data", command=transform_data_choice, font = button_font)
 	# Smoothing
-	smoothing_button <- tkbutton(preproc_window, text="Smoothing", command=smoothing_choice)
+	smoothing_button <- tkbutton(preproc_window, text="Smoothing", command=smoothing_choice, font = button_font)
 	# Baseline subtraction
-	baseline_subtraction_button <- tkbutton(preproc_window, text="Baseline subtraction", command=baseline_subtraction_choice)
-	baseline_subtraction_iterations_entry <- tkentry(preproc_window, width=15, textvariable=baseline_subtraction_iterations2)
+	baseline_subtraction_button <- tkbutton(preproc_window, text="Baseline subtraction", command=baseline_subtraction_choice, font = button_font)
+	baseline_subtraction_iterations_entry <- tkentry(preproc_window, width=15, textvariable=baseline_subtraction_iterations2, font = entry_font)
 	tkinsert(baseline_subtraction_iterations_entry, "end", as.character(baseline_subtraction_iterations))
-	# Normalization
-	normalisation_button <- tkbutton(preproc_window, text="Normalization", command=normalisation_choice)
-	normalisation_mass_range_entry <- tkentry(preproc_window, width=15, textvariable=normalisation_mass_range2)
+	# Normalisation
+	normalisation_button <- tkbutton(preproc_window, text="Normalisation", command=normalisation_choice, font = button_font)
+	normalisation_mass_range_entry <- tkentry(preproc_window, width=15, textvariable=normalisation_mass_range2, font = entry_font)
 	tkinsert(normalisation_mass_range_entry, "end", as.character(normalisation_mass_range))
 	# Spectral alignment
-	spectral_alignment_button <- tkbutton(preproc_window, text="Align spectra", command=spectral_alignment_choice)
+	spectral_alignment_button <- tkbutton(preproc_window, text="Align spectra", command=spectral_alignment_choice, font = button_font)
 	# Commit preprocessing
-	commit_preprocessing_button <- tkbutton(preproc_window, text="Commit preprocessing", command=commit_preprocessing_function)
+	commit_preprocessing_button <- tkbutton(preproc_window, text="Commit preprocessing", command=commit_preprocessing_function, font = button_font)
 	##### Displaying labels
-	tof_mode_value_label <- tklabel(preproc_window, text=tof_mode_value)
-	transform_data_value_label <- tklabel(preproc_window, text=transform_data_value)
-	smoothing_value_label <- tklabel(preproc_window, text=smoothing_value)
-	baseline_subtraction_value_label <- tklabel(preproc_window, text=baseline_subtraction_value)
-	normalisation_value_label <- tklabel(preproc_window, text=normalisation_value)
-	spectral_alignment_value_label <- tklabel(preproc_window, text=spectral_alignment_value)
+	tof_mode_value_label <- tklabel(preproc_window, text=tof_mode_value, font = label_font)
+	transform_data_value_label <- tklabel(preproc_window, text=transform_data_value, font = label_font)
+	smoothing_value_label <- tklabel(preproc_window, text=smoothing_value, font = label_font)
+	baseline_subtraction_value_label <- tklabel(preproc_window, text=baseline_subtraction_value, font = label_font)
+	normalisation_value_label <- tklabel(preproc_window, text=normalisation_value, font = label_font)
+	spectral_alignment_value_label <- tklabel(preproc_window, text=spectral_alignment_value, font = label_font)
 	#### Geometry manager
 	tkgrid(mass_range_label, row=1, column=1)
 	tkgrid(mass_range_entry, row=1, column=2)
@@ -9566,7 +9584,7 @@ file_type_export_choice <- function() {
 	# Escape the function
 	#.GlobalEnv$file_type_export <- file_type_export
 	# Set the value of the displaying label
-	file_type_export_value_label <- tklabel(window, text=file_type_export)
+	file_type_export_value_label <- tklabel(window, text=file_type_export, font = label_font)
 	tkgrid(file_type_export_value_label, row=10, column=4)
 }
 
@@ -9835,7 +9853,7 @@ peak_picking_mode_choice <- function() {
 	if (peak_picking_mode_value == "all") {
 		peak_picking_mode_value <- "        all        "
 	}
-	peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value)
+	peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value, font = label_font)
 	tkgrid(peak_picking_mode_value_label, row=2, column=5)
 	# Escape the function
 	.GlobalEnv$peak_picking_mode <- peak_picking_mode
@@ -9857,7 +9875,7 @@ peak_picking_algorithm_choice <- function() {
 	} else if (peak_picking_algorithm_value == "SuperSmoother") {
 		peak_picking_algorithm_value <- "Super Smoother"
 	}
-	peak_picking_algorithm_value_label <- tklabel(window, text=peak_picking_algorithm_value)
+	peak_picking_algorithm_value_label <- tklabel(window, text=peak_picking_algorithm_value, font = label_font)
 	tkgrid(peak_picking_algorithm_value_label, row=6, column=6)
 	# Escape the function
 	.GlobalEnv$peak_picking_algorithm <- peak_picking_algorithm
@@ -9881,7 +9899,7 @@ peaks_filtering_choice <- function() {
 	} else {
 		peaks_filtering_value <- "NO"
 	}
-	peaks_filtering_value_label <- tklabel(window, text=peaks_filtering_value)
+	peaks_filtering_value_label <- tklabel(window, text=peaks_filtering_value, font = label_font)
 	tkgrid(peaks_filtering_value_label, row=4, column=3)
 	# Escape the function
 	.GlobalEnv$peaks_filtering <- peaks_filtering
@@ -9905,7 +9923,7 @@ multicore_processing_choice <- function() {
 	} else {
 		multicore_processing_value <- "NO"
 	}
-	multicore_processing_value_label <- tklabel(window, text=multicore_processing_value)
+	multicore_processing_value_label <- tklabel(window, text=multicore_processing_value, font = label_font)
 	tkgrid(multicore_processing_value_label, row=12, column=3)
 	# Escape the function
 	.GlobalEnv$multicore_processing <- multicore_processing
@@ -9929,7 +9947,7 @@ average_replicates_choice <- function() {
 	} else {
 		average_replicates_value <- "NO"
 	}
-	average_replicates_value_label <- tklabel(window, text=average_replicates_value)
+	average_replicates_value_label <- tklabel(window, text=average_replicates_value, font = label_font)
 	tkgrid(average_replicates_value_label, row=10, column=6)
 	# Escape the function
 	.GlobalEnv$average_replicates <- average_replicates
@@ -9953,7 +9971,7 @@ low_intensity_peaks_removal_choice <- function() {
 	} else {
 		low_intensity_peaks_removal_value <- "NO"
 	}
-	low_intensity_peaks_removal_value_label <- tklabel(window, text=low_intensity_peaks_removal_value)
+	low_intensity_peaks_removal_value_label <- tklabel(window, text=low_intensity_peaks_removal_value, font = label_font)
 	tkgrid(low_intensity_peaks_removal_value_label, row=5, column=3)
 	# Escape the function
 	.GlobalEnv$low_intensity_peaks_removal <- low_intensity_peaks_removal
@@ -9973,7 +9991,7 @@ intensity_threshold_method_choice <- function() {
 	if (intensity_threshold_method_value == "whole") {
 		intensity_threshold_method_value <- "     whole     "
 	}
-	intensity_threshold_method_value_label <- tklabel(window, text=intensity_threshold_method_value)
+	intensity_threshold_method_value_label <- tklabel(window, text=intensity_threshold_method_value, font = label_font)
 	tkgrid(intensity_threshold_method_value_label, row=6, column=3)
 	# Escape the function
 	.GlobalEnv$intensity_threshold_method <- intensity_threshold_method
@@ -9997,7 +10015,7 @@ remove_outliers_choice <- function() {
 	} else {
 		remove_outliers_value <- "NO"
 	}
-	remove_outliers_value_label <- tklabel(window, text=remove_outliers_value)
+	remove_outliers_value_label <- tklabel(window, text=remove_outliers_value, font = label_font)
 	tkgrid(remove_outliers_value_label, row=7, column=3)
 	# Escape the function
 	.GlobalEnv$remove_outliers <- remove_outliers
@@ -10020,7 +10038,7 @@ exclude_spectra_without_peak_function <- function() {
 	} else {
 		exclude_spectra_without_peak_value <- "NO"
 	}
-	exclude_spectra_without_peak_value_label <- tklabel(window, text=exclude_spectra_without_peak_value)
+	exclude_spectra_without_peak_value_label <- tklabel(window, text=exclude_spectra_without_peak_value, font = label_font)
 	tkgrid(exclude_spectra_without_peak_value_label, row=7, column=5)
 	# Escape the function
 	.GlobalEnv$exclude_spectra_without_peak <- exclude_spectra_without_peak
@@ -10044,7 +10062,7 @@ spectra_format_choice <- function() {
 	.GlobalEnv$spectra_format <- spectra_format
 	.GlobalEnv$spectra_format_value <- spectra_format_value
 	# Set the value of the displaying label
-	spectra_format_value_label <- tklabel(window, text=spectra_format_value)
+	spectra_format_value_label <- tklabel(window, text=spectra_format_value, font = label_font)
 	tkgrid(spectra_format_value_label, row=9, column=3)
 }
 
@@ -10070,93 +10088,163 @@ file_name <- tclVar("")
 
 ######################## GUI
 
+### FONTS
+# Get system info (Platform - Release - Version (- Linux Distro))
+system_os = Sys.info()[1]
+os_release = Sys.info()[2]
+os_version = Sys.info()[3]
+# Windows
+if (system_os == "Windows") {
+	# Define the fonts
+	garamond_24_bold = tkfont.create(family = "Garamond", size = 24, weight = "bold")
+	garamond_12_normal = tkfont.create(family = "Garamond", size = 12, weight = "normal")
+	arial_24_bold = tkfont.create(family = "Arial", size = 24, weight = "bold")
+	arial_12_normal = tkfont.create(family = "Arial", size = 12, weight = "normal")
+	trebuchet_24_bold = tkfont.create(family = "Trebuchet MS", size = 24, weight = "bold")
+	trebuchet_11_normal = tkfont.create(family = "Trebuchet MS", size = 11, weight = "normal")
+	trebuchet_11_bold = tkfont.create(family = "Trebuchet MS", size = 11, weight = "bold")
+	# Use them in the GUI
+	title_font = trebuchet_24_bold
+	label_font = trebuchet_11_normal
+	entry_font = trebuchet_11_normal
+	button_font = trebuchet_11_bold
+} else if (system_os == "Linux") {
+	# Linux
+	# Ubuntu
+	if (length(grep("Ubuntu", os_version, ignore.case=TRUE)) > 0) {
+		# Define the fonts
+		ubuntu_24_bold = tkfont.create(family = "Ubuntu", size = 24, weight = "bold")
+		ubuntu_12_normal = tkfont.create(family = "Ubuntu", size = 12, weight = "normal")
+		ubuntu_12_bold = tkfont.create(family = "Ubuntu", size = 12, weight = "bold")
+		# Use them in the GUI
+		title_font = ubuntu_24_bold
+		label_font = ubuntu_12_normal
+		entry_font = ubuntu_12_normal
+		button_font = ubuntu_12_bold
+	} else if (length(grep("Fedora", os_version, ignore.case=TRUE)) > 0) {
+		# Fedora
+		# Define the fonts
+		cantarell_24_bold = tkfont.create(family = "Cantarell", size = 24, weight = "bold")
+		cantarell_12_normal = tkfont.create(family = "Cantarell", size = 12, weight = "normal")
+		cantarell_12_bold = tkfont.create(family = "Cantarell", size = 12, weight = "bold")
+		# Use them in the GUI
+		title_font = cantarell_24_bold
+		label_font = cantarell_12_normal
+		entry_font = cantarell_12_normal
+		button_font = cantarell_12_bold
+	} else {
+		# Other linux distros
+		# Define the fonts
+		liberation_24_bold = tkfont.create(family = "Liberation Sans", size = 24, weight = "bold")
+		liberation_12_normal = tkfont.create(family = "Liberation Sans", size = 12, weight = "normal")
+		liberation_12_bold = tkfont.create(family = "Liberation Sans", size = 12, weight = "bold")
+		# Use them in the GUI
+		title_font = liberation_24_bold
+		label_font = liberation_12_normal
+		entry_font = liberation_12_normal
+		button_font = liberation_12_bold
+	}
+} else if (system_os == "Darwin") {
+	# macOS
+	# Define the fonts
+	helvetica_24_bold = tkfont.create(family = "Helvetica", size = 24, weight = "bold")
+	helvetica_16_normal = tkfont.create(family = "Helvetica", size = 16, weight = "normal") 
+	helvetica_16_bold = tkfont.create(family = "Helvetica", size = 16, weight = "bold")
+	# Use them in the GUI
+	title_font = helvetica_24_bold
+	label_font = helvetica_16_normal
+	entry_font = helvetica_16_normal
+	button_font = helvetica_16_bold
+}
+
+
 # The "area" where we will put our input lines
 window <- tktoplevel()
 tktitle(window) <- "Peak statistics"
 #### Browse
 # Library
-select_samples_label <- tklabel(window, text="Select the file/folder containing the spectra")
-select_samples_button <- tkbutton(window, text="Browse spectra...", command=select_samples_function)
+select_samples_label <- tklabel(window, text="Select the file/folder containing the spectra", font = label_font)
+select_samples_button <- tkbutton(window, text="Browse spectra...", command=select_samples_function, font = button_font)
 # Output
-select_output_label <- tklabel(window, text="Select the folder where to save all the outputs")
-browse_output_button <- tkbutton(window, text="Browse output folder", command=browse_output_function)
+select_output_label <- tklabel(window, text="Select the folder where to save all the outputs", font = label_font)
+browse_output_button <- tkbutton(window, text="Browse output folder", command=browse_output_function, font = button_font)
 #### Entries
 # Peak picking mode
-peak_picking_mode_label <- tklabel(window, text="Peak picking mode")
-peak_picking_mode_entry <- tkbutton(window, text="Choose peak picking\nmode", command=peak_picking_mode_choice)
+peak_picking_mode_label <- tklabel(window, text="Peak picking mode", font = label_font)
+peak_picking_mode_entry <- tkbutton(window, text="Choose peak picking\nmode", command=peak_picking_mode_choice, font = button_font)
 # Peak picking method
-peak_picking_algorithm_label <- tklabel(window, text="Peak picking method")
-peak_picking_algorithm_entry <- tkbutton(window, text="Choose peak picking\nmethod", command=peak_picking_algorithm_choice)
+peak_picking_algorithm_label <- tklabel(window, text="Peak picking method", font = label_font)
+peak_picking_algorithm_entry <- tkbutton(window, text="Choose peak picking\nmethod", command=peak_picking_algorithm_choice, font = button_font)
 # Signals to take
-signals_to_take_label <- tklabel(window, text="Most intense signals to take\n(if 'most intense' is selected)")
-signals_to_take_entry <- tkentry(window, width=10, textvariable=signals_to_take)
+signals_to_take_label <- tklabel(window, text="Most intense signals to take\n(if 'most intense' is selected)", font = label_font)
+signals_to_take_entry <- tkentry(window, width=10, textvariable=signals_to_take, font = entry_font)
 tkinsert(signals_to_take_entry, "end", "25")
 # SNR
-SNR_label <- tklabel(window, text="Signal-to-noise ratio")
-SNR_entry <- tkentry(window, width=10, textvariable=SNR)
+SNR_label <- tklabel(window, text="Signal-to-noise ratio", font = label_font)
+SNR_entry <- tkentry(window, width=10, textvariable=SNR, font = entry_font)
 tkinsert(SNR_entry, "end", "5")
 # Peaks filtering
-peaks_filtering_label <- tklabel(window, text="Peaks filtering")
-peaks_filtering_entry <- tkbutton(window, text="Choose peak filtering", command=peaks_filtering_choice)
+peaks_filtering_label <- tklabel(window, text="Peaks filtering", font = label_font)
+peaks_filtering_entry <- tkbutton(window, text="Choose peak filtering", command=peaks_filtering_choice, font = button_font)
 # Peaks filtering threshold
-peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold frequency percentage")
-peaks_filtering_threshold_percent_entry <- tkentry(window, width=10, textvariable=peaks_filtering_threshold_percent)
+peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold frequency percentage", font = label_font)
+peaks_filtering_threshold_percent_entry <- tkentry(window, width=10, textvariable=peaks_filtering_threshold_percent, font = entry_font)
 tkinsert(peaks_filtering_threshold_percent_entry, "end", "25")
 # Low intensity peaks removal
-low_intensity_peaks_removal_label <- tklabel(window, text="Low intensity peaks removal")
-low_intensity_peaks_removal_entry <- tkbutton(window, text="Choose low intensity\npeaks removal", command=low_intensity_peaks_removal_choice)
+low_intensity_peaks_removal_label <- tklabel(window, text="Low intensity peaks removal", font = label_font)
+low_intensity_peaks_removal_entry <- tkbutton(window, text="Choose low intensity\npeaks removal", command=low_intensity_peaks_removal_choice, font = button_font)
 # Intensity percentage threshold
-intensity_percentage_threshold_label <- tklabel(window, text="Intensity percentage threshold")
-intensity_percentage_threshold_entry <- tkentry(window, width=10, textvariable=intensity_percentage_threshold)
+intensity_percentage_threshold_label <- tklabel(window, text="Intensity percentage threshold", font = label_font)
+intensity_percentage_threshold_entry <- tkentry(window, width=10, textvariable=intensity_percentage_threshold, font = entry_font)
 tkinsert(intensity_percentage_threshold_entry, "end", "0.1")
 # Intensiry percentage theshold method
-intensity_threshold_method_label <- tklabel(window, text="Intensity threshold method")
-intensity_threshold_method_entry <- tkbutton(window, text="Choose the method for\nthe intensity threshold", command=intensity_threshold_method_choice)
+intensity_threshold_method_label <- tklabel(window, text="Intensity threshold method", font = label_font)
+intensity_threshold_method_entry <- tkbutton(window, text="Choose the method for\nthe intensity threshold", command=intensity_threshold_method_choice, font = button_font)
 # Remove outliers
-remove_outliers_label <- tklabel(window, text="Discard outliers in intensity evaluation")
-remove_outliers_entry <- tkbutton(window, text="Choose if outliers are to be discarded", command=remove_outliers_choice)
+remove_outliers_label <- tklabel(window, text="Discard outliers in intensity evaluation", font = label_font)
+remove_outliers_entry <- tkbutton(window, text="Choose if outliers are to be discarded", command=remove_outliers_choice, font = button_font)
 # Exclude spectra without the peak
-exclude_spectra_without_peak_button <- tkbutton(window, text="Exclude spectra without\nthe peak", command=exclude_spectra_without_peak_function)
+exclude_spectra_without_peak_button <- tkbutton(window, text="Exclude spectra without\nthe peak", command=exclude_spectra_without_peak_function, font = button_font)
 # File format
-spectra_format_label <- tklabel(window, text="Select the spectra format")
-spectra_format_entry <- tkbutton(window, text="Choose the spectra format", command=spectra_format_choice)
+spectra_format_label <- tklabel(window, text="Select the spectra format", font = label_font)
+spectra_format_entry <- tkbutton(window, text="Choose the spectra format", command=spectra_format_choice, font = button_font)
 # File type export
-file_type_export_label <- tklabel(window, text="Select the format\nof the exported file")
-file_type_export_entry <- tkbutton(window, text="Choose the file type", command=file_type_export_choice)
+file_type_export_label <- tklabel(window, text="Select the format\nof the exported file", font = label_font)
+file_type_export_entry <- tkbutton(window, text="Choose the file type", command=file_type_export_choice, font = button_font)
 # Average the replicates
-average_replicates_button <- tkbutton(window, text="Average the replicates", command=average_replicates_choice)
+average_replicates_button <- tkbutton(window, text="Average the replicates", command=average_replicates_choice, font = button_font)
 # End session
-#end_session_label <- tklabel(window, text="Quit")
-end_session_button <- tkbutton(window, text="QUIT", command=end_session_function)
+#end_session_label <- tklabel(window, text="Quit", font = label_font)
+end_session_button <- tkbutton(window, text="QUIT", command=end_session_function, font = button_font)
 # Import the spectra
-import_spectra_button <- tkbutton(window, text="SPECTRA IMPORT AND\nPREPROCESSING", command=import_spectra_function)
+import_spectra_button <- tkbutton(window, text="SPECTRA IMPORT AND\nPREPROCESSING", command=import_spectra_function, font = button_font)
 # Peak picking
-peak_picking_button <- tkbutton(window, text="PEAK PICKING", command=peak_picking_function)
+peak_picking_button <- tkbutton(window, text="PEAK PICKING", command=peak_picking_function, font = button_font)
 # Run the Peak Statistics!!
-run_peak_statistics_button <- tkbutton(window, text="COMPUTE THE PEAK STATISTICS", command=run_peak_statistics_function)
+run_peak_statistics_button <- tkbutton(window, text="COMPUTE THE PEAK STATISTICS", command=run_peak_statistics_function, font = button_font)
 # Average number of signals and standard deviation
-signals_avg_and_sd_button <- tkbutton(window, text="MEAN +/- SD of number of signals", command=signals_avg_and_sd_function)
+signals_avg_and_sd_button <- tkbutton(window, text="MEAN +/- SD of number of signals", command=signals_avg_and_sd_function, font = button_font)
 # Multicore
-multicore_processing_button <- tkbutton(window, text="ALLOW PARALLEL\nPROCESSING", command=multicore_processing_choice)
+multicore_processing_button <- tkbutton(window, text="ALLOW PARALLEL\nPROCESSING", command=multicore_processing_choice, font = button_font)
 # Spectra preprocessing button
-spectra_preprocessing_button <- tkbutton(window, text="SPECTRA PREPROCESSING\nPARAMETERS", command=preprocessing_window_function)
+spectra_preprocessing_button <- tkbutton(window, text="SPECTRA PREPROCESSING\nPARAMETERS", command=preprocessing_window_function, font = button_font)
 # Set the file name
-set_file_name_label <- tklabel(window, text="<-- Set the file name")
-set_file_name_entry <- tkentry(window, width=30, textvariable=file_name)
+set_file_name_label <- tklabel(window, text="<-- Set the file name", font = label_font)
+set_file_name_entry <- tkentry(window, width=30, textvariable=file_name, font = entry_font)
 tkinsert(set_file_name_entry, "end", "Peak statistics")
 
 #### Displaying labels
-file_type_export_value_label <- tklabel(window, text=file_type_export)
-peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value)
-peak_picking_algorithm_value_label <- tklabel(window, text=peak_picking_algorithm_value)
-peaks_filtering_value_label <- tklabel(window, text=peaks_filtering_value)
-low_intensity_peaks_removal_value_label <- tklabel(window, text=low_intensity_peaks_removal_value)
-intensity_threshold_method_value_label <- tklabel(window, text=intensity_threshold_method_value)
-remove_outliers_value_label <- tklabel(window, text=remove_outliers_value)
-spectra_format_value_label <- tklabel(window, text=spectra_format_value)
-exclude_spectra_without_peak_value_label <- tklabel(window, text=exclude_spectra_without_peak_value)
-multicore_processing_value_label <- tklabel(window, text=multicore_processing_value)
-average_replicates_value_label <- tklabel(window, text=average_replicates_value)
+file_type_export_value_label <- tklabel(window, text=file_type_export, font = label_font)
+peak_picking_mode_value_label <- tklabel(window, text=peak_picking_mode_value, font = label_font)
+peak_picking_algorithm_value_label <- tklabel(window, text=peak_picking_algorithm_value, font = label_font)
+peaks_filtering_value_label <- tklabel(window, text=peaks_filtering_value, font = label_font)
+low_intensity_peaks_removal_value_label <- tklabel(window, text=low_intensity_peaks_removal_value, font = label_font)
+intensity_threshold_method_value_label <- tklabel(window, text=intensity_threshold_method_value, font = label_font)
+remove_outliers_value_label <- tklabel(window, text=remove_outliers_value, font = label_font)
+spectra_format_value_label <- tklabel(window, text=spectra_format_value, font = label_font)
+exclude_spectra_without_peak_value_label <- tklabel(window, text=exclude_spectra_without_peak_value, font = label_font)
+multicore_processing_value_label <- tklabel(window, text=multicore_processing_value, font = label_font)
+average_replicates_value_label <- tklabel(window, text=average_replicates_value, font = label_font)
 
 
 #### Geometry manager
