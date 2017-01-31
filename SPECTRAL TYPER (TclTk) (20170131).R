@@ -10523,7 +10523,7 @@ if (system_os == "Windows") {
 } else if (system_os == "Linux") {
 	# Linux
 	# Ubuntu
-	if (os_release == "Ubuntu") {
+	if (length(grep("Ubuntu", os_version, ignore.case=TRUE)) > 0) {
 		# Define the fonts
 		ubuntu_24_bold = tkfont.create(family = "Ubuntu", size = 24, weight = "bold")
 		ubuntu_12_normal = tkfont.create(family = "Ubuntu", size = 12, weight = "normal")
@@ -10533,7 +10533,7 @@ if (system_os == "Windows") {
 		label_font = ubuntu_12_normal
 		entry_font = ubuntu_12_normal
 		button_font = ubuntu_12_bold
-	} else if (os_release == "Fedora") {
+	} else if (length(grep("Fedora", os_version, ignore.case=TRUE)) > 0) {
 		# Fedora
 		# Define the fonts
 		cantarell_24_bold = tkfont.create(family = "Cantarell", size = 24, weight = "bold")
@@ -10768,3 +10768,4 @@ tkgrid(database_peaklist_dump_button, row=15, column=3)
 #tkgrid(quit_button, row=15, column=2)
 tkgrid(end_session_button, row=15, column=4)
 #window_scrollbar
+
