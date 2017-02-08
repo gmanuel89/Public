@@ -5059,7 +5059,7 @@ spectral_classification_pixelbypixel <- function (spectra_path, filepath_R, list
 				slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
 				plotMsiSlice(slices, legend = FALSE, scale = F)
 				legend(x = "bottomright", legend = class_list, fill = c("green", "red"))
-				legend(x = "topright", legend = sample_name)
+				legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1])
 				# Store the plot into the list of images
 				classification_ensemble_msi_list[[p]] <- recordPlot()
 			}
