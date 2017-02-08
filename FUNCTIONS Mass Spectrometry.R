@@ -4648,11 +4648,11 @@ single_model_classification_of_spectra <- function(spectra, model_x, features_mo
 				legend(x = "bottomright", legend = class_list, fill = c("green","red"))
 				legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1])
 				# Store the plot into the list of images (for SVM)
-				classification_msi_svm <- recordPlot()
+				classification_msi_model <- recordPlot()
 			} else {
 				### It is NULL if there are incompatibilities between the model features and the spectral features
 				result_matrix_model <- NULL
-				classification_msi_svm <- NULL
+				classification_msi_model <- NULL
 			}
 		}
 	}
