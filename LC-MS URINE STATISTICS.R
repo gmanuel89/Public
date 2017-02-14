@@ -1407,7 +1407,7 @@ if (isTRUE(multi_level_effect_analysis)) {
 		# Create the folder where to dump the files and go to it...
 		subfolder <- paste(combination_vector[comb], "multi-levels")
 		dir.create(file.path(output_folder, subfolder))
-		setwd(file.path(output_folder, combination_vector[comb]))
+		setwd(file.path(output_folder, subfolder))
 		# For each signals of inference...
 		for (s in selected_signals_for_inference) {
 			# Extract the intensity
