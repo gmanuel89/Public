@@ -1,4 +1,4 @@
-############################################## LC-MS URINE STATISTICS (TCL-TK GUI) 2017.02.15
+############################################## LC-MS URINE STATISTICS (TCL-TK GUI) 2017.02.16
 
 
 
@@ -50,8 +50,8 @@ update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE)
 ###################################### Initialize the variables (default values)
 input_file <- ""
 output_folder <- getwd()
-output_format <- "Microsoft Excel (.xlsx)"
-file_format <- "xlsx"
+output_format <- "Comma Separated Values (.csv)"
+file_format <- "csv"
 image_format <- ".png"
 pvalue_expression <- 0.05
 pvalue_tests <- 0.05
@@ -84,7 +84,7 @@ age_bins <- 6
 
 
 ################## Values of the variables (for displaying and dumping purposes)
-output_file_type_export_value <- "Microsoft Excel (.xlsx)"
+output_file_type_export_value <- "Comma Separated Values (.csv)"
 image_file_type_export_value <- "PNG (.png)"
 data_record_value <- "YES"
 correlation_analysis_value <- "NO"
@@ -107,9 +107,9 @@ output_file_type_export_choice <- function() {
 	# Catch the value from the menu
 	output_format <- select.list(c("Comma Separated Values (.csv)", "Microsoft Excel (.xls)", "Microsoft Excel (.xlsx)"), title = "Choose output file format")
 	# Fix the file format
-	if (output_format == "Comma Separated Values (.csv)") {
+	if (output_format == "Comma Separated Values (.csv)" || output_format == "") {
 		file_format <- "csv"
-	} else if (output_format == "Microsoft Excel (.xlsx)" || output_format == "") {
+	} else if (output_format == "Microsoft Excel (.xlsx)") {
 		file_format <- "xlsx"
 	} else if (output_format == "Microsoft Excel (.xls)") {
 		file_format <- "xls"
@@ -145,7 +145,7 @@ image_file_type_export_choice <- function() {
 ##### File import
 file_import_function <- function() {
 	filepath_import_select <- tkmessageBox(title = "Input file", message = "Select the file containing all the mass spectrometric information for the statistics", icon = "info")
-	input_file <- tclvalue(tkgetOpenFile(filetypes = "{{Comma Separated Value files} {.csv}} {{Microsoft Excel files} {.xls .xlsx}}"))
+	input_file <- tclvalue(tkgetOpenFile(filetypes = "{{Microsoft Excel files} {.xls .xlsx}} {{Comma Separated Value files} {.csv}}"))
 	if (!nchar(input_file)) {
 		tkmessageBox(message = "No file selected")
 	} else {
@@ -162,26 +162,27 @@ file_import_function <- function() {
 			input_data <- as.data.frame(input_data)
 		} else if (length(grep(".csv", input_file, fixed = TRUE)) > 0) {
 			##### CSV
-			input_data <- read.csv(input_file)
+			input_data <- read.csv(input_file, header=TRUE, sep=",")
 		}
 		## Rownames
-		rownames(input_data) <- input_data$No
+		try({rownames(input_data) <- input_data$No}, silent = TRUE)
 		## Data type
-		input_data$Age <- as.numeric(input_data$Age)
-		input_data$pT <- as.numeric(input_data$pT)
-		input_data$pT_2009 <- as.factor(input_data$pT_2009)
-		input_data$Dim <- as.numeric(input_data$Dim)
-		input_data$Grade <- as.numeric(input_data$Grade)
-		input_data$Class <- as.factor(input_data$Class)
-		input_data$Centro <- as.character(input_data$Centro)
+		try({input_data$Age <- as.numeric(input_data$Age)}, silent = TRUE)
+		try({input_data$pT <- as.numeric(input_data$pT)}, silent = TRUE)
+		try({input_data$pT_2009 <- as.factor(input_data$pT_2009)}, silent = TRUE)
+		try({input_data$Dim <- as.numeric(input_data$Dim)}, silent = TRUE)
+		try({input_data$Grade <- as.numeric(input_data$Grade)}, silent = TRUE)
+		try({input_data$Class <- as.factor(input_data$Class)}, silent = TRUE)
 		## Age binning
-		if (isTRUE(age_binning)) {
-			age_bins <- age_bins
-			Age_BINNED <- binning(input_data$Age, age_bins, method = "quantile", ordered = TRUE)
-			levels_age_binned <- levels(Age_BINNED) <- c(1:age_bins)
-			# Replace the Age with the Age_BINNED
-			input_data$Age <- cbind(Age_BINNED)
-		}
+		try({
+			if (isTRUE(age_binning)) {
+				age_bins <- age_bins
+				Age_BINNED <- binning(input_data$Age, age_bins, method = "quantile", ordered = TRUE)
+				levels_age_binned <- levels(Age_BINNED) <- c(1:age_bins)
+				# Replace the Age with the Age_BINNED
+				input_data$Age <- cbind(Age_BINNED)
+			}
+			}, silent = TRUE)
 		##### Separate the mass spectrometric data from the demographic data
 		# All features
 		feature_vector <- colnames(input_data)
@@ -197,7 +198,7 @@ file_import_function <- function() {
 		##### Determine the features of interest
 		# Discriminant column
 		tkmessageBox(title = "Discriminant feature", message = "Select the discriminant feature", icon = "info")
-		discriminant_feature <- select.list(non_signals, title = "Choose the discriminant feature", preselect = ifelse("Class" %in% feature_vector, "Class", NULL))
+		discriminant_feature <- select.list(c(non_signals, "NONE"), title = "Choose the discriminant feature", preselect = ifelse("Class" %in% feature_vector, "Class", NULL))
 		# Features for correlation analysis
 		tkmessageBox(title = "Correlation analysis data", message = "Select the demographic data for correlation analysis", icon = "info")
 		non_signals_for_correlation_analysis <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for correlation analysis", multiple = TRUE)
@@ -208,7 +209,11 @@ file_import_function <- function() {
 		tkmessageBox(title = "Multi-level effect analysis data", message = "Select the demographic data for multi-level effect analysis", icon = "info")
 		multi_level_effect_analysis_non_features <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for multi-level effect analysis", multiple = TRUE)
 		## Class list
-		class_list <- levels(as.factor(input_data[, discriminant_feature]))
+		if (discriminant_feature == "NONE") {
+			class_list <- discriminant_feature
+		} else {
+			class_list <- levels(as.factor(input_data[, discriminant_feature]))
+		}
 		# Escape the function
 		.GlobalEnv$input_file <- input_file
 		.GlobalEnv$input_data <- input_data
@@ -241,7 +246,7 @@ browse_output_function <- function() {
 	# Go to the working directory
 	setwd(output_folder)
 	tkmessageBox(message = paste("Every file will be saved in", output_folder))
-	tkmessageBox(message = "A sub-directory named 'RESULTS X' will be created for each run!")
+	tkmessageBox(message = "A sub-directory named 'STATISTICS X' will be created for each run!")
 	# Escape the function
 	.GlobalEnv$output_folder <- output_folder
 }
@@ -425,27 +430,35 @@ run_statistics_function <- function() {
 		### Automatically create a subfolder with all the results
 		# Check if such subfolder exists
 		list_of_directories <- list.dirs(output_folder, full.names = FALSE, recursive = FALSE)
-		# Check the presence of a RESULTS folder
-		RESULTS_folder_presence <- FALSE
+		# Check the presence of a STATISTICS folder
+		STATISTICS_folder_presence <- FALSE
 		if (length(list_of_directories) > 0) {
 			for (dr in 1:length(list_of_directories)) {
-				if (length(grep("RESULTS", list_of_directories[dr], fixed = TRUE)) > 0) {
-					RESULTS_folder_presence <- TRUE
+				if (length(grep("STATISTICS", list_of_directories[dr], fixed = TRUE)) > 0) {
+					STATISTICS_folder_presence <- TRUE
 				}
 			}
 		}
 		# If it present...
-		if (isTRUE(RESULTS_folder_presence)) {
-			# Extract the number after the RESULTS
-			RESULTS_folder_number <- 0
+		if (isTRUE(STATISTICS_folder_presence)) {
+			# Extract the number after the STATISTICS
+			STATISTICS_folder_number <- 0
 			for (dr in 1:length(list_of_directories)) {
-				if (length(grep("RESULTS", list_of_directories[dr], fixed = TRUE)) > 0) {
-					RESULTS_folder_split <- unlist(strsplit(list_of_directories[dr], "RESULTS"))
-					try(RESULTS_folder_number <- as.integer(RESULTS_folder_split[2]))
+				if (length(grep("STATISTICS", list_of_directories[dr], fixed = TRUE)) > 0) {
+					STATISTICS_folder_split <- unlist(strsplit(list_of_directories[dr], "STATISTICS"))
+					try(stat_folder_number <- STATISTICS_folder_split[2])
+					if (length(STATISTICS_folder_split) > 2) {
+						try({
+							stat_folder_number <- ""
+							for (st in 2:length(STATISTICS_folder_split)) {
+								stat_folder_number <- paste(stat_folder_number, STATISTICS_folder_split[st])
+							}
+							})
+						try(STATISTICS_folder_number <- as.integer(stat_folder_number))
 				}
 			}
 			# Generate the new subfolder
-			subfolder <- paste("RESULTS", (RESULTS_folder_number + 1))
+			subfolder <- paste("STATISTICS", (STATISTICS_folder_number + 1))
 			# Create the subfolder
 			dir.create(file.path(output_folder, subfolder))
 			# Estimate the new output folder
@@ -453,7 +466,7 @@ run_statistics_function <- function() {
 		} else {
 			# If it not present...
 			# Create the folder where to dump the files and go to it...
-			subfolder <- paste("RESULTS", "1")
+			subfolder <- paste("STATISTICS", "1")
 			# Create the subfolder
 			dir.create(file.path(output_folder, subfolder))
 			# Estimate the new output folder
@@ -487,9 +500,9 @@ run_statistics_function <- function() {
 		
 		
 		########## Exception handling
-		if (isTRUE(two_level_effect_analysis)) {
-			ifelse(isTRUE(sampling), print("The Two-Level Effect analysis is performed with sampling for RM"), print("WARNING!!! The Two-Level Effect analysis is performed without sampling!"))
-		}
+		#if (isTRUE(two_level_effect_analysis)) {
+		#	ifelse(isTRUE(sampling), print("The Two-Level Effect analysis is performed with sampling for RM"), print("WARNING!!! The Two-Level Effect analysis is performed without sampling!"))
+		#}
 		
 		################################# FUNCTIONS
 		
@@ -668,8 +681,13 @@ run_statistics_function <- function() {
 			# Generate a list of data frames and corresponding filenames to dump
 			list_of_dataframes <- list()
 			list_of_filenames <- character()
+			# If there is only one class...
+			if (length(class_list == 1)) {
+				# Generate a dataframe with the one class, otherwise dump one dataframe per each class
+				list_of_dataframes[[1]] <- input_data[,!(names(input_data) %in% non_signals)]
+				list_of_filenames <- "Whole data"
+			} else if (length(class_list) == 2) {
 			# If there are only two classes...
-			if (length(class_list) <= 2) {
 				# Generate a dataframe with those two classes, otherwise dump one dataframe per each class
 				list_of_dataframes[[1]] <- input_data[,!(names(input_data) %in% non_signals)]
 				list_of_filenames <- "Control_vs_Disease"
@@ -701,7 +719,7 @@ run_statistics_function <- function() {
 			# Features for correlation analysis (sorted for reproducibility reasons)
 			non_signals_for_correlation_analysis <- sort(non_signals_for_correlation_analysis)
 			features_for_correlation_analysis <- append(non_signals_for_correlation_analysis, names(signals_data))
-			print("########## Correlation Analysis ##########")
+			print("########## CORRELATION ANALYSIS ##########")
 			##### Create the folder for the correlation data
 			dir.create(file.path(output_folder, "Correlation"))
 			setwd(file.path(output_folder, "Correlation"))
@@ -714,9 +732,17 @@ run_statistics_function <- function() {
 			### For each class...
 			for (cl in 1:length(class_list)) {
 				# Message
-				print(paste("Task 1 - Correlation analysis, class:", discriminant_feature, class_list[cl]))
+				if (discriminant_feature == "NONE") {
+					print("########## CORRELATION ANALYSIS: Whole data ##########")
+				} else {
+					print(paste("########## CORRELATION ANALYSIS, class:", discriminant_feature, class_list[cl], "##########"))
+				}
 				# Filter the dataframe with only the data for that selected class
-				data_frame_correlation <- input_data[input_data[, discriminant_feature] == class_list[cl], features_for_correlation_analysis]
+				if (discriminant_feature == "NONE") {
+					data_frame_correlation <- input_data[, features_for_correlation_analysis]
+				} else {
+					data_frame_correlation <- input_data[input_data[, discriminant_feature] == class_list[cl], features_for_correlation_analysis]
+				}
 				# Store the original (after it will be modified by the outlier exclusion)
 				data_frame_correlation_original <- data_frame_correlation
 				### The correlation list is a list of correlation lists: one list for each correlation, each one of them is a list of the correlation with the signal intensity and the variable (correlation_list[[non_signal1]][[signal1]], correlation_list[[non_signal1]][[signal2]], correlation_list[[non_signal1]][[signal3]], correlation_list[[non_signal2]][[signal1]], correlation_list[[non_signal2]][[signal2]], correlation_list[[non_signal2]][[signal3]], ...)
@@ -751,17 +777,17 @@ run_statistics_function <- function() {
 									# Build the dataframe to be dumped
 									outliers_dataframe <- data_frame_correlation[mass_x %in% outliers, c(non_signals_for_correlation_analysis, m)]
 									# Signal name
-									signal_name <- rep(m, dim(outliers_dataframe)[1])
+									sign_name <- rep(m, dim(outliers_dataframe)[1])
 									# Patients
 									patients <- rownames(outliers_dataframe)
 									# Append the two columns...
-									outliers_dataframe <- cbind(outliers_dataframe, patients, signal_name)
+									outliers_dataframe <- cbind(outliers_dataframe, patients, sign_name)
 									# Fix the column names
 									colnames(outliers_dataframe) <- c(non_signals_for_correlation_analysis,"Intensity","Patient","Mass")
 									# Store this in the final list of outlier dataframes
 									outlier_list[[ms]] <- outliers_dataframe
 									# Replace the intensity in the original dataframe with NA (so that they are excluded)
-									data_frame_correlation[mass_x %in% outliers, m] <- NA
+									#data_frame_correlation[mass_x %in% outliers, m] <- NA
 									mass_x[mass_x %in% outliers] <- NA
 								}
 							}
@@ -772,7 +798,7 @@ run_statistics_function <- function() {
 							correlation_list[[ns]][[m]] <- correlation_result_vector
 						}
 						# Restore the original
-						data_frame_correlation <- data_frame_correlation_original
+						#data_frame_correlation <- data_frame_correlation_original
 					}
 					### Correlation matrices
 					# For each element of the correlation list...
@@ -780,7 +806,7 @@ run_statistics_function <- function() {
 						# Generate a matrix from the correlation list (one matrix for each non-signal)
 						corr_matrix <- matrix(0, nrow = ncol(signals_data), ncol = 2)
 						corr_matrix <- do.call(rbind, correlation_list[[l]])
-						colnames(corr_matrix) <- c(paste("Corr", class_list[cl], non_signals_for_correlation_analysis[l]), "p_value")
+						colnames(corr_matrix) <- c(paste("Correlation", class_list[cl], "vs", non_signals_for_correlation_analysis[l]), "p_value")
 						correlation_matrix_list[[l]] <- corr_matrix
 					}
 					### Build the final correlation matrix
@@ -796,9 +822,16 @@ run_statistics_function <- function() {
 					}
 				}
 				#### Save the outputs
-				write_file(file_name = paste(discriminant_feature, class_list[cl], "- Correlation matrix"), data = final_correlation_matrix, file_format = file_format)	
-				if (isTRUE(remove_outliers_correlation_analysis)) {
-					write_file(file_name = paste(discriminant_feature, class_list[cl], "- Outlier matrix"), data = final_outlier_matrix, file_format = file_format)
+				if (discriminant_feature == "NONE") {
+					write_file(file_name = "Correlation matrix", data = final_correlation_matrix, file_format = file_format)	
+					if (isTRUE(remove_outliers_correlation_analysis)) {
+						write_file(file_name = "Outlier matrix", data = final_outlier_matrix, file_format = file_format)
+					}
+				} else {
+					write_file(file_name = paste(discriminant_feature, class_list[cl], "- Correlation matrix"), data = final_correlation_matrix, file_format = file_format)	
+					if (isTRUE(remove_outliers_correlation_analysis)) {
+						write_file(file_name = paste(discriminant_feature, class_list[cl], "- Outlier matrix"), data = final_outlier_matrix, file_format = file_format)
+					}
 				}
 			}
 		}
@@ -809,8 +842,10 @@ run_statistics_function <- function() {
 		#################### 2-LEVEL EFFECT ANALYSIS OVER SIGNAL INTENSITY
 		if (isTRUE(two_level_effect_analysis)) {
 			# Establish the variables for the two-level effect analysis (Append the discriminant column to the previously selected variables)
-			two_level_effect_analysis_non_features <- sort(c(discriminant_feature, two_level_effect_analysis_non_features))
-			print("########## Simple Effect Analysis (2 LEVELS) ##########")
+			if (discriminant_feature != "NONE") {
+				two_level_effect_analysis_non_features <- sort(c(discriminant_feature, two_level_effect_analysis_non_features))
+			}
+			print("########## 2-LEVEL EFFECT ANALYSIS ##########")
 			### Build up the combinations of possibilities
 			# Empty vector
 			combination_vector <- character()
@@ -818,9 +853,9 @@ run_statistics_function <- function() {
 			for (t in 1:length(sort(two_level_effect_analysis_non_features))) {
 				# Isolate the dataframe column
 				data_column <- input_data[, two_level_effect_analysis_non_features[t]]
-				# Check if there are more than one level
+				# Check if there are more than two level (because if you have 2 levels there is only one combination)
 				number_of_levels <- length(levels(as.factor(data_column)))
-				if (number_of_levels > 1) {
+				if (number_of_levels > 2) {
 					# Extract the (unique) values
 					for (ch in sort(unique(as.character(data_column)))) {
 						# Append the combination ID to the vector...
@@ -828,6 +863,10 @@ run_statistics_function <- function() {
 						names(combination) <- two_level_effect_analysis_non_features[t]
 						combination_vector <- append(combination_vector, combination)
 					}
+				} else {
+					combination <- sort(unique(as.character(data_column)))[1]
+					names(combination) <- two_level_effect_analysis_non_features[t]
+					combination_vector <- append(combination_vector, combination)
 				}
 			}
 			# Generate the combination names (each element of the vector vs the others)
@@ -898,57 +937,71 @@ run_statistics_function <- function() {
 							# Build the dataframe to be dumped
 							outliers_dataframe <- temp_data_frame[mass_x %in% outliers, c(non_signal_variable, m)]
 							# Signal name
-							signal_name <- rep(m, dim(outliers_dataframe)[1])
+							sign_name <- rep(m, dim(outliers_dataframe)[1])
 							# Patients
 							patients <- rownames(outliers_dataframe)
 							# Append the two columns...
-							outliers_dataframe <- cbind(outliers_dataframe, patients, signal_name)
+							outliers_dataframe <- cbind(outliers_dataframe, patients, sign_name)
 							# Fix the column names
 							colnames(outliers_dataframe) <- c(non_signal_variable,"Intensity","Patient","Mass")
 							# Store this in the final list of outlier dataframes
 							outlier_list[[ms]] <- outliers_dataframe
 							# Replace the intensity in the original dataframe with NA (so that they are excluded)
-							temp_data_frame[mass_x %in% outliers, m] <- NA
+							#temp_data_frame[mass_x %in% outliers, m] <- NA
 							mass_x[mass_x %in% outliers] <- NA
 						}
 					}
-					### Clean the NA values from the mass column and the response variable column
+					## Group the dependent variable (the mass column) according to the response variable (for Shapiro test)
+					mass_x_split <- group_dependent_variable(mass_x, as.factor(response_variable))
+					### Clean the NA values from the mass column and the response variable column (after the grouping, because the NA removal can cause the loss of a response variable, if it contains only the outlier)
 					response_variable <- response_variable[!is.na(mass_x)]
 					mass_x <- mass_x[!is.na(mass_x)]
-					## Group the dependent variable (the mass column) according to the response variable
-					mass_x_split <- group_dependent_variable(mass_x, as.factor(response_variable))
-					# Define the groups (response variable = 0, response variable = 1)
-					group_0 <- mass_x_split[[1]]
-					group_1 <- mass_x_split[[2]]
-					# Define the names and the number of patients
-					name_group_0 <- sprintf("%s%s", m, "_0")
-					name_group_1 <- sprintf("%s%s", m, "_1")
-					number_of_patients_list[[m]] <- c(length(group_0),length(group_1))
+					for (x in 1:length(mass_x_split)) {
+						mass_x_split[[x]] <- mass_x_split[[x]][!is.na(mass_x_split[[x]])]
+					}
+					## If the response variable has only one level, it0s pointless to fodo ther statistics
+					if (length(mass_x_split) > 1) {
+						# Define the groups (response variable = 0, response variable = 1)
+						group_0 <- mass_x_split[[1]]
+						group_1 <- mass_x_split[[2]]
+						# Define the names and the number of patients
+						name_group_0 <- sprintf("%s%s", m, "_0")
+						name_group_1 <- sprintf("%s%s", m, "_1")
+						number_of_patients_list[[m]] <- c(length(group_0),length(group_1))
+					} else if (length(mass_x_split) == 1) {
+						# Define the groups (response variable = 0, response variable = 1)
+						group_0 <- mass_x_split[[1]]
+						group_1 <- numeric()
+						# Define the names and the number of patients
+						name_group_0 <- sprintf("%s%s", m, "_0")
+						name_group_1 <- sprintf("%s%s", m, "_1")
+						number_of_patients_list[[m]] <- c(length(group_0),length(group_1))
+					}
 					### If the number of patients in the two lists is more than the minimum number of patients allowed and all the elements of the two groups are not the same...
 					if (length(group_0) >= minimum_number_of_patients && length(group_1) >= minimum_number_of_patients && !all(group_0 == group_0[1]) && !all(group_1 == group_1[1])) {
 						# Checking for normal distributed data in the two groups (class 0 and class 1)
 						if (length(group_0) >= 3 && length(group_0) <= 5000) {
-							shapiro_list_0[[name_group_0]] <- shapiro.test(group_0)
+							shapiro_list_0[[name_group_0]] <- shapiro.test(as.numeric(group_0))
 						} else {
 							shapiro_list_0[[name_group_0]] <- NA
 						}
 						if (length(group_1) >= 3 && length(group_1) <= 5000) {
-							shapiro_list_1[[name_group_1]] <- shapiro.test(group_1)
+							shapiro_list_1[[name_group_1]] <- shapiro.test(as.numeric(group_1))
 						} else {
 							shapiro_list_1[[name_group_1]] <- NA
 						}
 						# Checking variances (Normal data)
-						variance_test_list[[m]] <- var.test(group_0, group_1)
+						variance_test_list[[m]] <- var.test(as.numeric(group_0), as.numeric(group_1))
 						# Checking variances (Non-Normal data)
-						Leven_test_list[[m]] <- levene.test(y = mass_x, group = response_variable, location = "mean", kruskal.test = T)
+						Leven_test_list[[m]] <- levene.test(y = as.numeric(mass_x), group = response_variable, location = "mean", kruskal.test = T)
 						# Normal Data, Equal Variances --> Equal Variance t-test
-						EqTTest_list[[m]] <- t.test(group_0, group_1)
+						EqTTest_list[[m]] <- t.test(as.numeric(group_0), as.numeric(group_1))
 						# Normal Data, Unequal Variances --> Unequal Variance t-test:
-						UneqTTest_list[[m]] <- t.test(group_0, group_1,var.equal = FALSE)
+						UneqTTest_list[[m]] <- t.test(as.numeric(group_0), as.numeric(group_1), var.equal = FALSE)
 						# Non-normal Data, Equal Variances --> Mann-Whitney U-test (Wilcoxon)
-						MWUTest_list[[m]] <- wilcox.test(group_0, group_1, paired = FALSE)
+						MWUTest_list[[m]] <- wilcox.test(as.numeric(group_0), as.numeric(group_1), paired = FALSE)
 						# Non-normal Data, Unequal Variances --> Kolmogorov-Smirnov test
-						KSTest_list[[m]] <- ks.test(group_0, group_1)
+						KSTest_list[[m]] <- ks.test(as.numeric(group_0), as.numeric(group_1))
 					} else {
 						### Otherwise all the results are NA...
 						shapiro_list_0[[name_group_0]] <- NA
@@ -979,6 +1032,10 @@ run_statistics_function <- function() {
 				vector_of_UneqTTest_list <- unlist(list_of_UneqTTest_list)
 				vector_of_MWUTest_list <- unlist(list_of_MWUTest_list)
 				vector_of_KSTest_list <- unlist(list_of_KSTest_list)
+				# Message (if the elements in the lists are NA it means that there weren't enough patients per class)
+				#if (is.na(vector_of_shapiro_list_0[1])) {
+				#	tkmessageBox(title = "Insufficient number of patients in one class", message = "There is an insufficient number of patients in at least one class: the statistics cannot be performed!", icon = "warning")
+				#}
 				# Matrix of patient numbers...
 				patient_number_matrix <- matrix(ncol = 2)	
 				patient_number_matrix <- do.call(rbind, number_of_patients_list)
@@ -1028,8 +1085,12 @@ run_statistics_function <- function() {
 				## Selected signals for inference
 				selected_signals_for_inference <- c(rownames(diff_normal_homoschedastic_data), rownames(diff_normal_heteroschedastic_data), rownames(diff_non_normal_homoschedastic_data), rownames(diff_non_normal_heteroschedastic_data))
 				# Print the message...
-				print("Differentially expressed signals for inference")
-				print(selected_signals_for_inference)
+				if (length(selected_signals_for_inference) > 0) {
+					print("Differentially expressed signals for inference")
+					print(selected_signals_for_inference)
+				} else {
+					print("There is an insufficient number of patients in at least one class or there is only one class: the statistics cannot be performed!")
+				}
 				# Generate a matrix with the signals for inference and the method used to identify them...
 				inference_signals_method_matrix <- rbind(matrix_diff_norm_homo, matrix_diff_norm_hetero, matrix_diff_non_norm_homo, matrix_diff_non_norm_hetero)
 				# Select the signals to be used for inference and the non-signal variable
@@ -1043,7 +1104,7 @@ run_statistics_function <- function() {
 				dir.create(file.path(output_folder, combination_names[comb]))
 				setwd(file.path(output_folder, combination_names[comb]))
 				# For each signals of inference...
-				for (s in selected_signals_for_inference){
+				for (s in selected_signals_for_inference) {
 					# Extract the intensity
 					signal_intensity <- selected_signals_for_inference_intensity_df[[s]]
 					# Extract the non-signal variable as an ordered factor
@@ -1135,7 +1196,7 @@ run_statistics_function <- function() {
 				# Go back to the output folder
 				setwd(output_folder)
 				# Restore the original data frame
-				temp_data_frame <- temp_data_frame_original
+				#temp_data_frame <- temp_data_frame_original
 			}
 		}
 		
@@ -1151,8 +1212,10 @@ run_statistics_function <- function() {
 		#################### MULTI-LEVEL EFFECT ANALYSIS OVER SIGNAL INTENSITY
 		if (isTRUE(multi_level_effect_analysis)) {
 			# Establish the variables for the multi-level effect analysis (Append the discriminant column to the previously selected variables)
-			multi_level_effect_analysis_non_features <- sort(c(discriminant_feature, multi_level_effect_analysis_non_features))
-			print("########## Simple Effect Analysis (MULTI-LEVEL) ##########")
+			if (discriminant_feature != "NONE") {
+				multi_level_effect_analysis_non_features <- sort(c(discriminant_feature, multi_level_effect_analysis_non_features))
+			}
+			print("########## MULTI-LEVEL EFFECT ANALYSIS ##########")
 			### Build up the combinations of possibilities (the possibilities are simply the name of the non-signal variables, since in each test, the test automatically reads all the levels of the variable)
 			combination_vector <- multi_level_effect_analysis_non_features
 			##### For each combination... (everytime read all the levels)
@@ -1188,36 +1251,39 @@ run_statistics_function <- function() {
 					# Extract the name of the signal...
 					m <- colnames(signals_data)[ms]
 					## Extract the column of the signal and the response variable...
-					mass_x <- temp_data_frame[, m]
+					mass_x <- as.numeric(temp_data_frame[, m])
 					response_variable <- temp_data_frame[, non_signal_variable]
 					if (isTRUE(remove_outliers_multi_level_effect_analysis)) {
 						## Outlier detection
 						# Detect the outliers (fence)
-						outliers <- boxplot(mass_x ~ response_variable, plot = FALSE)$out
+						outliers <- boxplot(as.numeric(mass_x) ~ response_variable, plot = FALSE)$out
 						# If there are some...
 						if (length(outliers) > 0) {
 							# Build the dataframe to be dumped
 							outliers_dataframe <- temp_data_frame[mass_x %in% outliers, c(non_signal_variable, m)]
 							# Signal name
-							signal_name <- rep(m, dim(outliers_dataframe)[1])
+							sign_name <- rep(m, dim(outliers_dataframe)[1])
 							# Patients
 							patients <- rownames(outliers_dataframe)
 							# Append the two columns...
-							outliers_dataframe <- cbind(outliers_dataframe, patients, signal_name)
+							outliers_dataframe <- cbind(outliers_dataframe, patients, sign_name)
 							# Fix the column names
 							colnames(outliers_dataframe) <- c(non_signal_variable,"Intensity","Patient","Mass")
 							# Store this in the final list of outlier dataframes
 							outlier_list_multi[[ms]] <- outliers_dataframe
 							# Replace the intensity in the original dataframe with NA (so that they are excluded)
-							temp_data_frame[mass_x %in% outliers, m] <- NA
+							#temp_data_frame[mass_x %in% outliers, m] <- NA
 							mass_x[mass_x %in% outliers] <- NA
 						}
 					}
-					### Clean the NA values (outliers) from the mass column and the response variable column
+					## Group the dependent variable (the mass column) according to the response variable (for Shapiro test)
+					mass_x_split <- group_dependent_variable(as.numeric(mass_x), as.factor(response_variable))
+					### Clean the NA values (outliers) from the mass column and the response variable column (after the grouping, because the NA removal can cause the loss of a response variable, if it contains only the outlier)
 					response_variable <- as.factor(response_variable[!is.na(mass_x)])
-					mass_x <- mass_x[!is.na(mass_x)]
-					## Group the dependent variable (the mass column) according to the response variable
-					mass_x_split <- group_dependent_variable(mass_x, as.factor(response_variable))
+					mass_x <- as.factor(mass_x[!is.na(mass_x)])
+					for (x in 1:length(mass_x_split)) {
+						mass_x_split[[x]] <- mass_x_split[[x]][!is.na(mass_x_split[[x]])]
+					}
 					# Define the names and the number of patients
 					number_of_patients_x_multi <- integer()
 					for (x in 1:length(mass_x_split)) {
@@ -1240,23 +1306,33 @@ run_statistics_function <- function() {
 						# Checking for normal distributed data in the groups
 						for (x in 1:length(mass_x_split)) {
 							if (length(mass_x_split[[x]]) >= 3 && length(mass_x_split[[x]]) <= 5000) {
-								shapiro_list_multi[[x]][[length(shapiro_list_multi[[x]]) + 1]] <- shapiro.test(mass_x_split[[x]])
-							} else {
+								shapiro_list_multi[[x]][[length(shapiro_list_multi[[x]]) + 1]] <- shapiro.test(as.numeric(mass_x_split[[x]]))
+							} else if (length(mass_x_split[[x]]) < 3 || length(mass_x_split[[x]]) > 5000) {
 								shapiro_list_multi[[x]][[length(shapiro_list_multi[[x]]) + 1]] <- NA
 							}
 						}
-						# Checking variances
-						bartlett_list_multi[[m]] <- bartlett.test(mass_x ~ response_variable)
-						### Anova
-						anova_list_multi[[m]] <- anova(lm(formula = mass_x ~ response_variable))
-						### Leven
-						leven_list_multi[[m]] <- levene.test(mass_x, response_variable, location = "mean", kruskal.test = T)
-						### Kruskal
-						kruskal_list_multi[[m]] <- kruskal.test(mass_x ~ response_variable)
-						### Welch
-						welch_list_multi[[m]] <- oneway.test(mass_x ~ response_variable, var.equal = F)
-						### k-sets Permutation Test for non parametric heteroschedastic data
-						permutation_test_list_multi[[m]] <- oneway_test(mass_x ~ response_variable, alternative = 'two.sided')
+						# Do everything only if the factor variable has more than one level
+						if (length(levels(as.factor(response_variable))) > 1) {
+							# Checking variances
+							bartlett_list_multi[[m]] <- bartlett.test(as.numeric(mass_x) ~ response_variable)
+							### Anova
+							anova_list_multi[[m]] <- anova(lm(formula = as.numeric(mass_x) ~ response_variable))
+							### Leven
+							leven_list_multi[[m]] <- levene.test(as.numeric(mass_x), response_variable, location = "mean", kruskal.test = T)
+							### Kruskal
+							kruskal_list_multi[[m]] <- kruskal.test(as.numeric(mass_x) ~ response_variable)
+							### Welch
+							welch_list_multi[[m]] <- oneway.test(as.numeric(mass_x) ~ response_variable, var.equal = F)
+							### k-sets Permutation Test for non parametric heteroschedastic data
+							permutation_test_list_multi[[m]] <- oneway_test(as.numeric(mass_x) ~ response_variable, alternative = 'two.sided')
+						} else {
+							bartlett_list_multi[[m]] <- NA
+							anova_list_multi[[m]] <- NA
+							leven_list_multi[[m]] <- NA	
+							kruskal_list_multi[[m]] <- NA
+							welch_list_multi[[m]] <- NA
+							permutation_test_list_multi[[m]] <- NA
+						}
 					} else {
 						for (x in 1:length(mass_x_split)) {
 							shapiro_list_multi[[x]][[length(shapiro_list_multi[[x]]) + 1]] <- NA
@@ -1294,6 +1370,10 @@ run_statistics_function <- function() {
 				vector_of_welch_pvalue <- unlist(list_of_welch_pvalue)
 				vector_of_permutation_pvalue <- unlist(list_of_permutation_pvalue)
 				vector_of_anova_pvalue <- unlist(list_of_anova_pvalue)
+				# Message (if the elements in the lists are NA it means that there weren't enough patients per class)
+				#if (is.na(vector_of_bartlett_pvalue[1])) {
+				#	tkmessageBox(title = "Insufficient number of patients in one class or all patients in one class", message = "There is an insufficient number of patients in at least one class or there is only one class: the statistics cannot be performed!", icon = "warning")
+				#}
 				# Matrix of patient numbers...
 				patient_number_matrix_multi <- matrix(ncol = 4)
 				patient_number_matrix_multi <- do.call(rbind, number_of_patients_list_multi)
@@ -1383,22 +1463,27 @@ run_statistics_function <- function() {
 				########## POST-HOC TESTS
 				### ANOVA POST-HOC	
 				post_hoc_anova_list <- list()
-				if (nrow(diff_normal_homoschedastic_data)){
+				if (nrow(diff_normal_homoschedastic_data)) {
 					# For each signal...
-					for (m in rownames(diff_normal_homoschedastic_data)){
+					for (m in rownames(diff_normal_homoschedastic_data)) {
 						## Extract the column of the signal and the response variable...
 						mass_x <- temp_data_frame[[m]]
 						response_variable <- temp_data_frame[[non_signal_variable]]
 						### Clean the NA values from the mass column and the response variable column
 						response_variable <- response_variable[!is.na(mass_x)]
 						mass_x <- mass_x[!is.na(mass_x)]
-						### Anova post hoc analysis: Tukey HSD test
-						anova_test <- aov(lm(formula = mass_x ~ response_variable))
-						# Post Hoc Tukey list creation
-						tukey_post <- TukeyHSD(anova_test)
-						rn <- rownames(tukey_post$response_variable)
-						anova_table <- cbind(rn, tukey_post$response_variable)
-						post_hoc_anova_list[[m]] <- anova_table
+						# Do not perform if the response variable has only one level...
+						if (length(levels(as.factor(response_variable))) > 1) {
+							### Anova post hoc analysis: Tukey HSD test
+							anova_test <- aov(lm(formula = mass_x ~ response_variable))
+							# Post Hoc Tukey list creation
+							tukey_post <- TukeyHSD(anova_test)
+							rn <- rownames(tukey_post$response_variable)
+							anova_table <- cbind(rn, tukey_post$response_variable)
+							post_hoc_anova_list[[m]] <- anova_table
+						} else {
+							post_hoc_anova_list[[m]] <- NA
+						}
 					}
 				}
 				### KRUSKAL-WALLIS POST-HOC	
@@ -1412,14 +1497,19 @@ run_statistics_function <- function() {
 						### Clean the NA values from the mass column and the response variable column
 						response_variable <- response_variable[!is.na(mass_x)]
 						mass_x <- mass_x[!is.na(mass_x)]
-						### Kruskal post hoc analysis: Nemenyi-Damico-Wolfe-Dunn test - coin required!
-						signal_data_frame <- data.frame(mass_x, response_variable)
-						# Post hoc test
-						NDWD <- oneway_test(mass_x ~ response_variable, data = signal_data_frame, ytrafo = function(data) trafo(data, numeric_trafo = rank), xtrafo = function(data) trafo(data, factor_trafo = function(mass_x) model.matrix(~mass_x - 1) %*% t(contrMat(table(mass_x), "Tukey"))), teststat = "max", distribution = approximate(B = 90000))
-						post_hoc_pvalue <- pvalue(NDWD, method = "single-step")
-						rn <- rownames(post_hoc_pvalue)
-						post_hoc_table <-  cbind(rn, post_hoc_pvalue)
-						post_hoc_kruskal_list[[m]] <- post_hoc_table
+						# Do not perform if the response variable has only one level...
+						if (length(levels(as.factor(response_variable))) > 1) {
+							### Kruskal post hoc analysis: Nemenyi-Damico-Wolfe-Dunn test - coin required!
+							signal_data_frame <- data.frame(mass_x, response_variable)
+							# Post hoc test
+							NDWD <- oneway_test(mass_x ~ response_variable, data = signal_data_frame, ytrafo = function(data) trafo(data, numeric_trafo = rank), xtrafo = function(data) trafo(data, factor_trafo = function(mass_x) model.matrix(~mass_x - 1) %*% t(contrMat(table(mass_x), "Tukey"))), teststat = "max", distribution = approximate(B = 90000))
+							post_hoc_pvalue <- pvalue(NDWD, method = "single-step")
+							rn <- rownames(post_hoc_pvalue)
+							post_hoc_table <-  cbind(rn, post_hoc_pvalue)
+							post_hoc_kruskal_list[[m]] <- post_hoc_table
+						} else {
+							post_hoc_kruskal_list[[m]] <- NA
+						}
 					}
 				}
 				### WELCH POST-HOC	
@@ -1433,14 +1523,19 @@ run_statistics_function <- function() {
 						### Clean the NA values from the mass column and the response variable column
 						response_variable <- response_variable[!is.na(mass_x)]
 						mass_x <- mass_x[!is.na(mass_x)]
-						### Welch post hoc analysis: Duncan-Waller post-hoc test - agricolae required!
-						degrees_of_freedom <- df.residual(lm(mass_x ~ response_variable))
-						MSerror <- deviance(lm(mass_x ~ response_variable))/degrees_of_freedom
-						Fc <- anova(lm(mass_x ~ response_variable))[1,4]
-						comparison <- waller.test(mass_x, response_variable, degrees_of_freedom, MSerror, Fc, group = FALSE)
-						rn <- rownames(as.data.frame(comparison[4]))
-						ndf <- cbind(as.data.frame(comparison[4]), rn)
-						post_hoc_welch_list[[m]] <- ndf
+						# Do not perform if the response variable has only one level...
+						if (length(levels(as.factor(response_variable))) > 1) {
+							### Welch post hoc analysis: Duncan-Waller post-hoc test - agricolae required!
+							degrees_of_freedom <- df.residual(lm(mass_x ~ response_variable))
+							MSerror <- deviance(lm(mass_x ~ response_variable))/degrees_of_freedom
+							Fc <- anova(lm(mass_x ~ response_variable))[1,4]
+							comparison <- waller.test(mass_x, response_variable, degrees_of_freedom, MSerror, Fc, group = FALSE)
+							rn <- rownames(as.data.frame(comparison[4]))
+							ndf <- cbind(as.data.frame(comparison[4]), rn)
+							post_hoc_welch_list[[m]] <- ndf
+						} else {
+							post_hoc_welch_list[[m]] <- NA
+						}
 					}
 				}
 				### PERMUTATION POST-HOC	
@@ -1454,22 +1549,31 @@ run_statistics_function <- function() {
 						### Clean the NA values from the mass column and the response variable column
 						response_variable <- response_variable[!is.na(mass_x)]
 						mass_x <- mass_x[!is.na(mass_x)]
-						### Permutation post hoc analysis: still follow Nemenyi-Damico-Wolfe-Dunn test - coin required!
-						signal_data_frame <- data.frame(mass_x, response_variable)
-						
-						NDWD <- oneway_test(mass_x ~ response_variable, data = signal_data_frame, ytrafo = function(data) trafo(data, numeric_trafo = rank), xtrafo = function(data) trafo(data, factor_trafo = function(mass_x) model.matrix(~mass_x - 1) %*% t(contrMat(table(mass_x), "Tukey"))), teststat = "max", distribution = approximate(B = 90000))
-						
-						post_hoc_pvalue  <- pvalue(NDWD, method = "single-step")
-						rn <- rownames(post_hoc_pvalue)
-						post_hoc_table <-  cbind(rn, post_hoc_pvalue)
-						post_hoc_permutation_list[[m]] <- post_hoc_table
+						# Do not perform if the response variable has only one level...
+						if (length(levels(as.factor(response_variable))) > 1) {
+							### Permutation post hoc analysis: still follow Nemenyi-Damico-Wolfe-Dunn test - coin required!
+							signal_data_frame <- data.frame(mass_x, response_variable)
+							
+							NDWD <- oneway_test(mass_x ~ response_variable, data = signal_data_frame, ytrafo = function(data) trafo(data, numeric_trafo = rank), xtrafo = function(data) trafo(data, factor_trafo = function(mass_x) model.matrix(~mass_x - 1) %*% t(contrMat(table(mass_x), "Tukey"))), teststat = "max", distribution = approximate(B = 90000))
+							
+							post_hoc_pvalue  <- pvalue(NDWD, method = "single-step")
+							rn <- rownames(post_hoc_pvalue)
+							post_hoc_table <-  cbind(rn, post_hoc_pvalue)
+							post_hoc_permutation_list[[m]] <- post_hoc_table
+						} else {
+							post_hoc_permutation_list[[m]] <- NA
+						}
 					}
 				}
 				##### Selected signals for inference
 				selected_signals_for_inference <- c(rownames(diff_normal_homoschedastic_data), rownames(diff_normal_heteroschedastic_data), rownames(diff_non_normal_homoschedastic_data), rownames(diff_non_normal_heteroschedastic_data))
 				# Print the message...
-				print("Differentially expressed signals for inference")
-				print(selected_signals_for_inference)
+				if (length(selected_signals_for_inference) > 0) {
+					print("Differentially expressed signals for inference")
+					print(selected_signals_for_inference)
+				} else {
+					print("There is an insufficient number of patients in at least one class or there is only one class: the statistics cannot be performed!")
+				}
 				# Generate a matrix with the signals for inference and the method used to identify them...
 				inference_signals_method_matrix <- rbind(matrix_diff_norm_homo, matrix_diff_norm_hetero, matrix_diff_non_norm_homo, matrix_diff_non_norm_hetero)
 				# Select the signals to be used for inference and the non-signal variable
@@ -1529,13 +1633,11 @@ run_statistics_function <- function() {
 				if (nrow(diff_normal_heteroschedastic_data)) {
 					write_posthoc_file(file_name = "PostHoc Welch", data = post_hoc_welch_list, file_format = file_format)
 				}
-				if(nrow(diff_non_normal_heteroschedastic_data)) {
+				if (nrow(diff_non_normal_heteroschedastic_data)) {
 					write_posthoc_file(file_name = "PostHoc Permutation", data = post_hoc_permutation_list, file_format = file_format)
 				}
 				# Go back to the output folder
 				setwd(output_folder)
-				# Restore the original data frame
-				temp_data_frame <- temp_data_frame_original
 			}
 		}
 		
