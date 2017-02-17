@@ -1845,184 +1845,188 @@ return (spectra)
 # The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalization). The function can be applied both to a spectra list or a single spectrum, allowing parallel computation.
 # The function allows to select some additional parameters of the preprocessing.
 # This version of the function whould be faster because each element of the spectral list is subjected to all the preprocessing step.
-preprocess_spectra <- function (spectra, tof_mode = "linear", preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), process_in_packages_of = length(spectra), align_spectra = FALSE, spectra_alignment_method = "cubic", allow_parallelization = TRUE) {
-##### Load the required libraries
-install_and_load_required_packages(c("MALDIquant", "parallel"))
-##### Rename the trim function
-trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
-##### Extract the parameters from the input list
-crop_spectra <- preprocessing_parameters$crop_spectra
-mass_range <- preprocessing_parameters$mass_range
-data_transformation <- preprocessing_parameters$data_transformation
-transformation_algorithm <- preprocessing_parameters$transformation_algorithm
-smoothing_algorithm <- preprocessing_parameters$smoothing_algorithm
-smoothing_strength <- preprocessing_parameters$smoothing_strength
-baseline_subtraction_algorithm <- preprocessing_parameters$baseline_subtraction_algorithm
-baseline_subtraction_iterations <- preprocessing_parameters$baseline_subtraction_iterations
-normalization_algorithm <- preprocessing_parameters$normalization_algorithm
-normalization_mass_range <- preprocessing_parameters$normalization_mass_range
-##### Define the smoothing half wondow size
-# Initialization
-smoothing_half_window_size <- NULL
-if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-	#if (!is.null(smoothing_strength) && smoothing_strength == "small") {
-		#if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			#smoothing_half_window_size <- 5
-		#} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			#smoothing_half_window_size <- 1
-		#}
-	if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 10
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 2
+preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), process_in_packages_of = length(spectra), align_spectra = FALSE, spectra_alignment_method = "cubic", allow_parallelization = TRUE) {
+	##### Load the required libraries
+	install_and_load_required_packages(c("MALDIquant", "parallel"))
+	##### Rename the trim function
+	trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
+	##### Extract the parameters from the input list
+	crop_spectra <- preprocessing_parameters$crop_spectra
+	mass_range <- preprocessing_parameters$mass_range
+	data_transformation <- preprocessing_parameters$data_transformation
+	transformation_algorithm <- preprocessing_parameters$transformation_algorithm
+	smoothing_algorithm <- preprocessing_parameters$smoothing_algorithm
+	smoothing_strength <- preprocessing_parameters$smoothing_strength
+	baseline_subtraction_algorithm <- preprocessing_parameters$baseline_subtraction_algorithm
+	baseline_subtraction_iterations <- preprocessing_parameters$baseline_subtraction_iterations
+	normalization_algorithm <- preprocessing_parameters$normalization_algorithm
+	normalization_mass_range <- preprocessing_parameters$normalization_mass_range
+	##### Fix the names
+	if (smoothing_algorithm == "SavitzkyGolay" || smoothing_algorithm == "Savitzky-Golay" || smoothing_algorithm == "SG") {
+		smoothing_algorithm <- "SavitzkyGolay"
+	} else if (smoothing_algorithm == "MovingAverage" || smoothing_algorithm == "Moving Average" || smoothing_algorithm == "MA") {
+		smoothing_algorithm <- "MovingAverage"
+	}
+	##### Define the smoothing half wondow size
+	if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+		#if (!is.null(smoothing_strength) && smoothing_strength == "small") {
+			#if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				#smoothing_half_window_size <- 5
+			#} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				#smoothing_half_window_size <- 1
+			#}
+		if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 10
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 2
+			}
+		} else if (!is.null(smoothing_strength) && smoothing_strength == "strong") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 20
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 4
+			}
+		} else if (!is.null(smoothing_strength) && smoothing_strength == "stronger") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 30
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 6
+			}
 		}
-	} else if (!is.null(smoothing_strength) && smoothing_strength == "strong") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 20
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 4
-		}
-	} else if (!is.null(smoothing_strength) && smoothing_strength == "stronger") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 30
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 6
+	} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+		#if (!is.null(smoothing_strength) && smoothing_strength == "small") {
+			#if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				#smoothing_half_window_size <- 1
+			#} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				#smoothing_half_window_size <- 0.2
+			#}
+		if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 3
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 0.6
+			}
+		} else if (!is.null(smoothing_strength) && smoothing_strength == "strong") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 6
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 1.2
+			}
+		} else if (!is.null(smoothing_strength) && smoothing_strength == "stronger") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 9
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 1.8
+			}
 		}
 	}
-} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-	#if (!is.null(smoothing_strength) && smoothing_strength == "small") {
-		#if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			#smoothing_half_window_size <- 1
-		#} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			#smoothing_half_window_size <- 0.2
-		#}
-	if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 3
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 0.6
+	##### Generate the preprocessing function to be applied to every element of the spectra_temp list (x = spectrum)
+	preprocessing_subfunction <- function(x, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range) {
+		### Remove flat spectra
+		# x <- removeEmptyMassObjects (x)
+		### Trimming
+		if (crop_spectra == TRUE) {
+			# Mass range specified
+			if (!is.null(mass_range)) {
+				x <- trim_spectra(x, range = mass_range)
+			}
 		}
-	} else if (!is.null(smoothing_strength) && smoothing_strength == "strong") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 6
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 1.2
+		### Transformation
+		if (data_transformation == TRUE) {
+			x <- transformIntensity(x, method = transformation_algorithm)
 		}
-	} else if (!is.null(smoothing_strength) && smoothing_strength == "stronger") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 9
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 1.8
+		### Smoothing
+		if (!is.null(smoothing_algorithm)) {
+			x <- smoothIntensity(x, method = smoothing_algorithm, halfWindowSize = smoothing_half_window_size)
 		}
-	}
-}
-##### Generate the preprocessing function to be applied to every element of the spectra_temp list (x = spectrum)
-preprocessing_subfunction <- function(x, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range) {
-	### Remove flat spectra
-	# x <- removeEmptyMassObjects (x)
-	### Trimming
-	if (crop_spectra == TRUE) {
-		# Mass range specified
-		if (!is.null(mass_range)) {
-			x <- trim_spectra(x, range = mass_range)
+		### Baseline removal
+		if (!is.null(baseline_subtraction_algorithm) && baseline_subtraction_algorithm == "TopHat") {
+			x <- removeBaseline(x, method = baseline_subtraction_algorithm)
+		} else if (!is.null(baseline_subtraction_algorithm) && baseline_subtraction_algorithm == "SNIP") {
+			# Default value for the number of iterations
+			if (baseline_subtraction_iterations <= 0) {
+				baseline_subtraction_iterations <- 100
+			}
+			x <- removeBaseline(x, method = baseline_subtraction_algorithm, iterations = baseline_subtraction_iterations)
 		}
-	}
-	### Transformation
-	if (data_transformation == TRUE) {
-		x <- transformIntensity(x, method = transformation_algorithm)
-	}
-	### Smoothing
-	if (!is.null(smoothing_algorithm)) {
-		x <- smoothIntensity(x, method = smoothing_algorithm, halfWindowSize = smoothing_half_window_size)
-	}
-	### Baseline removal
-	if (!is.null(baseline_subtraction_algorithm) && baseline_subtraction_algorithm == "TopHat") {
-		x <- removeBaseline(x, method = baseline_subtraction_algorithm)
-	} else if (!is.null(baseline_subtraction_algorithm) && baseline_subtraction_algorithm == "SNIP") {
-		# Default value for the number of iterations
-		if (baseline_subtraction_iterations <= 0) {
-			baseline_subtraction_iterations <- 100
-		}
-		x <- removeBaseline(x, method = baseline_subtraction_algorithm, iterations = baseline_subtraction_iterations)
-	}
-	### Normalization
-	if (normalization_algorithm == "TIC") {
-		if(!is.null(normalization_mass_range)) {
-			x <- calibrateIntensity(x, method = normalization_algorithm, range = normalization_mass_range)
+		### Normalization
+		if (normalization_algorithm == "TIC") {
+			if(!is.null(normalization_mass_range)) {
+				x <- calibrateIntensity(x, method = normalization_algorithm, range = normalization_mass_range)
+			} else {
+				x <- calibrateIntensity(x, method = normalization_algorithm)
+			}
 		} else {
 			x <- calibrateIntensity(x, method = normalization_algorithm)
 		}
-	} else {
-		x <- calibrateIntensity(x, method = normalization_algorithm)
+		### Return the preprocessed spectrum (x)
+		return(x)
 	}
-	### Return the preprocessed spectrum (x)
-	return(x)
-}
-######################################### Multiple spectra
-if (isMassSpectrumList(spectra)) {
-	### Trimming (same mass range for all the dataset)
-	if (crop_spectra == TRUE && is.null(mass_range)) {
-			spectra <- trim_spectra(spectra)
-	}
-	##### Detect the number of cores
-	cpu_thread_number <- detectCores(logical = TRUE) - 1
-	##### Packages of preprocessing
-	if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
-		process_in_packages_of <- length(spectra)
-	}
-	##### Create the list containing the processed spectra
-	preprocessed_spectra <- list()
-	index1 <- 1
-	index2 <- process_in_packages_of
-	spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
-	for (p in 1:spectra_packages) {
-		## If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
-		if (index2 < length(spectra)) {
-			spectra_temp <- spectra [index1:index2]
-		} else {spectra_temp <- spectra [index1:length(spectra)]}
-		## Fix the indexes at every cycle
-		index1 <- index2 + 1
-		index2 <- index2 + process_in_packages_of
-		##################### Process the selected spectra (spectra_temp)
-		##### Apply the function to the list of spectra_temp
-		if (allow_parallelization == TRUE) {
-			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-				spectra_temp <- mclapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), mc.cores = cpu_thread_number)
-			} else if (Sys.info()[1] == "Windows") {
-				cl <- makeCluster(cpu_thread_number)
-				clusterEvalQ(cl, {library(MALDIquant)})
-				clusterExport(cl = cl, varlist = c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range", "preprocessing_subfunction"), envir = environment())
-				spectra_temp <- parLapply(cl, spectra_temp, fun = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
-				stopCluster(cl)
+	######################################### Multiple spectra
+	if (isMassSpectrumList(spectra)) {
+		### Trimming (same mass range for all the dataset)
+		if (crop_spectra == TRUE && is.null(mass_range)) {
+				spectra <- trim_spectra(spectra)
+		}
+		##### Detect the number of cores
+		cpu_thread_number <- detectCores(logical = TRUE) - 1
+		##### Packages of preprocessing
+		if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
+			process_in_packages_of <- length(spectra)
+		}
+		##### Create the list containing the processed spectra
+		preprocessed_spectra <- list()
+		index1 <- 1
+		index2 <- process_in_packages_of
+		spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
+		for (p in 1:spectra_packages) {
+			## If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
+			if (index2 < length(spectra)) {
+				spectra_temp <- spectra [index1:index2]
+			} else {spectra_temp <- spectra [index1:length(spectra)]}
+			## Fix the indexes at every cycle
+			index1 <- index2 + 1
+			index2 <- index2 + process_in_packages_of
+			##################### Process the selected spectra (spectra_temp)
+			##### Apply the function to the list of spectra_temp
+			if (allow_parallelization == TRUE) {
+				if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+					spectra_temp <- mclapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), mc.cores = cpu_thread_number)
+				} else if (Sys.info()[1] == "Windows") {
+					cl <- makeCluster(cpu_thread_number)
+					clusterEvalQ(cl, {library(MALDIquant)})
+					clusterExport(cl = cl, varlist = c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range", "preprocessing_subfunction"), envir = environment())
+					spectra_temp <- parLapply(cl, spectra_temp, fun = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
+					stopCluster(cl)
+				}
+			} else {
+					spectra_temp <- preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range)
 			}
-		} else {
-				spectra_temp <- preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range)
+			########## Add to the final preprocessed spectral dataset
+			preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
 		}
+	}
+	######################################### Single spectra
+	if (!isMassSpectrumList(spectra) && isMassSpectrum(spectra)) {
+		spectra <- preprocessing_subfunction(spectra, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range)
 		########## Add to the final preprocessed spectral dataset
-		preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
+		preprocessed_spectra <- spectra
 	}
-}
-######################################### Single spectra
-if (!isMassSpectrumList(spectra) && isMassSpectrum(spectra)) {
-	spectra <- preprocessing_subfunction(spectra, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range)
-	########## Add to the final preprocessed spectral dataset
-	preprocessed_spectra <- spectra
-}
-######################################### SPECTRAL ALIGNMENT
-if (align_spectra == TRUE) {
-	if (isMassSpectrumList(preprocessed_spectra)) {
-		if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-			half_window_alignment <- 20
-			tolerance_ppm <- 2000
-		} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-			half_window_alignment <- 5
-			tolerance_ppm <- 200
+	######################################### SPECTRAL ALIGNMENT
+	if (align_spectra == TRUE) {
+		if (isMassSpectrumList(preprocessed_spectra)) {
+			if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+				half_window_alignment <- 20
+				tolerance_ppm <- 2000
+			} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+				half_window_alignment <- 5
+				tolerance_ppm <- 200
+			}
+			preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 3, tolerance=(tolerance_ppm/10^6), warpingMethod = spectra_alignment_method)
 		}
-		preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 3, tolerance=(tolerance_ppm/10^6), warpingMethod = spectra_alignment_method)
 	}
-}
-return (preprocessed_spectra)
+	return (preprocessed_spectra)
 }
 
 
@@ -9316,6 +9320,8 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 
+
+
 ##########################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
 
@@ -9350,7 +9356,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 
-################ SPECTRAL TYPER PROGRAM 2017.02.10
+################ SPECTRAL TYPER PROGRAM 2017.02.17
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 install_and_load_required_packages(c("tcltk", "XLConnect", "ggplot2"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
@@ -9370,7 +9376,7 @@ update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE)
 ###################################### Initialise the variables (default values)
 filepath_database <- NULL
 filepath_test <- NULL
-output_folder <- NULL
+output_folder <- getwd()
 average_replicates_in_database <- FALSE
 average_replicates_in_test <- FALSE
 peaks_filtering <- FALSE
@@ -9882,10 +9888,10 @@ select_samples_function <-function() {
 browse_output_function <- function() {
 	output_folder <<- tclvalue(tkchooseDirectory())
 	if (!nchar(output_folder)) {
-	    tkmessageBox(message = "No folder selected")
-	}	else {
-	    tkmessageBox(message = paste("Every file will be saved in", output_folder))
+		# Get the output folder from the default working directory
+		output_folder <- getwd()
 	}
+	tkmessageBox(message = paste("Every file will be saved in", output_folder))
 	setwd(output_folder)
 	# Exit the function and put the variable into the R workspace
 	#.GlobalEnv$output_folder <- output_folder
@@ -10641,75 +10647,120 @@ intensity_tolerance_percent <- tclVar("")
 
 ######################## GUI
 
-### FONTS
 # Get system info (Platform - Release - Version (- Linux Distro))
 system_os = Sys.info()[1]
 os_release = Sys.info()[2]
 os_version = Sys.info()[3]
+
+### Get the screen resolution
 # Windows
 if (system_os == "Windows") {
+	# Windows 7
+	if (length(grep("7", os_release, fixed = TRUE)) > 0) {
+		# Get system info
+		screen_height <- system("wmic desktopmonitor get screenheight", intern = TRUE)
+		screen_width <- system("wmic desktopmonitor get screenwidth", intern = TRUE)
+		# Retrieve the values
+		screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
+		screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
+	}
+} else if (system_os == "Linux") {
+	# Get system info
+	screen_info <- system("xdpyinfo -display :0", intern = TRUE)
+	# Get the resolution
+	screen_resolution <- screen_info[which(screen_info == "screen #0:") + 1]
+	screen_resolution <- unlist(strsplit(screen_resolution, "dimensions: ")[1])
+	screen_resolution <- unlist(strsplit(screen_resolution, "pixels"))[2]
+	# Retrieve the wto dimensions...
+	screen_width <- as.numeric(unlist(strsplit(screen_resolution, "x"))[1])
+	screen_height <- as.numeric(unlist(strsplit(screen_resolution, "x"))[2])
+}
+
+
+### FONTS
+# Default sizes (determined on a 1680x1050 screen) (in order to make them adjust to the size screen, the screen resolution should be retrieved)
+title_font_size <- 24
+other_font_size <- 11
+# Windows
+if (system_os == "Windows") {
+	# Windows 7
+	if (length(grep("7", os_release, fixed = TRUE)) > 0) {
+		# Determine the font size according to the resolution
+		total_number_of_pixels <- screen_width * screen_height
+		# Determine the scaling factor (according to a complex formula)
+		scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+		scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+		title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+		other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+	}
 	# Define the fonts
-	garamond_24_bold = tkfont.create(family = "Garamond", size = 24, weight = "bold")
-	garamond_12_normal = tkfont.create(family = "Garamond", size = 12, weight = "normal")
-	arial_24_bold = tkfont.create(family = "Arial", size = 24, weight = "bold")
-	arial_12_normal = tkfont.create(family = "Arial", size = 12, weight = "normal")
-	trebuchet_24_bold = tkfont.create(family = "Trebuchet MS", size = 24, weight = "bold")
-	trebuchet_11_normal = tkfont.create(family = "Trebuchet MS", size = 11, weight = "normal")
-	trebuchet_11_bold = tkfont.create(family = "Trebuchet MS", size = 11, weight = "bold")
+	garamond_title_bold = tkfont.create(family = "Garamond", size = title_font_size, weight = "bold")
+	garamond_other_normal = tkfont.create(family = "Garamond", size = other_font_size, weight = "normal")
+	arial_title_bold = tkfont.create(family = "Arial", size = title_font_size, weight = "bold")
+	arial_other_normal = tkfont.create(family = "Arial", size = other_font_size, weight = "normal")
+	trebuchet_title_bold = tkfont.create(family = "Trebuchet MS", size = title_font_size, weight = "bold")
+	trebuchet_other_normal = tkfont.create(family = "Trebuchet MS", size = other_font_size, weight = "normal")
+	trebuchet_other_bold = tkfont.create(family = "Trebuchet MS", size = other_font_size, weight = "bold")
 	# Use them in the GUI
-	title_font = trebuchet_24_bold
-	label_font = trebuchet_11_normal
-	entry_font = trebuchet_11_normal
-	button_font = trebuchet_11_bold
+	title_font = trebuchet_title_bold
+	label_font = trebuchet_other_normal
+	entry_font = trebuchet_other_normal
+	button_font = trebuchet_other_bold
 } else if (system_os == "Linux") {
 	# Linux
+	# Determine the font size according to the resolution
+	total_number_of_pixels <- screen_width * screen_height
+	# Determine the scaling factor (according to a complex formula)
+	scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+	scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+	title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+	other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
 	# Ubuntu
 	if (length(grep("Ubuntu", os_version, ignore.case = TRUE)) > 0) {
 		# Define the fonts
-		ubuntu_24_bold = tkfont.create(family = "Ubuntu", size = 24, weight = "bold")
-		ubuntu_12_normal = tkfont.create(family = "Ubuntu", size = 12, weight = "normal")
-		ubuntu_12_bold = tkfont.create(family = "Ubuntu", size = 12, weight = "bold")
+		ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = title_font_size, weight = "bold")
+		ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "normal")
+		ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "bold")
 		# Use them in the GUI
-		title_font = ubuntu_24_bold
-		label_font = ubuntu_12_normal
-		entry_font = ubuntu_12_normal
-		button_font = ubuntu_12_bold
+		title_font = ubuntu_title_bold
+		label_font = ubuntu_other_normal
+		entry_font = ubuntu_other_normal
+		button_font = ubuntu_other_bold
 	} else if (length(grep("Fedora", os_version, ignore.case = TRUE)) > 0) {
 		# Fedora
 		# Define the fonts
-		cantarell_24_bold = tkfont.create(family = "Cantarell", size = 24, weight = "bold")
-		cantarell_12_normal = tkfont.create(family = "Cantarell", size = 12, weight = "normal")
-		cantarell_12_bold = tkfont.create(family = "Cantarell", size = 12, weight = "bold")
+		cantarell_title_bold = tkfont.create(family = "Cantarell", size = title_font_size, weight = "bold")
+		cantarell_other_normal = tkfont.create(family = "Cantarell", size = other_font_size, weight = "normal")
+		cantarell_other_bold = tkfont.create(family = "Cantarell", size = other_font_size, weight = "bold")
 		# Use them in the GUI
-		title_font = cantarell_24_bold
-		label_font = cantarell_12_normal
-		entry_font = cantarell_12_normal
-		button_font = cantarell_12_bold
+		title_font = cantarell_title_bold
+		label_font = cantarell_other_normal
+		entry_font = cantarell_other_normal
+		button_font = cantarell_other_bold
 	} else {
 		# Other linux distros
 		# Define the fonts
-		liberation_24_bold = tkfont.create(family = "Liberation Sans", size = 24, weight = "bold")
-		liberation_12_normal = tkfont.create(family = "Liberation Sans", size = 12, weight = "normal")
-		liberation_12_bold = tkfont.create(family = "Liberation Sans", size = 12, weight = "bold")
+		liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
+		liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
+		liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
 		# Use them in the GUI
-		title_font = liberation_24_bold
-		label_font = liberation_12_normal
-		entry_font = liberation_12_normal
-		button_font = liberation_12_bold
+		title_font = liberation_title_bold
+		label_font = liberation_other_normal
+		entry_font = liberation_other_normal
+		button_font = liberation_other_bold
 	}
 } else if (system_os == "Darwin") {
 	# macOS
 	# Define the fonts
-	helvetica_24_bold = tkfont.create(family = "Helvetica", size = 24, weight = "bold")
-	helvetica_16_normal = tkfont.create(family = "Helvetica", size = 16, weight = "normal") 
-	helvetica_16_bold = tkfont.create(family = "Helvetica", size = 16, weight = "bold")
+	helvetica_title_bold = tkfont.create(family = "Helvetica", size = title_font_size, weight = "bold")
+	helvetica_other_normal = tkfont.create(family = "Helvetica", size = other_font_size, weight = "normal") 
+	helvetica_other_bold = tkfont.create(family = "Helvetica", size = other_font_size, weight = "bold")
 	# Use them in the GUI
-	title_font = helvetica_24_bold
-	label_font = helvetica_16_normal
-	entry_font = helvetica_16_normal
-	button_font = helvetica_16_bold
+	title_font = helvetica_title_bold
+	label_font = helvetica_other_normal
+	entry_font = helvetica_other_normal
+	button_font = helvetica_other_bold
 }
-
 
 
 ### Initial Messagebox
