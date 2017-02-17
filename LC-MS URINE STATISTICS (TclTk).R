@@ -550,10 +550,10 @@ run_statistics_function <- function() {
 			} else {
 				final_sheet_name <- original_file_name
 			}
-			# Fix the extension
-			file_name <- paste(file_name, ".", file_format, sep = "")
 			### Excel
 			if (file_format == "xls" || file_format == "xlsx" || file_format == "csv") {
+				# Fix the extension
+				file_name <- paste(file_name, ".xlsx", sep = "")
 				install_and_load_required_packages("XLConnect")
 				wb = loadWorkbook(file = file_name, create = TRUE)
 				# Create a new sheet
@@ -567,6 +567,8 @@ run_statistics_function <- function() {
 				writeWorksheet(wb, data = as.list(names(data)), sheet = final_sheet_name, startRow = cumlen, header = FALSE)
 				saveWorkbook(wb)
 			} else if (file_format == "csv") {
+				# Fix the extension
+				file_name <- paste(file_name, ".", file_format, sep = "")
 				output_matrix <- matrix(nrow = 1, ncol = length(data))
 				# Fill the matrix
 				for (l in 1:length(data)) {
@@ -899,8 +901,8 @@ run_statistics_function <- function() {
 				# Convert the selected non-feature variable to character
 				temp_data_frame[, non_signal_variable] <- as.character(temp_data_frame[, non_signal_variable])
 				# Replace one level (the current level l) with 0 and the other ones with 1
-				temp_data_frame[temp_data_frame[, non_signal_variable] == l, non_signal_variable] <- "0"
-				temp_data_frame[temp_data_frame[, non_signal_variable] != "0", non_signal_variable] <- "1"
+				#temp_data_frame[temp_data_frame[, non_signal_variable] == l, non_signal_variable] <- "0"
+				temp_data_frame[temp_data_frame[, non_signal_variable] != l, non_signal_variable] <- "OTHERS"
 				##### Sampling
 				if (isTRUE(sampling)){
 					
@@ -932,7 +934,7 @@ run_statistics_function <- function() {
 					m <- colnames(signals_data)[ms]
 					## Extract the column of the signal and the response variable...
 					mass_x <- temp_data_frame[, m]
-					response_variable <- as.integer(temp_data_frame[, non_signal_variable])
+					response_variable <- as.factor(temp_data_frame[, non_signal_variable])
 					### Outlier analysis 
 					if (isTRUE(remove_outliers_two_level_effect_analysis)) {
 						## Outlier detection
@@ -971,16 +973,16 @@ run_statistics_function <- function() {
 						group_0 <- mass_x_split[[1]]
 						group_1 <- mass_x_split[[2]]
 						# Define the names and the number of patients
-						name_group_0 <- sprintf("%s%s", m, "_0")
-						name_group_1 <- sprintf("%s%s", m, "_1")
+						name_group_0 <- sprintf("%s%s", m, l)
+						name_group_1 <- sprintf("%s%s", m, "_OTHERS")
 						number_of_patients_list[[m]] <- c(length(group_0),length(group_1))
 					} else if (length(mass_x_split) == 1) {
 						# Define the groups (response variable = 0, response variable = 1)
 						group_0 <- mass_x_split[[1]]
 						group_1 <- numeric()
 						# Define the names and the number of patients
-						name_group_0 <- sprintf("%s%s", m, "_0")
-						name_group_1 <- sprintf("%s%s", m, "_1")
+						name_group_0 <- sprintf("%s%s", m, l)
+						name_group_1 <- sprintf("%s%s", m, "_OTHERS")
 						number_of_patients_list[[m]] <- c(length(group_0),length(group_1))
 					}
 					### If the number of patients in the two lists is more than the minimum number of patients allowed and all the elements of the two groups are not the same...
@@ -1125,13 +1127,13 @@ run_statistics_function <- function() {
 					##### Jitter plot
 					plot_name <- sprintf("%s%s", non_signal_variable,"_VS_Intensity")
 					file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
-					jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5))
+					jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
 					ggsave(jitter_plot, file = file_name, width = 4, height = 4)
 					
 					##### Box plot
 					plot_name <- sprintf("%s%s", non_signal_variable,"_boxplot") 
 					file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
-					box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot")
+					box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
 					ggsave(box_plot, file = file_name, width = 4, height = 4)
 					
 					##### Scatter plot
@@ -1142,7 +1144,7 @@ run_statistics_function <- function() {
 					colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
 					file_name <- sprintf("%s%s%s%s", " ", s, plot_name, image_format)
 					graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
-					scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors)
+					scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
 					ggsave(scatter_plot, file = file_name , width = 4, height = 4)
 				}
 				### Dump the files
@@ -1605,12 +1607,12 @@ run_statistics_function <- function() {
 					##### Jitter plot	
 					plot_name <- sprintf("%s%s", non_signal_variable,"_VS_Intensity")
 					file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
-					jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5))
+					jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
 					ggsave(jitter_plot, file = file_name, width = 4, height = 4)
 					##### Box plot
 					plot_name <- sprintf("%s%s", non_signal_variable,"_boxplot") 
 					file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
-					box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot")
+					box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
 					ggsave(box_plot, file = file_name, width = 4, height = 4)
 					##### Scatter plot
 					plot_name <- sprintf("%s%s", non_signal_variable,"_factor-Ordered_Spectrum__VS__Intensity") 
@@ -1620,7 +1622,7 @@ run_statistics_function <- function() {
 					colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
 					file_name <- sprintf("%s%s%s%s", " ", s, plot_name, image_format)
 					graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
-					scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors)
+					scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
 					ggsave(scatter_plot, file = file_name , width = 4, height = 4)
 				}
 				### Dump the files
@@ -1815,7 +1817,7 @@ if (system_os == "Windows") {
 
 # The "area" where we will put our input lines
 window <- tktoplevel()
-tktitle(window) <- "Peak statistics"
+tktitle(window) <- "LC-MS PEAK STATISTICS"
 #### Browse
 select_input_button <- tkbutton(window, text="Import file...", command = file_import_function, font = button_font)
 browse_output_button <- tkbutton(window, text="Browse output folder", command = browse_output_function, font = button_font)
