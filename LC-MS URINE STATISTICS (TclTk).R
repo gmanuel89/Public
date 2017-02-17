@@ -553,7 +553,8 @@ run_statistics_function <- function() {
 			# Fix the extension
 			file_name <- paste(file_name, ".", file_format, sep = "")
 			### Excel
-			if (file_format == "xls" || file_format == "xlsx") {
+			if (file_format == "xls" || file_format == "xlsx" || file_format == "csv") {
+				install_and_load_required_packages("XLConnect")
 				wb = loadWorkbook(file = file_name, create = TRUE)
 				# Create a new sheet
 				createSheet(wb, name = final_sheet_name)
@@ -1094,7 +1095,7 @@ run_statistics_function <- function() {
 					print("Differentially expressed signals for inference")
 					print(selected_signals_for_inference)
 				} else {
-					print("There is an insufficient number of patients in at least one class or there is only one class: the statistics cannot be performed!")
+					print(paste("There are no differentially expressed signals between", names(l), l, "and OTHERS or there is an insuffucient number of patients in at least one class or there is only one class!"))
 				}
 				# Generate a matrix with the signals for inference and the method used to identify them...
 				inference_signals_method_matrix <- rbind(matrix_diff_norm_homo, matrix_diff_norm_hetero, matrix_diff_non_norm_homo, matrix_diff_non_norm_hetero)
@@ -1577,7 +1578,7 @@ run_statistics_function <- function() {
 					print("Differentially expressed signals for inference")
 					print(selected_signals_for_inference)
 				} else {
-					print("There is an insufficient number of patients in at least one class or there is only one class: the statistics cannot be performed!")
+					print(paste("There are no differentially expressed signals among the levels of:", non_signal_variable, "or there is an insuffucient number of patients in at least one class or there is only one class!"))
 				}
 				# Generate a matrix with the signals for inference and the method used to identify them...
 				inference_signals_method_matrix <- rbind(matrix_diff_norm_homo, matrix_diff_norm_hetero, matrix_diff_non_norm_homo, matrix_diff_non_norm_hetero)
@@ -1704,12 +1705,15 @@ os_version = Sys.info()[3]
 ### Get the screen resolution
 # Windows
 if (system_os == "Windows") {
-	# Get system info
-	screen_height <- system("wmic desktopmonitor get screenheight", intern = TRUE)
-	screen_width <- system("wmic desktopmonitor get screenwidth", intern = TRUE)
-	# Retrieve the values
-	screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
-	screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
+	# Windows 7
+	if (length(grep("7", os_release, fixed = TRUE)) > 0) {
+		# Get system info
+		screen_height <- system("wmic desktopmonitor get screenheight", intern = TRUE)
+		screen_width <- system("wmic desktopmonitor get screenwidth", intern = TRUE)
+		# Retrieve the values
+		screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
+		screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
+	}
 } else if (system_os == "Linux") {
 	# Get system info
 	screen_info <- system("xdpyinfo -display :0", intern = TRUE)
@@ -1729,10 +1733,16 @@ title_font_size <- 24
 other_font_size <- 11
 # Windows
 if (system_os == "Windows") {
-	# Determine the font size according to the resolution
-	total_number_of_pixels <- screen_width * screen_height
-	title_font_size <- as.integer(round(total_number_of_pixels / 73500))
-	other_font_size <- as.integer(round(total_number_of_pixels / 160364))
+	# Windows 7
+	if (length(grep("7", os_release, fixed = TRUE)) > 0) {
+		# Determine the font size according to the resolution
+		total_number_of_pixels <- screen_width * screen_height
+		# Determine the scaling factor (according to a complex formula)
+		scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+		scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+		title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+		other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+	}
 	# Define the fonts
 	garamond_title_bold = tkfont.create(family = "Garamond", size = title_font_size, weight = "bold")
 	garamond_other_normal = tkfont.create(family = "Garamond", size = other_font_size, weight = "normal")
@@ -1750,8 +1760,11 @@ if (system_os == "Windows") {
 	# Linux
 	# Determine the font size according to the resolution
 	total_number_of_pixels <- screen_width * screen_height
-	title_font_size <- as.integer(round(total_number_of_pixels / 73500))
-	other_font_size <- as.integer(round(total_number_of_pixels / 160364))
+	# Determine the scaling factor (according to a complex formula)
+	scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+	scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+	title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+	other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
 	# Ubuntu
 	if (length(grep("Ubuntu", os_version, ignore.case = TRUE)) > 0) {
 		# Define the fonts
@@ -1877,51 +1890,3 @@ tkgrid(TestPer_Adv_label, row = 8, column = 3)
 tkgrid(TestPer_Adv_entry, row = 8, column = 4)
 tkgrid(run_statistics_function_button, row = 9, column = 2)
 tkgrid(end_session_button, row = 9, column = 3)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
