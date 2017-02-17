@@ -1696,73 +1696,107 @@ minimum_number_of_patients <- tclVar("")
 
 ######################## GUI
 
-### FONTS
 # Get system info (Platform - Release - Version (- Linux Distro))
 system_os = Sys.info()[1]
 os_release = Sys.info()[2]
 os_version = Sys.info()[3]
+
+### Get the screen resolution
 # Windows
 if (system_os == "Windows") {
+	# Get system info
+	screen_height <- system("wmic desktopmonitor get screenheight", intern = TRUE)
+	screen_width <- system("wmic desktopmonitor get screenwidth", intern = TRUE)
+	# Retrieve the values
+	screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
+	screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
+} else if (system_os == "Linux") {
+	# Get system info
+	screen_info <- system("xdpyinfo -display :0", intern = TRUE)
+	# Get the resolution
+	screen_resolution <- screen_info[which(screen_info == "screen #0:") + 1]
+	screen_resolution <- unlist(strsplit(screen_resolution, "dimensions: ")[1])
+	screen_resolution <- unlist(strsplit(screen_resolution, "pixels"))[2]
+	# Retrieve the wto dimensions...
+	screen_width <- as.numeric(unlist(strsplit(screen_resolution, "x"))[1])
+	screen_height <- as.numeric(unlist(strsplit(screen_resolution, "x"))[2])
+}
+
+
+### FONTS
+# Default sizes (determined on a 1680x1050 screen) (in order to make them adjust to the size screen, the screen resolution should be retrieved)
+title_font_size <- 24
+other_font_size <- 11
+# Windows
+if (system_os == "Windows") {
+	# Determine the font size according to the resolution
+	total_number_of_pixels <- screen_width * screen_height
+	title_font_size <- as.integer(round(total_number_of_pixels / 73500))
+	other_font_size <- as.integer(round(total_number_of_pixels / 160364))
 	# Define the fonts
-	garamond_24_bold = tkfont.create(family = "Garamond", size = 24, weight = "bold")
-	garamond_12_normal = tkfont.create(family = "Garamond", size = 12, weight = "normal")
-	arial_24_bold = tkfont.create(family = "Arial", size = 24, weight = "bold")
-	arial_12_normal = tkfont.create(family = "Arial", size = 12, weight = "normal")
-	trebuchet_24_bold = tkfont.create(family = "Trebuchet MS", size = 24, weight = "bold")
-	trebuchet_11_normal = tkfont.create(family = "Trebuchet MS", size = 11, weight = "normal")
-	trebuchet_11_bold = tkfont.create(family = "Trebuchet MS", size = 11, weight = "bold")
+	garamond_title_bold = tkfont.create(family = "Garamond", size = title_font_size, weight = "bold")
+	garamond_other_normal = tkfont.create(family = "Garamond", size = other_font_size, weight = "normal")
+	arial_title_bold = tkfont.create(family = "Arial", size = title_font_size, weight = "bold")
+	arial_other_normal = tkfont.create(family = "Arial", size = other_font_size, weight = "normal")
+	trebuchet_title_bold = tkfont.create(family = "Trebuchet MS", size = title_font_size, weight = "bold")
+	trebuchet_other_normal = tkfont.create(family = "Trebuchet MS", size = other_font_size, weight = "normal")
+	trebuchet_other_bold = tkfont.create(family = "Trebuchet MS", size = other_font_size, weight = "bold")
 	# Use them in the GUI
-	title_font = trebuchet_24_bold
-	label_font = trebuchet_11_normal
-	entry_font = trebuchet_11_normal
-	button_font = trebuchet_11_bold
+	title_font = trebuchet_title_bold
+	label_font = trebuchet_other_normal
+	entry_font = trebuchet_other_normal
+	button_font = trebuchet_other_bold
 } else if (system_os == "Linux") {
 	# Linux
+	# Determine the font size according to the resolution
+	total_number_of_pixels <- screen_width * screen_height
+	title_font_size <- as.integer(round(total_number_of_pixels / 73500))
+	other_font_size <- as.integer(round(total_number_of_pixels / 160364))
 	# Ubuntu
 	if (length(grep("Ubuntu", os_version, ignore.case = TRUE)) > 0) {
 		# Define the fonts
-		ubuntu_24_bold = tkfont.create(family = "Ubuntu", size = 24, weight = "bold")
-		ubuntu_12_normal = tkfont.create(family = "Ubuntu", size = 12, weight = "normal")
-		ubuntu_12_bold = tkfont.create(family = "Ubuntu", size = 12, weight = "bold")
+		ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = title_font_size, weight = "bold")
+		ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "normal")
+		ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "bold")
 		# Use them in the GUI
-		title_font = ubuntu_24_bold
-		label_font = ubuntu_12_normal
-		entry_font = ubuntu_12_normal
-		button_font = ubuntu_12_bold
+		title_font = ubuntu_title_bold
+		label_font = ubuntu_other_normal
+		entry_font = ubuntu_other_normal
+		button_font = ubuntu_other_bold
 	} else if (length(grep("Fedora", os_version, ignore.case = TRUE)) > 0) {
 		# Fedora
 		# Define the fonts
-		cantarell_24_bold = tkfont.create(family = "Cantarell", size = 24, weight = "bold")
-		cantarell_12_normal = tkfont.create(family = "Cantarell", size = 12, weight = "normal")
-		cantarell_12_bold = tkfont.create(family = "Cantarell", size = 12, weight = "bold")
+		cantarell_title_bold = tkfont.create(family = "Cantarell", size = title_font_size, weight = "bold")
+		cantarell_other_normal = tkfont.create(family = "Cantarell", size = other_font_size, weight = "normal")
+		cantarell_other_bold = tkfont.create(family = "Cantarell", size = other_font_size, weight = "bold")
 		# Use them in the GUI
-		title_font = cantarell_24_bold
-		label_font = cantarell_12_normal
-		entry_font = cantarell_12_normal
-		button_font = cantarell_12_bold
+		title_font = cantarell_title_bold
+		label_font = cantarell_other_normal
+		entry_font = cantarell_other_normal
+		button_font = cantarell_other_bold
 	} else {
 		# Other linux distros
 		# Define the fonts
-		liberation_24_bold = tkfont.create(family = "Liberation Sans", size = 24, weight = "bold")
-		liberation_12_normal = tkfont.create(family = "Liberation Sans", size = 12, weight = "normal")
-		liberation_12_bold = tkfont.create(family = "Liberation Sans", size = 12, weight = "bold")
+		liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
+		liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
+		liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
 		# Use them in the GUI
-		title_font = liberation_24_bold
-		label_font = liberation_12_normal
-		entry_font = liberation_12_normal
-		button_font = liberation_12_bold
+		title_font = liberation_title_bold
+		label_font = liberation_other_normal
+		entry_font = liberation_other_normal
+		button_font = liberation_other_bold
 	}
 } else if (system_os == "Darwin") {
 	# macOS
 	# Define the fonts
-	helvetica_24_bold = tkfont.create(family = "Helvetica", size = 24, weight = "bold")
-	helvetica_16_normal = tkfont.create(family = "Helvetica", size = 16, weight = "normal") 
-	helvetica_16_bold = tkfont.create(family = "Helvetica", size = 16, weight = "bold")
+	helvetica_title_bold = tkfont.create(family = "Helvetica", size = title_font_size, weight = "bold")
+	helvetica_other_normal = tkfont.create(family = "Helvetica", size = other_font_size, weight = "normal") 
+	helvetica_other_bold = tkfont.create(family = "Helvetica", size = other_font_size, weight = "bold")
 	# Use them in the GUI
-	title_font = helvetica_24_bold
-	label_font = helvetica_16_normal
-	entry_font = helvetica_16_normal
-	button_font = helvetica_16_bold
+	title_font = helvetica_title_bold
+	label_font = helvetica_other_normal
+	entry_font = helvetica_other_normal
+	button_font = helvetica_other_bold
 }
 
 
@@ -1843,4 +1877,51 @@ tkgrid(TestPer_Adv_label, row = 8, column = 3)
 tkgrid(TestPer_Adv_entry, row = 8, column = 4)
 tkgrid(run_statistics_function_button, row = 9, column = 2)
 tkgrid(end_session_button, row = 9, column = 3)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
