@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2017.02.10
+###################### FUNCTIONS - MASS SPECTROMETRY 2017.02.17
 
 # Update the packages
 update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE)
@@ -1845,184 +1845,188 @@ return (spectra)
 # The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalization). The function can be applied both to a spectra list or a single spectrum, allowing parallel computation.
 # The function allows to select some additional parameters of the preprocessing.
 # This version of the function whould be faster because each element of the spectral list is subjected to all the preprocessing step.
-preprocess_spectra <- function (spectra, tof_mode = "linear", preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), process_in_packages_of = length(spectra), align_spectra = FALSE, spectra_alignment_method = "cubic", allow_parallelization = TRUE) {
-##### Load the required libraries
-install_and_load_required_packages(c("MALDIquant", "parallel"))
-##### Rename the trim function
-trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
-##### Extract the parameters from the input list
-crop_spectra <- preprocessing_parameters$crop_spectra
-mass_range <- preprocessing_parameters$mass_range
-data_transformation <- preprocessing_parameters$data_transformation
-transformation_algorithm <- preprocessing_parameters$transformation_algorithm
-smoothing_algorithm <- preprocessing_parameters$smoothing_algorithm
-smoothing_strength <- preprocessing_parameters$smoothing_strength
-baseline_subtraction_algorithm <- preprocessing_parameters$baseline_subtraction_algorithm
-baseline_subtraction_iterations <- preprocessing_parameters$baseline_subtraction_iterations
-normalization_algorithm <- preprocessing_parameters$normalization_algorithm
-normalization_mass_range <- preprocessing_parameters$normalization_mass_range
-##### Define the smoothing half wondow size
-# Initialization
-smoothing_half_window_size <- NULL
-if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-	#if (!is.null(smoothing_strength) && smoothing_strength == "small") {
-		#if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			#smoothing_half_window_size <- 5
-		#} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			#smoothing_half_window_size <- 1
-		#}
-	if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 10
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 2
+preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), process_in_packages_of = length(spectra), align_spectra = FALSE, spectra_alignment_method = "cubic", allow_parallelization = TRUE) {
+	##### Load the required libraries
+	install_and_load_required_packages(c("MALDIquant", "parallel"))
+	##### Rename the trim function
+	trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
+	##### Extract the parameters from the input list
+	crop_spectra <- preprocessing_parameters$crop_spectra
+	mass_range <- preprocessing_parameters$mass_range
+	data_transformation <- preprocessing_parameters$data_transformation
+	transformation_algorithm <- preprocessing_parameters$transformation_algorithm
+	smoothing_algorithm <- preprocessing_parameters$smoothing_algorithm
+	smoothing_strength <- preprocessing_parameters$smoothing_strength
+	baseline_subtraction_algorithm <- preprocessing_parameters$baseline_subtraction_algorithm
+	baseline_subtraction_iterations <- preprocessing_parameters$baseline_subtraction_iterations
+	normalization_algorithm <- preprocessing_parameters$normalization_algorithm
+	normalization_mass_range <- preprocessing_parameters$normalization_mass_range
+	##### Fix the names
+	if (smoothing_algorithm == "SavitzkyGolay" || smoothing_algorithm == "Savitzky-Golay" || smoothing_algorithm == "SG") {
+		smoothing_algorithm <- "SavitzkyGolay"
+	} else if (smoothing_algorithm == "MovingAverage" || smoothing_algorithm == "Moving Average" || smoothing_algorithm == "MA") {
+		smoothing_algorithm <- "MovingAverage"
+	}
+	##### Define the smoothing half wondow size
+	if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+		#if (!is.null(smoothing_strength) && smoothing_strength == "small") {
+			#if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				#smoothing_half_window_size <- 5
+			#} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				#smoothing_half_window_size <- 1
+			#}
+		if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 10
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 2
+			}
+		} else if (!is.null(smoothing_strength) && smoothing_strength == "strong") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 20
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 4
+			}
+		} else if (!is.null(smoothing_strength) && smoothing_strength == "stronger") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 30
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 6
+			}
 		}
-	} else if (!is.null(smoothing_strength) && smoothing_strength == "strong") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 20
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 4
-		}
-	} else if (!is.null(smoothing_strength) && smoothing_strength == "stronger") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 30
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 6
+	} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+		#if (!is.null(smoothing_strength) && smoothing_strength == "small") {
+			#if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				#smoothing_half_window_size <- 1
+			#} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				#smoothing_half_window_size <- 0.2
+			#}
+		if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 3
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 0.6
+			}
+		} else if (!is.null(smoothing_strength) && smoothing_strength == "strong") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 6
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 1.2
+			}
+		} else if (!is.null(smoothing_strength) && smoothing_strength == "stronger") {
+			if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
+				smoothing_half_window_size <- 9
+			} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
+				smoothing_half_window_size <- 1.8
+			}
 		}
 	}
-} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-	#if (!is.null(smoothing_strength) && smoothing_strength == "small") {
-		#if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			#smoothing_half_window_size <- 1
-		#} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			#smoothing_half_window_size <- 0.2
-		#}
-	if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 3
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 0.6
+	##### Generate the preprocessing function to be applied to every element of the spectra_temp list (x = spectrum)
+	preprocessing_subfunction <- function(x, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range) {
+		### Remove flat spectra
+		# x <- removeEmptyMassObjects (x)
+		### Trimming
+		if (crop_spectra == TRUE) {
+			# Mass range specified
+			if (!is.null(mass_range)) {
+				x <- trim_spectra(x, range = mass_range)
+			}
 		}
-	} else if (!is.null(smoothing_strength) && smoothing_strength == "strong") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 6
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 1.2
+		### Transformation
+		if (data_transformation == TRUE) {
+			x <- transformIntensity(x, method = transformation_algorithm)
 		}
-	} else if (!is.null(smoothing_strength) && smoothing_strength == "stronger") {
-		if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-			smoothing_half_window_size <- 9
-		} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-			smoothing_half_window_size <- 1.8
+		### Smoothing
+		if (!is.null(smoothing_algorithm)) {
+			x <- smoothIntensity(x, method = smoothing_algorithm, halfWindowSize = smoothing_half_window_size)
 		}
-	}
-}
-##### Generate the preprocessing function to be applied to every element of the spectra_temp list (x = spectrum)
-preprocessing_subfunction <- function(x, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range) {
-	### Remove flat spectra
-	# x <- removeEmptyMassObjects (x)
-	### Trimming
-	if (crop_spectra == TRUE) {
-		# Mass range specified
-		if (!is.null(mass_range)) {
-			x <- trim_spectra(x, range = mass_range)
+		### Baseline removal
+		if (!is.null(baseline_subtraction_algorithm) && baseline_subtraction_algorithm == "TopHat") {
+			x <- removeBaseline(x, method = baseline_subtraction_algorithm)
+		} else if (!is.null(baseline_subtraction_algorithm) && baseline_subtraction_algorithm == "SNIP") {
+			# Default value for the number of iterations
+			if (baseline_subtraction_iterations <= 0) {
+				baseline_subtraction_iterations <- 100
+			}
+			x <- removeBaseline(x, method = baseline_subtraction_algorithm, iterations = baseline_subtraction_iterations)
 		}
-	}
-	### Transformation
-	if (data_transformation == TRUE) {
-		x <- transformIntensity(x, method = transformation_algorithm)
-	}
-	### Smoothing
-	if (!is.null(smoothing_algorithm)) {
-		x <- smoothIntensity(x, method = smoothing_algorithm, halfWindowSize = smoothing_half_window_size)
-	}
-	### Baseline removal
-	if (!is.null(baseline_subtraction_algorithm) && baseline_subtraction_algorithm == "TopHat") {
-		x <- removeBaseline(x, method = baseline_subtraction_algorithm)
-	} else if (!is.null(baseline_subtraction_algorithm) && baseline_subtraction_algorithm == "SNIP") {
-		# Default value for the number of iterations
-		if (baseline_subtraction_iterations <= 0) {
-			baseline_subtraction_iterations <- 100
-		}
-		x <- removeBaseline(x, method = baseline_subtraction_algorithm, iterations = baseline_subtraction_iterations)
-	}
-	### Normalization
-	if (normalization_algorithm == "TIC") {
-		if(!is.null(normalization_mass_range)) {
-			x <- calibrateIntensity(x, method = normalization_algorithm, range = normalization_mass_range)
+		### Normalization
+		if (normalization_algorithm == "TIC") {
+			if(!is.null(normalization_mass_range)) {
+				x <- calibrateIntensity(x, method = normalization_algorithm, range = normalization_mass_range)
+			} else {
+				x <- calibrateIntensity(x, method = normalization_algorithm)
+			}
 		} else {
 			x <- calibrateIntensity(x, method = normalization_algorithm)
 		}
-	} else {
-		x <- calibrateIntensity(x, method = normalization_algorithm)
+		### Return the preprocessed spectrum (x)
+		return(x)
 	}
-	### Return the preprocessed spectrum (x)
-	return(x)
-}
-######################################### Multiple spectra
-if (isMassSpectrumList(spectra)) {
-	### Trimming (same mass range for all the dataset)
-	if (crop_spectra == TRUE && is.null(mass_range)) {
-			spectra <- trim_spectra(spectra)
-	}
-	##### Detect the number of cores
-	cpu_thread_number <- detectCores(logical = TRUE) - 1
-	##### Packages of preprocessing
-	if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
-		process_in_packages_of <- length(spectra)
-	}
-	##### Create the list containing the processed spectra
-	preprocessed_spectra <- list()
-	index1 <- 1
-	index2 <- process_in_packages_of
-	spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
-	for (p in 1:spectra_packages) {
-		## If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
-		if (index2 < length(spectra)) {
-			spectra_temp <- spectra [index1:index2]
-		} else {spectra_temp <- spectra [index1:length(spectra)]}
-		## Fix the indexes at every cycle
-		index1 <- index2 + 1
-		index2 <- index2 + process_in_packages_of
-		##################### Process the selected spectra (spectra_temp)
-		##### Apply the function to the list of spectra_temp
-		if (allow_parallelization == TRUE) {
-			if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-				spectra_temp <- mclapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), mc.cores = cpu_thread_number)
-			} else if (Sys.info()[1] == "Windows") {
-				cl <- makeCluster(cpu_thread_number)
-				clusterEvalQ(cl, {library(MALDIquant)})
-				clusterExport(cl = cl, varlist = c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range", "preprocessing_subfunction"), envir = environment())
-				spectra_temp <- parLapply(cl, spectra_temp, fun = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
-				stopCluster(cl)
+	######################################### Multiple spectra
+	if (isMassSpectrumList(spectra)) {
+		### Trimming (same mass range for all the dataset)
+		if (crop_spectra == TRUE && is.null(mass_range)) {
+				spectra <- trim_spectra(spectra)
+		}
+		##### Detect the number of cores
+		cpu_thread_number <- detectCores(logical = TRUE) - 1
+		##### Packages of preprocessing
+		if (process_in_packages_of <= 0 || process_in_packages_of > length(spectra)) {
+			process_in_packages_of <- length(spectra)
+		}
+		##### Create the list containing the processed spectra
+		preprocessed_spectra <- list()
+		index1 <- 1
+		index2 <- process_in_packages_of
+		spectra_packages <- ceiling(length(spectra) / process_in_packages_of)
+		for (p in 1:spectra_packages) {
+			## If the index 2 is more than the length of the spectra list, it has to be equal to the length of the list, it is not possible to go beyond the last element of the list
+			if (index2 < length(spectra)) {
+				spectra_temp <- spectra [index1:index2]
+			} else {spectra_temp <- spectra [index1:length(spectra)]}
+			## Fix the indexes at every cycle
+			index1 <- index2 + 1
+			index2 <- index2 + process_in_packages_of
+			##################### Process the selected spectra (spectra_temp)
+			##### Apply the function to the list of spectra_temp
+			if (allow_parallelization == TRUE) {
+				if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+					spectra_temp <- mclapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), mc.cores = cpu_thread_number)
+				} else if (Sys.info()[1] == "Windows") {
+					cl <- makeCluster(cpu_thread_number)
+					clusterEvalQ(cl, {library(MALDIquant)})
+					clusterExport(cl = cl, varlist = c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range", "preprocessing_subfunction"), envir = environment())
+					spectra_temp <- parLapply(cl, spectra_temp, fun = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
+					stopCluster(cl)
+				}
+			} else {
+					spectra_temp <- preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range)
 			}
-		} else {
-				spectra_temp <- preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range)
+			########## Add to the final preprocessed spectral dataset
+			preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
 		}
+	}
+	######################################### Single spectra
+	if (!isMassSpectrumList(spectra) && isMassSpectrum(spectra)) {
+		spectra <- preprocessing_subfunction(spectra, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range)
 		########## Add to the final preprocessed spectral dataset
-		preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
+		preprocessed_spectra <- spectra
 	}
-}
-######################################### Single spectra
-if (!isMassSpectrumList(spectra) && isMassSpectrum(spectra)) {
-	spectra <- preprocessing_subfunction(spectra, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range)
-	########## Add to the final preprocessed spectral dataset
-	preprocessed_spectra <- spectra
-}
-######################################### SPECTRAL ALIGNMENT
-if (align_spectra == TRUE) {
-	if (isMassSpectrumList(preprocessed_spectra)) {
-		if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-			half_window_alignment <- 20
-			tolerance_ppm <- 2000
-		} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-			half_window_alignment <- 5
-			tolerance_ppm <- 200
+	######################################### SPECTRAL ALIGNMENT
+	if (align_spectra == TRUE) {
+		if (isMassSpectrumList(preprocessed_spectra)) {
+			if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+				half_window_alignment <- 20
+				tolerance_ppm <- 2000
+			} else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+				half_window_alignment <- 5
+				tolerance_ppm <- 200
+			}
+			preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 3, tolerance=(tolerance_ppm/10^6), warpingMethod = spectra_alignment_method)
 		}
-		preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 3, tolerance=(tolerance_ppm/10^6), warpingMethod = spectra_alignment_method)
 	}
-}
-return (preprocessed_spectra)
+	return (preprocessed_spectra)
 }
 
 
