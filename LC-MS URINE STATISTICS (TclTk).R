@@ -35,7 +35,7 @@ install_and_load_required_packages <- function(required_packages, repository="ht
 	}
 }
 # RUN THE FUNCTION
-install_and_load_required_packages(c("XLConnect", "rattle", "phia", "MASS", "ggplot2", "lawstat", "coin", "multcomp", "agricolae", "tcltk", "Hmisc")) # "Rcmdr", "RcmdrPlugin.coin"
+install_and_load_required_packages(c("rattle", "phia", "MASS", "ggplot2", "lawstat", "coin", "multcomp", "agricolae", "tcltk", "Hmisc")) # "Rcmdr", "RcmdrPlugin.coin"
 # The package lawstat is used for levene test for non parametric anova
 # Update packages and load the required packages
 update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE)
@@ -111,8 +111,10 @@ output_file_type_export_choice <- function() {
 		file_format <- "csv"
 	} else if (output_format == "Microsoft Excel (.xlsx)") {
 		file_format <- "xlsx"
+		install_and_load_required_packages("XLConnect")
 	} else if (output_format == "Microsoft Excel (.xls)") {
 		file_format <- "xls"
+		install_and_load_required_packages("XLConnect")
 	}
 	# Set the value of the displaying label
 	output_file_type_export_value_label <- tklabel(window, text = output_format, font = label_font)
@@ -427,10 +429,10 @@ remove_outliers_multi_level_effect_analysis_choice <- function() {
 ##### Run the statistics
 run_statistics_function <- function() {
 	if (input_file != "") {
-		### Automatically create a subfolder with all the results
-		# Check if such subfolder exists
+		##### Automatically create a subfolder with all the results
+		## Check if such subfolder exists
 		list_of_directories <- list.dirs(output_folder, full.names = FALSE, recursive = FALSE)
-		# Check the presence of a STATISTICS folder
+		## Check the presence of a STATISTICS folder
 		STATISTICS_folder_presence <- FALSE
 		if (length(list_of_directories) > 0) {
 			for (dr in 1:length(list_of_directories)) {
@@ -439,26 +441,29 @@ run_statistics_function <- function() {
 				}
 			}
 		}
-		# If it present...
+		## If it present...
 		if (isTRUE(STATISTICS_folder_presence)) {
-			# Extract the number after the STATISTICS
-			STATISTICS_folder_number <- 0
+			## Extract the number after the STATISTICS
+			# Number for the newly created folder
+			STATISTICS_new_folder_number <- 0
+			# List of already present numbers
+			STATISTICS_present_folder_numbers <- integer()
+			# For each folder present...
 			for (dr in 1:length(list_of_directories)) {
+				# If it is named STATISTICS
 				if (length(grep("STATISTICS", list_of_directories[dr], fixed = TRUE)) > 0) {
-					STATISTICS_folder_split <- unlist(strsplit(list_of_directories[dr], "STATISTICS"))
-					try(stat_folder_number <- STATISTICS_folder_split[2])
-					if (length(STATISTICS_folder_split) > 2) {
-						try({
-							stat_folder_number <- ""
-							for (st in 2:length(STATISTICS_folder_split)) {
-								stat_folder_number <- paste(stat_folder_number, STATISTICS_folder_split[st])
-							}
-							})
-						try(STATISTICS_folder_number <- as.integer(stat_folder_number))
+					# Split the name
+					STATISTICS_present_folder_split <- unlist(strsplit(list_of_directories[dr], "STATISTICS"))
+					# Add the number to the list of STATISTICS numbers
+					try(STATISTICS_present_folder_numbers <- append(STATISTICS_present_folder_numbers, as.integer(STATISTICS_present_folder_split[2])))
 				}
 			}
+			# Sort the STATISTICS folder numbers
+			try(STATISTICS_present_folder_numbers <- sort(STATISTICS_present_folder_numbers))
+			# The new folder number will be the greater + 1
+			try(STATISTICS_new_folder_number <- STATISTICS_present_folder_numbers[length(STATISTICS_present_folder_numbers)] + 1)
 			# Generate the new subfolder
-			subfolder <- paste("STATISTICS", (STATISTICS_folder_number + 1))
+			subfolder <- paste("STATISTICS", STATISTICS_new_folder_number)
 			# Create the subfolder
 			dir.create(file.path(output_folder, subfolder))
 			# Estimate the new output folder
@@ -1838,51 +1843,4 @@ tkgrid(TestPer_Adv_label, row = 8, column = 3)
 tkgrid(TestPer_Adv_entry, row = 8, column = 4)
 tkgrid(run_statistics_function_button, row = 9, column = 2)
 tkgrid(end_session_button, row = 9, column = 3)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
