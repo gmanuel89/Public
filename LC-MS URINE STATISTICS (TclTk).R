@@ -1,8 +1,7 @@
-############################################## LC-MS URINE STATISTICS (TCL-TK GUI)
+#################### LC-MS URINE STATISTICS (TCL-TK GUI) ####################
 
-
-# Program version
-program_version <- "2017.02.20.01"
+# Program version (Specified by the program writer!!!!)
+program_version <- "2017.02.22.01"
 
 
 
@@ -98,6 +97,7 @@ remove_outliers_two_level_effect_analysis_value <- "NO"
 multi_level_effect_analysis_value <- "YES"
 remove_outliers_multi_level_effect_analysis_value <- "NO"
 cumulative_class_in_two_level_effect_analysis_value <- "NO"
+check_for_updates_value <- program_version
 
 
 
@@ -106,6 +106,63 @@ cumulative_class_in_two_level_effect_analysis_value <- "NO"
 
 
 ##################################################### DEFINE WHAT THE BUTTONS DO
+
+##### Check for updates (from my GitHub page)
+check_for_updates_function <- function() {
+	### GitHub URL where the R file is
+	github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
+	### Initialize the version number
+	online_version_number <- NULL
+	try({
+		### Read the file from the web (first 10 lines)
+		online_file <- readLines(con = github_R_url, n = 10)
+		### Retrieve the version number
+		for (l in online_file) {
+			if (length(grep("program_version", l, fixed = TRUE)) > 0) {
+				# Isolate the "variable" value
+				online_version_number <- unlist(strsplit(l, "program_version <- ", fixed = TRUE))[2]
+				# Remove the quotes
+				online_version_number <- unlist(strsplit(online_version_number, "\""))[2]
+				break
+			}
+		}
+		### Split the version number in YYYY.MM.DD
+		online_version_YYYYMMDDVV <- unlist(strsplit(online_version_number, ".", fixed=TRUE))
+		### Compare with the local version
+		local_version_YYYYMMDDVV = unlist(strsplit(program_version, ".", fixed = TRUE))
+		### Initialize the variable that says if there are updates
+		update_available = FALSE
+		### Check the versions
+		for (v in 1:length(local_version_YYYYMMDDVV)) {
+			if (as.numeric(local_version_YYYYMMDDVV[v]) < as.numeric(online_version_YYYYMMDDVV[v])) {
+				update_available <- TRUE
+				break
+			}
+		}
+		### Return messages
+		if (is.null(online_version_number)) {
+			# The version number could not be ckecked due to internet problems
+			tkmessageBox(title = "Connection problem", message = "The program version number could not be checked due to internet connection problems!\n\nManually check for updates at:\n\nhttps://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R", icon="warning")
+		} else {
+			if (update_available == TRUE) {
+				tkmessageBox(title = "Update available", message = "UPDATES AVAILABLE!\n\nDownload the updated iMatrixSpray Gcode Generator at:\n\nhttps://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R", icon="info")
+				# Update the label
+				check_for_updates_value_label <- tklabel(window, text = paste("Version:", program_version, "\nUpdated version:", online_version_number), font = label_font)
+				tkgrid(check_for_updates_value_label, row = 1, column = 4)
+				# Download the file
+				setwd(output_folder)
+				download.file(url = "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R", destfile = "LC-MS Urine Statistics (GUI TclTk).R", method = "auto")
+				tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\nLC-MS Urine Statistics (GUI TclTk).R\n\nhas been downloaded to:\n\n", output_folder), icon = "info")
+			} else {
+				tkmessageBox(title = "No update available", message = "NO UPDATES AVAILABLE!\n\nThe latest version is running!", icon="info")
+			}
+		}
+	})
+	### Something went wrong: library not installed, retrieving failed, errors in parsing the version number
+	if (is.null(online_version_number)) {
+		tkmessageBox(title = "Connection problem", message = "The program version number could not be checked due to internet connection problems!\n\nManually check for updates at:\n\nhttps://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R", icon="warning")
+	}
+}
 
 ##### Output file type (export)
 output_file_type_export_choice <- function() {
@@ -1891,9 +1948,11 @@ cumulative_class_in_two_level_effect_analysis_entry <- tkbutton(window, text="Cu
 #TestPer_Adv_entry <- tkentry(window, width = 10, textvariable = TestPer_Adv, font = entry_font)
 #tkinsert(TestPer_Adv_entry, "end", "0.19")
 # Buttons
+check_for_updates_button <- tkbutton(window, text="CHECK FOR UPDATES", command = check_for_updates_function, font = button_font)
 run_statistics_function_button <- tkbutton(window, text="RUN STATISTICS", command = run_statistics_function, font = button_font)
 end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
 #### Displaying labels
+check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font)
 output_file_type_export_value_label <- tklabel(window, text = output_file_type_export_value, font = label_font)
 image_file_type_export_value_label <- tklabel(window, text = image_file_type_export_value, font = label_font)
 data_record_value_label <- tklabel(window, text = data_record_value, font = label_font)
@@ -1905,8 +1964,10 @@ multi_level_effect_analysis_value_label <- tklabel(window, text = multi_level_ef
 remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_multi_level_effect_analysis_value, font = label_font)
 cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font)
 #### Geometry manager
-tkgrid(select_input_button, row = 1, column = 1)
-tkgrid(browse_output_button, row = 1, column = 2)
+tkgrid(check_for_updates_button, row = 1, column = 3)
+tkgrid(check_for_updates_value_label, row = 1, column = 4)
+tkgrid(select_input_button, row = 1, column = 2)
+tkgrid(browse_output_button, row = 1, column = 1)
 tkgrid(output_file_type_export_entry, row = 2, column = 1)
 tkgrid(image_file_type_export_entry, row = 3, column = 1)
 tkgrid(data_record_entry, row = 4, column = 1)
