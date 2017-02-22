@@ -1,6 +1,8 @@
-############################################## LC-MS URINE STATISTICS (TCL-TK GUI) 2017.02.17
+############################################## LC-MS URINE STATISTICS (TCL-TK GUI)
 
 
+# Program version
+program_version <- "2017.02.20"
 
 
 
@@ -71,6 +73,8 @@ two_level_effect_analysis  <- TRUE
 sampling <- FALSE
 # Outlier estimation in the 2-level effect analysis
 remove_outliers_two_level_effect_analysis <- FALSE
+# Cumulative class in two level effect
+cumulative_class_in_two_level_effect_analysis <- FALSE
 ### Effect Analysis (Multi-Level Effects) Stima pT (pT4 e pT5 sono uniti) e Grade
 multi_level_effect_analysis <- TRUE
 remove_outliers_multi_level_effect_analysis <- FALSE
@@ -93,6 +97,7 @@ two_level_effect_analysis_value <- "YES"
 remove_outliers_two_level_effect_analysis_value <- "NO"
 multi_level_effect_analysis_value <- "YES"
 remove_outliers_multi_level_effect_analysis_value <- "NO"
+cumulative_class_in_two_level_effect_analysis_value <- "NO"
 
 
 
@@ -354,6 +359,30 @@ two_level_effect_analysis_choice <- function() {
 	.GlobalEnv$two_level_effect_analysis_value <- two_level_effect_analysis_value
 }
 
+##### Cumulative class in Two-level effect analysis
+cumulative_class_in_two_level_effect_analysis_choice <- function() {
+	# Catch the value from the menu
+	cumulative_class_in_two_level_effect_analysis <- select.list(c("YES","NO"), title="Choose")
+	# Default
+	if (cumulative_class_in_two_level_effect_analysis == "YES" || cumulative_class_in_two_level_effect_analysis == "") {
+		cumulative_class_in_two_level_effect_analysis <- TRUE
+	}
+	if (cumulative_class_in_two_level_effect_analysis == "NO") {
+		cumulative_class_in_two_level_effect_analysis <- FALSE
+	}
+	# Set the value of the displaying label
+	if (cumulative_class_in_two_level_effect_analysis == TRUE) {
+		cumulative_class_in_two_level_effect_analysis_value <- "YES"
+	} else {
+		cumulative_class_in_two_level_effect_analysis_value <- "NO"
+	}
+	cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font)
+	tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 7, column = 4)
+	# Escape the function
+	.GlobalEnv$cumulative_class_in_two_level_effect_analysis <- cumulative_class_in_two_level_effect_analysis
+	.GlobalEnv$cumulative_class_in_two_level_effect_analysis_value <- cumulative_class_in_two_level_effect_analysis_value
+}
+
 ##### Multi-level effect analysis
 multi_level_effect_analysis_choice <- function() {
 	# Catch the value from the menu
@@ -491,12 +520,12 @@ run_statistics_function <- function() {
 		pvalue_tests <- tclvalue(pvalue_tests)
 		pvalue_tests <- as.numeric(pvalue_tests)
 		pvalue_tests_value <- as.character(pvalue_tests)
-		TestPer_Base <- tclvalue(TestPer_Base)
-		TestPer_Base <- as.numeric(TestPer_Base)
-		TestPer_Base_value <- as.character(TestPer_Base)
-		TestPer_Adv <- tclvalue(TestPer_Adv)
-		TestPer_Adv <- as.numeric(TestPer_Adv)
-		TestPer_Adv_value <- as.character(TestPer_Adv)
+		#TestPer_Base <- tclvalue(TestPer_Base)
+		#TestPer_Base <- as.numeric(TestPer_Base)
+		#TestPer_Base_value <- as.character(TestPer_Base)
+		#TestPer_Adv <- tclvalue(TestPer_Adv)
+		#TestPer_Adv <- as.numeric(TestPer_Adv)
+		#TestPer_Adv_value <- as.character(TestPer_Adv)
 		minimum_number_of_patients <- tclvalue(minimum_number_of_patients)
 		minimum_number_of_patients <- as.integer(minimum_number_of_patients)
 		minimum_number_of_patients_value <- as.character(minimum_number_of_patients)
@@ -521,7 +550,7 @@ run_statistics_function <- function() {
 				NULL
 			}
 		}
-		################################
+		################################ P-value extractor functions
 		
 		assumption_p <- function(objt) {
 			ifelse(is.object(objt), return(objt$p.value), return(NA))
@@ -534,7 +563,7 @@ run_statistics_function <- function() {
 		}
 		
 		
-		#################  Post hoc 
+		#################  Post hoc tests
 		write_posthoc_file <- function(file_name, data, file_format = "xlsx"){
 			# Store the original filename
 			original_file_name <- file_name
@@ -578,6 +607,7 @@ run_statistics_function <- function() {
 				write.csv(output_matrix, file = file_name)
 			}
 		}
+		
 		###################################################
 		
 		sammy <- function(pn, minpos, maxpos){
@@ -698,7 +728,7 @@ run_statistics_function <- function() {
 			# If there are only two classes...
 				# Generate a dataframe with those two classes, otherwise dump one dataframe per each class
 				list_of_dataframes[[1]] <- input_data[,!(names(input_data) %in% non_signals)]
-				list_of_filenames <- "Control_vs_Disease"
+				list_of_filenames <- paste("Class", class_list[1], "vs", class_list[2])
 			} else if (length(class_list) > 2) {
 				# If there are more than two classes...
 				for (cl in 1:length(class_list)) {
@@ -880,7 +910,11 @@ run_statistics_function <- function() {
 			# Generate the combination names (each element of the vector vs the others)
 			combination_names <- character()
 			for (l in 1:length(combination_vector)) {
-				combination_name <- paste(names(combination_vector[l]), combination_vector[l], "vs OTHERS")
+				if (isTRUE(cumulative_class_in_two_level_effect_analysis)) {
+					combination_name <- paste(names(combination_vector[l]), combination_vector[l], "vs OTHERS more than", combination_vector[l])
+				} else {
+					combination_name <- paste(names(combination_vector[l]), combination_vector[l], "vs OTHERS")
+				}
 				combination_names <- append(combination_names, combination_name)
 			}
 			##### For each combination... (everytime fall on the 0-1 case, by replacing values)
@@ -900,9 +934,18 @@ run_statistics_function <- function() {
 				temp_data_frame <- temp_data_frame[!is.na(temp_data_frame[, non_signal_variable]), ]
 				# Convert the selected non-feature variable to character
 				temp_data_frame[, non_signal_variable] <- as.character(temp_data_frame[, non_signal_variable])
-				# Replace one level (the current level l) with 0 and the other ones with 1
-				#temp_data_frame[temp_data_frame[, non_signal_variable] == l, non_signal_variable] <- "0"
-				temp_data_frame[temp_data_frame[, non_signal_variable] != l, non_signal_variable] <- "OTHERS"
+				if (isTRUE(cumulative_class_in_two_level_effect_analysis)) {
+					# Replace one level (the current level l) with 0 and the other ones (more than the selected one) with 1 (cumulative option), discarding the others (less than the selected one) (by setting them as NAs and then removing them)
+					#temp_data_frame[temp_data_frame[, non_signal_variable] == l, non_signal_variable] <- "0"
+					try(temp_data_frame[as.numeric(temp_data_frame[, non_signal_variable]) < as.numeric(l), non_signal_variable] <- NA)
+					# Remove NAs from the non signal and from the signal
+					temp_data_frame <- temp_data_frame[!is.na(temp_data_frame[, non_signal_variable]), ]
+					try(temp_data_frame[as.numeric(temp_data_frame[, non_signal_variable]) > as.numeric(l), non_signal_variable] <- paste(">", l))
+				} else {
+					# Replace one level (the current level l) with 0 and the other ones with 1 (non-cumulative option)
+					#temp_data_frame[temp_data_frame[, non_signal_variable] == l, non_signal_variable] <- "0"
+					temp_data_frame[temp_data_frame[, non_signal_variable] != l, non_signal_variable] <- "OTHERS"
+				}
 				##### Sampling
 				if (isTRUE(sampling)){
 					
@@ -1691,8 +1734,8 @@ run_statistics_function <- function() {
 ########## List of variables, whose values are taken from the entries in the GUI
 pvalue_expression <- tclVar("")
 pvalue_tests <- tclVar("")
-TestPer_Base <- tclVar("")
-TestPer_adv <- tclVar("")
+#TestPer_Base <- tclVar("")
+#TestPer_adv <- tclVar("")
 minimum_number_of_patients <- tclVar("")
 
 
@@ -1840,12 +1883,13 @@ tkinsert(pvalue_expression_entry, "end", "0.05")
 pvalue_tests_label <- tklabel(window, text="p-value for significance\nin statistical tests", font = label_font)
 pvalue_tests_entry <- tkentry(window, width = 10, textvariable = pvalue_tests, font = entry_font)
 tkinsert(pvalue_tests_entry, "end", "0.05")
-TestPer_Base_label <- tklabel(window, text="TestPer_Base", font = label_font)
-TestPer_Base_entry <- tkentry(window, width = 10, textvariable = TestPer_Base, font = entry_font)
-tkinsert(TestPer_Base_entry, "end", "0.17")
-TestPer_Adv_label <- tklabel(window, text="TestPer_Adv", font = label_font)
-TestPer_Adv_entry <- tkentry(window, width = 10, textvariable = TestPer_Adv, font = entry_font)
-tkinsert(TestPer_Adv_entry, "end", "0.19")
+cumulative_class_in_two_level_effect_analysis_entry <- tkbutton(window, text="Cumulative class in the\ntwo-level effect analysis", command = cumulative_class_in_two_level_effect_analysis_choice, font = button_font)
+#TestPer_Base_label <- tklabel(window, text="TestPer_Base", font = label_font)
+#TestPer_Base_entry <- tkentry(window, width = 10, textvariable = TestPer_Base, font = entry_font)
+#tkinsert(TestPer_Base_entry, "end", "0.17")
+#TestPer_Adv_label <- tklabel(window, text="TestPer_Adv", font = label_font)
+#TestPer_Adv_entry <- tkentry(window, width = 10, textvariable = TestPer_Adv, font = entry_font)
+#tkinsert(TestPer_Adv_entry, "end", "0.19")
 # Buttons
 run_statistics_function_button <- tkbutton(window, text="RUN STATISTICS", command = run_statistics_function, font = button_font)
 end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
@@ -1859,6 +1903,7 @@ two_level_effect_analysis_value_label <- tklabel(window, text = two_level_effect
 remove_outliers_two_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_two_level_effect_analysis_value, font = label_font)
 multi_level_effect_analysis_value_label <- tklabel(window, text = multi_level_effect_analysis_value, font = label_font)
 remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_multi_level_effect_analysis_value, font = label_font)
+cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font)
 #### Geometry manager
 tkgrid(select_input_button, row = 1, column = 1)
 tkgrid(browse_output_button, row = 1, column = 2)
@@ -1886,9 +1931,11 @@ tkgrid(pvalue_expression_label, row = 7, column = 1)
 tkgrid(pvalue_expression_entry, row = 7, column = 2)
 tkgrid(pvalue_tests_label, row = 8, column = 1)
 tkgrid(pvalue_tests_entry, row = 8, column = 2)
-tkgrid(TestPer_Base_label, row = 7, column = 3)
-tkgrid(TestPer_Base_entry, row = 7, column = 4)
-tkgrid(TestPer_Adv_label, row = 8, column = 3)
-tkgrid(TestPer_Adv_entry, row = 8, column = 4)
+tkgrid(cumulative_class_in_two_level_effect_analysis_entry, row = 7, column = 3)
+tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 7, column = 4)
+#tkgrid(TestPer_Base_label, row = 7, column = 3)
+#tkgrid(TestPer_Base_entry, row = 7, column = 4)
+#tkgrid(TestPer_Adv_label, row = 8, column = 3)
+#tkgrid(TestPer_Adv_entry, row = 8, column = 4)
 tkgrid(run_statistics_function_button, row = 9, column = 2)
 tkgrid(end_session_button, row = 9, column = 3)
