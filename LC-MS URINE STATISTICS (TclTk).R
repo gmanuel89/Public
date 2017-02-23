@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.02.23.1"
+R_script_version <- "2017.02.23.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
 ### Name of the file when downloaded
@@ -194,7 +194,7 @@ download_updates_function <- function() {
 			file_downloaded <- TRUE
 		})
 		if (file_downloaded == TRUE) {
-			tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, sep = ""), icon = "info")
+			tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
 		} else {
 			tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url, sep = ""), icon = "warning")
 		}
@@ -553,6 +553,8 @@ remove_outliers_multi_level_effect_analysis_choice <- function() {
 
 ##### Run the statistics
 run_statistics_function <- function() {
+	# Go to the working directory
+	setwd(output_folder)
 	if (input_file != "") {
 		##### Automatically create a subfolder with all the results
 		## Check if such subfolder exists
@@ -834,8 +836,9 @@ run_statistics_function <- function() {
 				}
 			}
 			# Create the folder containing all the data frames (and go to it temporarily to dump the files)
-			dir.create(file.path(output_folder, "Data"))
-			setwd(file.path(output_folder, "Data"))
+			data_rec_subfolder <- file.path(output_folder, "Data")
+			dir.create(data_rec_subfolder)
+			setwd(data_rec_subfolder)
 			# Dump the dataframes
 			for (d in 1:length(list_of_dataframes)) {
 				write_file(file_name = list_of_filenames[d], data = list_of_dataframes[[d]], file_format = file_format)
@@ -855,8 +858,9 @@ run_statistics_function <- function() {
 			features_for_correlation_analysis <- append(non_signals_for_correlation_analysis, names(signals_data))
 			print("########## CORRELATION ANALYSIS ##########")
 			##### Create the folder for the correlation data
-			dir.create(file.path(output_folder, "Correlation"))
-			setwd(file.path(output_folder, "Correlation"))
+			correlation_subfolder <- file.path(output_folder, "Correlation")
+			dir.create(correlation_subfolder)
+			setwd(correlation_subfolder)
 			########## Task #1: -- RCC correlation analysis 
 			#Rcc Age VS Signal intensity
 			#Rcc Dim VS Signal intensity
@@ -1015,6 +1019,11 @@ run_statistics_function <- function() {
 			}
 			##### For each combination... (everytime fall on the 0-1 case, by replacing values)
 			for (comb in 1:length(combination_names)) {
+				# Create the folder in which every file goes
+				# Create the folder where to dump the files and go to it...
+				combination_subfolder <- file.path(output_folder, combination_names[comb])
+				dir.create(combination_subfolder)
+				setwd(combination_subfolder)
 				# Message
 				print(paste("Processing ->", combination_names[comb]))
 				########## Each time put one class with the value 0 and the others with 1
@@ -1037,10 +1046,14 @@ run_statistics_function <- function() {
 					# Remove NAs from the non signal and from the signal
 					temp_data_frame <- temp_data_frame[!is.na(temp_data_frame[, non_signal_variable]), ]
 					try(temp_data_frame[as.numeric(temp_data_frame[, non_signal_variable]) > as.numeric(l), non_signal_variable] <- paste(">", l))
+					# Generate a corresponding temp data frame but without outliers
+					temp_data_frame_no_outliers <- temp_data_frame
 				} else {
 					# Replace one level (the current level l) with 0 and the other ones with 1 (non-cumulative option)
 					#temp_data_frame[temp_data_frame[, non_signal_variable] == l, non_signal_variable] <- "0"
 					temp_data_frame[temp_data_frame[, non_signal_variable] != l, non_signal_variable] <- "OTHERS"
+					# Generate a corresponding temp data frame but without outliers
+					temp_data_frame_no_outliers <- temp_data_frame
 				}
 				##### Sampling
 				if (isTRUE(sampling)){
@@ -1094,7 +1107,7 @@ run_statistics_function <- function() {
 							# Store this in the final list of outlier dataframes
 							outlier_list[[ms]] <- outliers_dataframe
 							# Replace the intensity in the original dataframe with NA (so that they are excluded)
-							#temp_data_frame[mass_x %in% outliers, m] <- NA
+							temp_data_frame_no_outliers[mass_x %in% outliers, m] <- NA
 							mass_x[mass_x %in% outliers] <- NA
 						}
 					}
@@ -1242,15 +1255,18 @@ run_statistics_function <- function() {
 				inference_signals_method_matrix <- rbind(matrix_diff_norm_homo, matrix_diff_norm_hetero, matrix_diff_non_norm_homo, matrix_diff_non_norm_hetero)
 				# Select the signals to be used for inference and the non-signal variable
 				selected_signals_for_inference_intensity_df <- subset(temp_data_frame, select = c(non_signal_variable, selected_signals_for_inference))
-				
+				if (remove_outliers_two_level_effect_analysis == TRUE) {
+					selected_signals_for_inference_intensity_df_no_outliers <- subset(temp_data_frame_no_outliers, select = c(non_signal_variable, selected_signals_for_inference))
+				}
 				### data for testing: for diagnostic analysis 
 				if (isTRUE(sampling)) TEST <- DIAGTFD[c("No",BaseEffName,non_signal_variable,SelectedSignsForEffect)]
-				
 				############################### Dump the files
-				# Create the folder where to dump the files and go to it...
-				dir.create(file.path(output_folder, combination_names[comb]))
-				setwd(file.path(output_folder, combination_names[comb]))
 				# For each signals of inference...
+				### OUTLIERS
+				# Create the folder where to dump the files and go to it...
+				plots_two_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots")
+				dir.create(plots_two_level_effect_analysis_subfolder)
+				setwd(plots_two_level_effect_analysis_subfolder)
 				for (s in selected_signals_for_inference) {
 					# Extract the intensity
 					signal_intensity <- selected_signals_for_inference_intensity_df[[s]]
@@ -1286,6 +1302,52 @@ run_statistics_function <- function() {
 					scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
 					ggsave(scatter_plot, file = file_name , width = 4, height = 4)
 				}
+				### NO OUTLIERS
+				if (remove_outliers_two_level_effect_analysis == TRUE) {
+					# Create the folder where to dump the files and go to it...
+					plots_two_level_effect_analysis_no_outliers_subfolder <- file.path(combination_subfolder, "Plots (No outliers)")
+					dir.create(plots_two_level_effect_analysis_no_outliers_subfolder)
+					setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
+					for (s in selected_signals_for_inference) {
+						# Extract the intensity
+						signal_intensity <- selected_signals_for_inference_intensity_df_no_outliers[[s]]
+						# Extract the non-signal variable as an ordered factor
+						non_signal_as_ordered_factor <- ordered(temp_data_frame_no_outliers[, non_signal_variable])
+						# Remove possible NA values
+						non_signal_as_ordered_factor <- non_signal_as_ordered_factor[!is.na(signal_intensity)]
+						signal_intensity <- signal_intensity[!is.na(signal_intensity)]
+						# Number the observations
+						IDs <- c(1:length(signal_intensity))
+						# Generate a matrix with the ID, the intensities of the selected signal for inference and the non-signal variable
+						signal_dataframe <- data.frame(IDs, signal_intensity, non_signal_as_ordered_factor)
+						##### Jitter plot
+						plot_name <- sprintf("%s%s", non_signal_variable,"_VS_Intensity")
+						file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
+						jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+						ggsave(jitter_plot, file = file_name, width = 4, height = 4)
+						
+						##### Box plot
+						plot_name <- sprintf("%s%s", non_signal_variable,"_boxplot") 
+						file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
+						box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+						ggsave(box_plot, file = file_name, width = 4, height = 4)
+						
+						##### Scatter plot
+						plot_name <- sprintf("%s%s", non_signal_variable,"_factor-Ordered_Spectrum__VS__Intensity") 
+						# Sort the dataframe rows according to the values of the non-signal variable
+						ordered_signal_dataframe <- signal_dataframe[order(non_signal_as_ordered_factor),]
+						ordered_signal_dataframe <- cbind(ordered_signal_dataframe, c(1:nrow(signal_dataframe[order(non_signal_as_ordered_factor),])))
+						colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
+						file_name <- sprintf("%s%s%s%s", " ", s, plot_name, image_format)
+						graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
+						scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+						ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+					}
+				}
+				# Create the folder where to dump the files and go to it...
+				tables_two_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Tables")
+				dir.create(tables_two_level_effect_analysis_subfolder)
+				setwd(tables_two_level_effect_analysis_subfolder)
 				### Dump the files
 				write_file(file_name = "Patient number matrix", data = patient_number_matrix, file_format = file_format)
 				write_file(file_name = "Outliers", data = outlier_matrix, file_format = file_format)
@@ -1367,17 +1429,25 @@ run_statistics_function <- function() {
 			combination_vector <- multi_level_effect_analysis_non_features
 			##### For each combination... (everytime read all the levels)
 			for (comb in 1:length(combination_vector)) {
+				# Create the folder in which every file goes
+				# Create the folder where to dump the files and go to it...
+				combination_subfolder <- file.path(output_folder, paste(combination_vector[comb], "(multi-level)"))
+				dir.create(combination_subfolder)
+				setwd(combination_subfolder)
+				# Message
 				print(paste("Simple effects (multi-level) -> ", combination_vector[comb]))
 				# Non signal variable
 				non_signal_variable <- combination_vector[comb]
 				# Isolate the dataframe with the signals + the selected non-signal variable
 				temp_data_frame <- input_data[, c(non_signal_variable, names(signals_data))]
-				# Remove NAs from the non signal and from the signal
-				temp_data_frame <- temp_data_frame[!is.na(temp_data_frame[, non_signal_variable]), ]
 				# Store the original data frame
 				temp_data_frame_original <- temp_data_frame
+				# Remove NAs from the non signal and from the signal
+				temp_data_frame <- temp_data_frame[!is.na(temp_data_frame[, non_signal_variable]), ]
 				# Convert the selected non-feature variable to character
 				temp_data_frame[, non_signal_variable] <- as.character(temp_data_frame[, non_signal_variable])
+				# Generate a corresponding temp data frame but without outliers
+				temp_data_frame_no_outliers <- temp_data_frame
 				# Levels of the non-signal variable
 				levels_non_signal_variable <- levels(as.factor(temp_data_frame[, non_signal_variable]))
 				### Output initialization
@@ -1419,7 +1489,7 @@ run_statistics_function <- function() {
 							# Store this in the final list of outlier dataframes
 							outlier_list_multi[[ms]] <- outliers_dataframe
 							# Replace the intensity in the original dataframe with NA (so that they are excluded)
-							#temp_data_frame[mass_x %in% outliers, m] <- NA
+							temp_data_frame_no_outliers[mass_x %in% outliers, m] <- NA
 							mass_x[mass_x %in% outliers] <- NA
 						}
 					}
@@ -1725,11 +1795,16 @@ run_statistics_function <- function() {
 				inference_signals_method_matrix <- rbind(matrix_diff_norm_homo, matrix_diff_norm_hetero, matrix_diff_non_norm_homo, matrix_diff_non_norm_hetero)
 				# Select the signals to be used for inference and the non-signal variable
 				selected_signals_for_inference_intensity_df <- subset(temp_data_frame, select = c(non_signal_variable, selected_signals_for_inference))
+				# Select the signals to be used for inference and the non-signal variable (NO OUTLIERS)
+				if (remove_outliers_multi_level_effect_analysis == TRUE) {
+					selected_signals_for_inference_intensity_df_no_outliers <- subset(temp_data_frame_no_outliers, select = c(non_signal_variable, selected_signals_for_inference))
+				}
 				########### Dump the files
+				# OUTLIERS
 				# Create the folder where to dump the files and go to it...
-				subfolder <- paste(combination_vector[comb], "multi-levels")
-				dir.create(file.path(output_folder, subfolder))
-				setwd(file.path(output_folder, subfolder))
+				plots_multi_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots")
+				dir.create(plots_multi_level_effect_analysis_subfolder)
+				setwd(plots_multi_level_effect_analysis_subfolder)
 				# For each signals of inference...
 				for (s in selected_signals_for_inference) {
 					# Extract the intensity
@@ -1764,7 +1839,52 @@ run_statistics_function <- function() {
 					scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
 					ggsave(scatter_plot, file = file_name , width = 4, height = 4)
 				}
+				### NO OUTLIERS
+				if (remove_outliers_multi_level_effect_analysis == TRUE) {
+					# Create the folder where to dump the files and go to it...
+					plots_multi_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots (No outliers)")
+					dir.create(plots_multi_level_effect_analysis_subfolder)
+					setwd(plots_multi_level_effect_analysis_subfolder)
+					# For each signals of inference...
+					for (s in selected_signals_for_inference) {
+						# Extract the intensity
+						signal_intensity <- selected_signals_for_inference_intensity_df_no_outliers[[s]]
+						# Extract the non-signal variable as an ordered factor
+						non_signal_as_ordered_factor <- ordered(temp_data_frame_no_outliers[, non_signal_variable])
+						# Remove possible NA values
+						non_signal_as_ordered_factor <- non_signal_as_ordered_factor[!is.na(signal_intensity)]
+						signal_intensity <- signal_intensity[!is.na(signal_intensity)]
+						# Number the observations
+						IDs <- c(1:length(signal_intensity))
+						# Generate a matrix with the ID, the intensities of the selected signal for inference and the non-signal variable
+						signal_dataframe <- data.frame(IDs, signal_intensity, non_signal_as_ordered_factor)
+						##### Jitter plot	
+						plot_name <- sprintf("%s%s", non_signal_variable,"_VS_Intensity")
+						file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
+						jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+						ggsave(jitter_plot, file = file_name, width = 4, height = 4)
+						##### Box plot
+						plot_name <- sprintf("%s%s", non_signal_variable,"_boxplot") 
+						file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
+						box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+						ggsave(box_plot, file = file_name, width = 4, height = 4)
+						##### Scatter plot
+						plot_name <- sprintf("%s%s", non_signal_variable,"_factor-Ordered_Spectrum__VS__Intensity") 
+						# Sort the dataframe rows according to the values of the non-signal variable
+						ordered_signal_dataframe <- signal_dataframe[order(non_signal_as_ordered_factor),]
+						ordered_signal_dataframe <- cbind(ordered_signal_dataframe, c(1:nrow(signal_dataframe[order(non_signal_as_ordered_factor),])))
+						colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
+						file_name <- sprintf("%s%s%s%s", " ", s, plot_name, image_format)
+						graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
+						scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+						ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+					}
+				}
 				### Dump the files
+				# Create the folder where to dump the files and go to it...
+				tables_multi_level_effect_analysis <- file.path(combination_subfolder, "Tables")
+				dir.create(tables_multi_level_effect_analysis)
+				setwd(tables_multi_level_effect_analysis)
 				write_file(file_name = "Patient number matrix", data = patient_number_matrix_multi, file_format = file_format)
 				write_file(file_name = "Outliers", data = outlier_matrix_multi, file_format = file_format)
 				write_file(file_name = "Methods", data = inference_signals_method_matrix, file_format = file_format)
