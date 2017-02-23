@@ -8,7 +8,8 @@
 R_script_version <- "2017.02.23.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
-script_file_name <- "LC-MS Urine Statistics.R"
+### Name of the file when downloaded
+script_file_name <- "LC-MS URINE STATISTICS.R"
 
 
 
@@ -120,6 +121,8 @@ check_for_updates_value <- R_script_version
 check_for_updates_function <- function() {
 	### Initialize the version number
 	online_version_number <- NULL
+	### Initialize the variable that says if there are updates
+	update_available <- FALSE
 	try({
 		### Read the file from the web (first 10 lines)
 		online_file <- readLines(con = github_R_url, n = 20)
@@ -137,8 +140,6 @@ check_for_updates_function <- function() {
 		online_version_YYYYMMDDVV <- unlist(strsplit(online_version_number, ".", fixed=TRUE))
 		### Compare with the local version
 		local_version_YYYYMMDDVV = unlist(strsplit(R_script_version, ".", fixed = TRUE))
-		### Initialize the variable that says if there are updates
-		update_available = FALSE
 		### Check the versions
 		for (v in 1:length(local_version_YYYYMMDDVV)) {
 			if (as.numeric(local_version_YYYYMMDDVV[v]) < as.numeric(online_version_YYYYMMDDVV[v])) {
@@ -150,21 +151,21 @@ check_for_updates_function <- function() {
 		if (is.null(online_version_number)) {
 			# The version number could not be ckecked due to internet problems
 			# Update the label
-			check_for_updates_value <- paste("Version:", R_script_version, "\nUpdates not checked: connection problems")
+			check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked: connection problems", sep = "")
 		} else {
 			if (update_available == TRUE) {
 				# Update the label
-				check_for_updates_value <- paste("Version:", R_script_version, "\nUpdate available:", online_version_number)
+				check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
 			} else {
 				# Update the label
-				check_for_updates_value <- paste("Version:", R_script_version, "\nNo updates available")
+				check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
 			}
 		}
 	})
 	### Something went wrong: library not installed, retrieving failed, errors in parsing the version number
 	if (is.null(online_version_number)) {
 		# Update the label
-		check_for_updates_value <- paste("Version:", R_script_version, "\nUpdates not checked: connection problems")
+		check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked: connection problems", sep = "")
 	}
 	# Escape the function
 	.GlobalEnv$update_available <- update_available
@@ -186,16 +187,16 @@ download_updates_function <- function() {
 		}
 		# Go to the working directory
 		setwd(download_folder)
-		tkmessageBox(message = paste("The updated script file will be downloaded in:\n\n", download_folder))
+		tkmessageBox(message = paste("The updated script file will be downloaded in:\n\n", download_folder, sep = ""))
 		# Download the file
 		try({
 			download.file(url = github_R_url, destfile = script_file_name, method = "auto")
 			file_downloaded <- TRUE
 		})
 		if (file_downloaded == TRUE) {
-			tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder), icon = "info")
+			tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, sep = ""), icon = "info")
 		} else {
-			tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url), icon = "warning")
+			tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url, sep = ""), icon = "warning")
 		}
 	} else {
 		tkmessageBox(title = "No update available", message = "NO UPDATES AVAILABLE!\n\nThe latest version is running!", icon = "info")
@@ -1992,7 +1993,7 @@ cumulative_class_in_two_level_effect_analysis_entry <- tkbutton(window, text="Cu
 #TestPer_Adv_entry <- tkentry(window, width = 10, textvariable = TestPer_Adv, font = entry_font)
 #tkinsert(TestPer_Adv_entry, "end", "0.19")
 # Buttons
-download_updates_button <- tkbutton(window, text="DOWNLOAD UPDATES", command = download_updates_function, font = button_font)
+download_updates_button <- tkbutton(window, text="DOWNLOAD UPDATE", command = download_updates_function, font = button_font)
 run_statistics_function_button <- tkbutton(window, text="RUN STATISTICS", command = run_statistics_function, font = button_font)
 end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
 #### Displaying labels
