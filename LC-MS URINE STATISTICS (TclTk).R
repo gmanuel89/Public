@@ -1,7 +1,12 @@
 #################### LC-MS URINE STATISTICS (TCL-TK GUI) ####################
 
-# Program version (Specified by the program writer!!!!)
-program_version <- "2017.02.22.01"
+
+### Program version (Specified by the program writer!!!!)
+program_version <- "2017.02.22.1"
+
+### GitHub URL where the R file is
+github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
+script_file_name <- "LC-MS Urine Statistics.R"
 
 
 
@@ -109,8 +114,6 @@ check_for_updates_value <- program_version
 
 ##### Check for updates (from my GitHub page)
 check_for_updates_function <- function() {
-	### GitHub URL where the R file is
-	github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
 	### Initialize the version number
 	online_version_number <- NULL
 	try({
@@ -142,25 +145,25 @@ check_for_updates_function <- function() {
 		### Return messages
 		if (is.null(online_version_number)) {
 			# The version number could not be ckecked due to internet problems
-			tkmessageBox(title = "Connection problem", message = "The program version number could not be checked due to internet connection problems!\n\nManually check for updates at:\n\nhttps://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R", icon="warning")
+			tkmessageBox(title = "Connection problem", message = paste("The program version number could not be checked due to internet connection problems!\n\nManually check for updates at:\n\n", github_R_url), icon="warning")
 		} else {
 			if (update_available == TRUE) {
-				tkmessageBox(title = "Update available", message = "UPDATES AVAILABLE!\n\nDownload the updated iMatrixSpray Gcode Generator at:\n\nhttps://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R", icon="info")
+				tkmessageBox(title = "Update available", message = paste("UPDATES AVAILABLE!\n\nDownload the updated iMatrixSpray Gcode Generator at:\n\n", github_R_url), icon="info")
 				# Update the label
 				check_for_updates_value_label <- tklabel(window, text = paste("Version:", program_version, "\nUpdated version:", online_version_number), font = label_font)
 				tkgrid(check_for_updates_value_label, row = 1, column = 4)
 				# Download the file
 				setwd(output_folder)
-				download.file(url = "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R", destfile = "LC-MS Urine Statistics (GUI TclTk).R", method = "auto")
-				tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\nLC-MS Urine Statistics (GUI TclTk).R\n\nhas been downloaded to:\n\n", output_folder), icon = "info")
+				download.file(url = github_R_url, destfile = script_file_name, method = "auto")
+				tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", output_folder), icon = "info")
 			} else {
-				tkmessageBox(title = "No update available", message = "NO UPDATES AVAILABLE!\n\nThe latest version is running!", icon="info")
+				tkmessageBox(title = "No update available", message = "NO UPDATES AVAILABLE!\n\nThe latest version is running!", icon = "info")
 			}
 		}
 	})
 	### Something went wrong: library not installed, retrieving failed, errors in parsing the version number
 	if (is.null(online_version_number)) {
-		tkmessageBox(title = "Connection problem", message = "The program version number could not be checked due to internet connection problems!\n\nManually check for updates at:\n\nhttps://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R", icon="warning")
+		tkmessageBox(title = "Connection problem", message = paste("The program version number could not be checked due to internet connection problems!\n\nManually check for updates at:\n\n", github_R_url), icon="warning")
 	}
 }
 
