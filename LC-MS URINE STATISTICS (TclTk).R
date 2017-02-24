@@ -5,11 +5,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.02.23.2"
+R_script_version <- "2017.02.24.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS.R"
+# Change log
+change_log <- "Bug fixes"
 
 
 
@@ -195,6 +197,7 @@ download_updates_function <- function() {
 		})
 		if (file_downloaded == TRUE) {
 			tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
+			tkmessageBox(title = "Changelog", message = paste("The updated script contains the following changes:\n\n", change_log, sep = ""), icon = "info")
 		} else {
 			tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url, sep = ""), icon = "warning")
 		}
