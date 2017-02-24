@@ -125,6 +125,8 @@ check_for_updates_function <- function() {
 	online_version_number <- NULL
 	### Initialize the variable that says if there are updates
 	update_available <- FALSE
+	### Initialize the change log
+	online_change_log <- "Bug fixes"
 	try({
 		### Read the file from the web (first 10 lines)
 		online_file <- readLines(con = github_R_url, n = 20)
@@ -135,6 +137,16 @@ check_for_updates_function <- function() {
 				online_version_number <- unlist(strsplit(l, "R_script_version <- ", fixed = TRUE))[2]
 				# Remove the quotes
 				online_version_number <- unlist(strsplit(online_version_number, "\""))[2]
+				break
+			}
+		}
+		### Retrieve the change log
+		for (l in online_file) {
+			if (length(grep("change_log", l, fixed = TRUE)) > 0) {
+				# Isolate the "variable" value
+				online_change_log <- unlist(strsplit(l, "change_log <- ", fixed = TRUE))[2]
+				# Remove the quotes
+				online_change_log <- unlist(strsplit(online_change_log, "\""))[2]
 				break
 			}
 		}
@@ -171,6 +183,7 @@ check_for_updates_function <- function() {
 	}
 	# Escape the function
 	.GlobalEnv$update_available <- update_available
+	.GlobalEnv$online_change_log <- online_change_log
 	.GlobalEnv$check_for_updates_value <- check_for_updates_value
 }
 
@@ -197,7 +210,7 @@ download_updates_function <- function() {
 		})
 		if (file_downloaded == TRUE) {
 			tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
-			tkmessageBox(title = "Changelog", message = paste("The updated script contains the following changes:\n\n", change_log, sep = ""), icon = "info")
+			tkmessageBox(title = "Changelog", message = paste("The updated script contains the following changes:\n\n", online_change_log, sep = ""), icon = "info")
 		} else {
 			tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url, sep = ""), icon = "warning")
 		}
