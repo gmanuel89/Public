@@ -5,13 +5,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.02.24.3"
+R_script_version <- "2017.02.24.4"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS.R"
 # Change log
-change_log <- "1. Correlation plots are now generated and saved\n2. All the outputs are put in a subfolder named 'STATISTICS X'\n3. All the outputs in the subfolder are more organized\n4. The boxplots are generated also without the outliers\n5. The labels in the plots are correctly displayed\n6. New GUI"
+change_log <- "1. Correlation plots are now generated and saved\n2. All the outputs are put in a subfolder named 'STATISTICS X'\n3. All the outputs in the subfolder are more organized\n4. The boxplots are generated also without the outliers\n5. The labels in the plots are correctly displayed\n6. New GUI (adaptive fonts also on Windows 10)"
 
 
 
@@ -2031,6 +2031,16 @@ if (system_os == "Windows") {
         screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
         screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
     }
+    # Windows 10
+    if (length(grep("10", os_release, fixed = TRUE)) > 0) {
+        # Get system info
+        screen_info <- system("wmic path Win32_VideoController get VideoModeDescription", intern = TRUE)[2]
+        # Get the resolution
+        screen_resolution <- unlist(strsplit(screen_info, "x"))
+        # Retrieve the values
+        screen_height <- as.numeric(screen_resolution[2])
+        screen_width <- as.numeric(screen_resolution[1])
+    }
 } else if (system_os == "Linux") {
     # Get system info
     screen_info <- system("xdpyinfo -display :0", intern = TRUE)
@@ -2052,6 +2062,16 @@ other_font_size <- 11
 if (system_os == "Windows") {
     # Windows 7
     if (length(grep("7", os_release, fixed = TRUE)) > 0) {
+        # Determine the font size according to the resolution
+        total_number_of_pixels <- screen_width * screen_height
+        # Determine the scaling factor (according to a complex formula)
+        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    }
+    # Windows 10
+    if (length(grep("10", os_release, fixed = TRUE)) > 0) {
         # Determine the font size according to the resolution
         total_number_of_pixels <- screen_width * screen_height
         # Determine the scaling factor (according to a complex formula)
