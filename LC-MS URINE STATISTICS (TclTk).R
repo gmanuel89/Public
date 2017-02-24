@@ -18,13 +18,13 @@ change_log <- "1. All the outputs are put in a subfolder named 'STATISTICS X'\n2
 
 
 #################### INSTALL AND LOAD THE REQUIRED PACKAGES
-##### Update the packages
-update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE)
 ##### Install the required packages if not already installed
 # FUNCTION
-install_and_load_required_packages <- function(required_packages, repository="http://cran.mirror.garr.it/mirrors/CRAN/") {
+install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
+	# Update all the packages
+	try(update.packages(repos = repository, ask = FALSE))
 	# Retrieve the installed packages
-	installed_packages <- installed.packages() [,1]
+	installed_packages <- installed.packages()[,1]
 	# Determine the missing packages
 	missing_packages <- character()
 	for (p in 1:length(required_packages)) {
@@ -35,7 +35,7 @@ install_and_load_required_packages <- function(required_packages, repository="ht
 	# If a repository is specified
 	if (repository != "" || !is.null(repository)) {
 		if (length(missing_packages) > 0) {
-			install.packages(missing_packages, repos=repository)
+			install.packages(missing_packages, repos = repository)
 		}
 	} else {
 		if (length(missing_packages) > 0) {
@@ -44,14 +44,13 @@ install_and_load_required_packages <- function(required_packages, repository="ht
 	}
 	# Load the packages
 	for (i in 1:length(required_packages)) {
-		library (required_packages[i], character.only=TRUE)
+		library(required_packages[i], character.only = TRUE)
 	}
 }
+
 # RUN THE FUNCTION
 install_and_load_required_packages(c("rattle", "phia", "MASS", "ggplot2", "lawstat", "coin", "multcomp", "agricolae", "tcltk", "Hmisc")) # "Rcmdr", "RcmdrPlugin.coin"
 # The package lawstat is used for levene test for non parametric anova
-# Update packages and load the required packages
-update.packages(repos="http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE)
 
 
 
