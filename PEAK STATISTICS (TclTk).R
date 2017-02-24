@@ -1,7 +1,7 @@
 ###################### FUNCTIONS - MASS SPECTROMETRY 2017.02.24
 
 # Update the packages
-update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE)
+try(update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE), silent = TRUE)
 
 
 ########################################################################## MISC
