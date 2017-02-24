@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.02.24.4"
+R_script_version <- "2017.02.24.5"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
 ### Name of the file when downloaded
@@ -893,7 +893,7 @@ run_statistics_function <- function() {
             correlation_plot_subfolder <- file.path(correlation_subfolder, "Plots")
             dir.create(correlation_plot_subfolder)
             ##### Create the folder for the correlation scatter plots (no outliers)
-            correlation_plot_subfolder_no_outliers <- file.path(correlation_subfolder, "Plots (No outliers)")
+            correlation_plot_subfolder_no_outliers <- file.path(correlation_subfolder, "Plots (Without outliers)")
             dir.create(correlation_plot_subfolder_no_outliers)
             ##### Create the folder for the correlation data tables
             correlation_tables_subfolder <- file.path(correlation_subfolder, "Tables")
@@ -975,7 +975,7 @@ run_statistics_function <- function() {
                                 mass_x_no_outliers <- mass_x[!is.na(mass_x)]
                                 non_signal_column_no_outliers <- non_signal_column[!is.na(mass_x)]
                                 ### Generate a graph after the removal of outliers
-                                plot_name <- paste("Correlation", m, "vs", ns, "(No outliers)")
+                                plot_name <- paste("Correlation", m, "vs", ns, "(Without outliers)")
                                 file_name <- sprintf("%s%s", plot_name, image_format)
                                 scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = plot_name, ylab = ns, xlab = m)
                                 setwd(correlation_plot_subfolder_no_outliers)
@@ -1358,7 +1358,7 @@ run_statistics_function <- function() {
                 ### NO OUTLIERS
                 if (remove_outliers_two_level_effect_analysis == TRUE) {
                     # Create the folder where to dump the files and go to it...
-                    plots_two_level_effect_analysis_no_outliers_subfolder <- file.path(combination_subfolder, "Plots (No outliers)")
+                    plots_two_level_effect_analysis_no_outliers_subfolder <- file.path(combination_subfolder, "Plots (Without outliers)")
                     dir.create(plots_two_level_effect_analysis_no_outliers_subfolder)
                     setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
                     for (s in selected_signals_for_inference) {
@@ -1895,7 +1895,7 @@ run_statistics_function <- function() {
                 ### NO OUTLIERS
                 if (remove_outliers_multi_level_effect_analysis == TRUE) {
                     # Create the folder where to dump the files and go to it...
-                    plots_multi_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots (No outliers)")
+                    plots_multi_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots (Without outliers)")
                     dir.create(plots_multi_level_effect_analysis_subfolder)
                     setwd(plots_multi_level_effect_analysis_subfolder)
                     # For each signals of inference...
