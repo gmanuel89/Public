@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2017.02.10
+###################### FUNCTIONS - MASS SPECTROMETRY 2017.02.24
 
 # Update the packages
 update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE)
@@ -9,29 +9,31 @@ update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE)
 ##################################################### INSTALL REQUIRED PACKAGES
 # This function installs and loads the selected packages
 install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
-# Retrieve the installed packages
-installed_packages <- installed.packages() [,1]
-# Determine the missing packages
-missing_packages <- character()
-for (p in 1:length(required_packages)) {
-	if ((required_packages[p] %in% installed_packages) == FALSE) {
-		missing_packages <- append(missing_packages, required_packages[p])
+	# Update all the packages
+	try(update.packages(repos = repository, ask = FALSE), silent = TRUE)
+	# Retrieve the installed packages
+	installed_packages <- installed.packages()[,1]
+	# Determine the missing packages
+	missing_packages <- character()
+	for (p in 1:length(required_packages)) {
+		if ((required_packages[p] %in% installed_packages) == FALSE) {
+			missing_packages <- append(missing_packages, required_packages[p])
+		}
 	}
-}
-# If a repository is specified
-if (repository != "" || !is.null(repository)) {
-	if (length(missing_packages) > 0) {
-		install.packages(missing_packages, repos = repository)
+	# If a repository is specified
+	if (repository != "" || !is.null(repository)) {
+		if (length(missing_packages) > 0) {
+			install.packages(missing_packages, repos = repository)
+		}
+	} else {
+		if (length(missing_packages) > 0) {
+			install.packages(missing_packages)
+		}
 	}
-} else {
-	if (length(missing_packages) > 0) {
-		install.packages(missing_packages)
+	# Load the packages
+	for (i in 1:length(required_packages)) {
+		library(required_packages[i], character.only = TRUE)
 	}
-}
-# Load the packages
-for (i in 1:length(required_packages)) {
-	library (required_packages[i], character.only = TRUE)
-}
 }
 
 
@@ -1862,9 +1864,9 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
 	normalization_algorithm <- preprocessing_parameters$normalization_algorithm
 	normalization_mass_range <- preprocessing_parameters$normalization_mass_range
 	##### Fix the names
-	if (smoothing_algorithm == "SavitzkyGolay" || smoothing_algorithm == "Savitzky-Golay" || smoothing_algorithm == "SG") {
+	if (!is.null(smoothing_algorithm) && (smoothing_algorithm == "SavitzkyGolay" || smoothing_algorithm == "Savitzky-Golay" || smoothing_algorithm == "SG")) {
 		smoothing_algorithm <- "SavitzkyGolay"
-	} else if (smoothing_algorithm == "MovingAverage" || smoothing_algorithm == "Moving Average" || smoothing_algorithm == "MA") {
+	} else if (!is.null(smoothing_algorithm) && (smoothing_algorithm == "MovingAverage" || smoothing_algorithm == "Moving Average" || smoothing_algorithm == "MA")) {
 		smoothing_algorithm <- "MovingAverage"
 	}
 	##### Define the smoothing half wondow size
@@ -4492,7 +4494,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, features_mo
 		sample_name <- spectra[[1]]@metaData$file[1]
 		rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
 		########## GRAPH SEGMENTATION
-		graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, SNR = peak_picking_SNR, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, filepath_R_models = filepath_R, use_features_from_models = FALSE, custom_feature_vector = features_model, list_of_models = model_ID, model_names = NULL, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, partition_spectra = partition_spectra, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed)
+		graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, SNR = peak_picking_SNR, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, filepath_R_models = filepath_R, use_features_from_models = FALSE, custom_feature_vector = features_model, list_of_models = model_ID, model_names = NULL, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, partition_spectra = partition_spectra, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed)
 		### Extract the spectra from the clique and from the independent set (mind that they are two lists if the spectra are taken all at the same time or they are two lists of lists if the spectra are partitioned)
 		if (partition_spectra == TRUE && number_of_spectra_partitions > 1) {
 			spectra_clique <- graph_segmentation$spectra_clique
@@ -5520,308 +5522,452 @@ matrix_splitting_training_test <- function(peaklist, discriminant_feature = "Cla
 # This function runs the feature selection algorithm onto the peaklist matrix, returning the peaklist without the redundant/non-informative features, the original peaklist and the list of selected features.
 # The function allows for the use of several feature selection algorithms.
 feature_selection <- function (peaklist, feature_selection_method = "rfe", features_to_select = 20, selection_method = "pls", selection_metric = "Kappa", correlation_method = "pearson", correlation_threshold = 0.75, auc_threshold = 0.7, cv_repeats_control = 5, k_fold_cv_control = 10, discriminant_attribute = "Class", non_features = c("Sample", "Class", "THY"), seed = NULL, automatically_select_features = FALSE, generate_plots = TRUE, preprocessing = c("center","scale"), allow_parallelization = TRUE, feature_reranking = FALSE) {
-# Load the required libraries
-install_and_load_required_packages(c("caret", "pls", "stats", "randomForest", "pROC"))
-### PARALLEL BACKEND
-# Detect the number of cores
-cpu_thread_number <- detectCores(logical = TRUE) - 1
-if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-	install_and_load_required_packages("doMC")
-	# Register the foreach backend
-	registerDoMC(cores = cpu_thread_number)
-} else if (Sys.info()[1] == "Windows") {
-	install_and_load_required_packages("doParallel")
-	# Register the foreach backend
-	cl <- makeCluster(cpu_thread_number, type='PSOCK')
-	registerDoParallel(cl)
-}
-# Initialization
-feature_weights <- NULL
-variable_importance <- NULL
-fs_model_performance <- NULL
-########################################################### RFE MODEL
-if (feature_selection_method == "rfe" || feature_selection_method == "recursive feature elimination") {
-	# The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
-	if (automatically_select_features == TRUE) {
-		if (selection_method != "") {
-			# Define the feature subset sizes
-			subset_sizes <- seq(2, features_to_select, by = 1)
-			# Set the seeds (for each resampling iteration in the cv)
-			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
-			seeds <- vector(mode = "list", length = number_of_iterations)
-			# Plant the seed only if a specified value is entered
-			if (!is.null(seed)) {
-				# Make the randomness reproducible
-				set.seed(seed)
+	# Load the required libraries
+	install_and_load_required_packages(c("caret", "pls", "stats", "randomForest", "pROC"))
+	### PARALLEL BACKEND
+	# Detect the number of cores
+	cpu_thread_number <- detectCores(logical = TRUE) - 1
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+		install_and_load_required_packages("doMC")
+		# Register the foreach backend
+		registerDoMC(cores = cpu_thread_number)
+	} else if (Sys.info()[1] == "Windows") {
+		install_and_load_required_packages("doParallel")
+		# Register the foreach backend
+		cl <- makeCluster(cpu_thread_number, type='PSOCK')
+		registerDoParallel(cl)
+	}
+	# Initialization
+	feature_weights <- NULL
+	variable_importance <- NULL
+	fs_model_performance <- NULL
+	fs_model <- NULL
+	########################################################### RFE MODEL
+	if (feature_selection_method == "rfe" || feature_selection_method == "recursive feature elimination") {
+		# The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
+		if (automatically_select_features == TRUE) {
+			if (selection_method != "") {
+				# Define the feature subset sizes
+				subset_sizes <- seq(2, features_to_select, by = 1)
+				# Set the seeds (for each resampling iteration in the cv)
+				number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
+				seeds <- vector(mode = "list", length = number_of_iterations)
+				# Plant the seed only if a specified value is entered
+				if (!is.null(seed)) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
+				for (s in 1:(number_of_iterations - 1)) {
+					seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
+				}
+				# Plant the seed only if a specified value is entered
+				if (!is.null(seed)) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
+				seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
+				# Define the control function of the RFE
+				rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
+				# Run the RFE
+				rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess = preprocessing)
+				# Extract the model
+				fs_model <- rfe_model$fit$finalModel
+				# Variable importance
+				variable_importance <- varImp(rfe_model$fit)
+				# Feature weights
+				feature_weights <- rfe_model$fit
+				# Model performances
+				if (selection_metric == "kappa" || selection_metric == "Kappa") {
+					fs_model_performance <- max(rfe_model$fit$results$Kappa)
+				} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
+					fs_model_performance <- max(rfe_model$fit$results$Accuracy)
+				}
+			} else {
+				# Define the feature subset sizes
+				subset_sizes <- seq(2, features_to_select, by = 1)
+				# Set the seeds (for each resampling iteration in the cv)
+				number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
+				seeds <- vector(mode = "list", length = number_of_iterations)
+				# Plant the seed only if a specified value is entered
+				if (!is.null(seed)) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
+				for (s in 1:(number_of_iterations - 1)) {
+					seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
+				}
+				# Plant the seed only if a specified value is entered
+				if (!is.null(seed)) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
+				seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
+				# Define the control function of the RFE
+				rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
+				# Run the RFE
+				rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess = preprocessing)
+				# Extract the model
+				fs_model <- rfe_model$fit$finalModel
+				# Variable importance
+				variable_importance <- varImp(rfe_model$fit)
+				# Feature weights
+				feature_weights <- rfe_model$fit
+				# Model performances
+				if (selection_metric == "kappa" || selection_metric == "Kappa") {
+					fs_model_performance <- max(rfe_model$fit$results$Kappa)
+				} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
+					fs_model_performance <- max(rfe_model$fit$results$Accuracy)
+				}
 			}
-			for (s in 1:(number_of_iterations - 1)) {
-				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
+			# Output the best predictors after the RFE
+			predictors_rfe <- predictors(rfe_model)
+		} else {
+			############# NO AUTOMATIC DETERMINATION
+			if (selection_method != "") {
+				# Define the feature subset sizes
+				subset_sizes <- features_to_select
+				# Set the seeds (for each resampling iteration in the cv)
+				number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
+				seeds <- vector(mode = "list", length = number_of_iterations)
+				# Plant the seed only if a specified value is entered
+				if (!is.null(seed)) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
+				for (s in 1:(number_of_iterations - 1)) {
+					seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
+				}
+				# Plant the seed only if a specified value is entered
+				if (!is.null(seed)) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
+				seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
+				# Define the control function of the RFE
+				rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
+				# Run the RFE
+				rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess = preprocessing)
+				# Extract the model
+				fs_model <- rfe_model$fit$finalModel
+				# Variable importance
+				variable_importance <- varImp(rfe_model$fit)
+				# Feature weights
+				feature_weights <- rfe_model$fit
+				# Model performances
+				if (selection_metric == "kappa" || selection_metric == "Kappa") {
+					fs_model_performance <- max(rfe_model$fit$results$Kappa)
+				} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
+					fs_model_performance <- max(rfe_model$fit$results$Accuracy)
+				}
+			} else {
+				# Define the feature subset sizes
+				subset_sizes <- features_to_select
+				# Set the seeds (for each resampling iteration in the cv)
+				number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
+				seeds <- vector(mode = "list", length = number_of_iterations)
+				# Plant the seed only if a specified value is entered
+				if (!is.null(seed)) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
+				for (s in 1:(number_of_iterations - 1)) {
+					seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
+				}
+				# Plant the seed only if a specified value is entered
+				if (!is.null(seed)) {
+					# Make the randomness reproducible
+					set.seed(seed)
+				}
+				seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
+				# Define the control function of the RFE
+				rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
+				# Run the RFE
+				rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess = preprocessing)
+				# Extract the model
+				fs_model <- rfe_model$fit$finalModel
+				# Variable importance
+				variable_importance <- varImp(rfe_model$fit)
+				# Feature weights
+				feature_weights <- rfe_model$fit
+				# Model performances
+				if (selection_metric == "kappa" || selection_metric == "Kappa") {
+					fs_model_performance <- max(rfe_model$fit$results$Kappa)
+				} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
+					fs_model_performance <- max(rfe_model$fit$results$Accuracy)
+				}
 			}
-			# Plant the seed only if a specified value is entered
-			if (!is.null(seed)) {
-				# Make the randomness reproducible
-				set.seed(seed)
+			# Output the best predictors after the RFE
+			predictors_rfe <- predictors(rfe_model) [1:features_to_select]
+		}
+		# Predictors
+		predictors_feature_selection <- predictors_rfe
+	}
+	######################################################################### ANOVA
+	if (feature_selection_method == "ANOVA") {
+		feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
+		features_ANOVA <- character()
+		# For each feature, calculate the impact on the classification capability by fitting an ANOVA
+		for (feature in feature_list){
+			# Isolate the peak intensities
+			intensity_vector <- peaklist [,feature]
+			# Compute an ANOVA based upon the discriminant attribute
+			feature_ANOVA <- aov(intensity_vector ~ peaklist[,discriminant_attribute])
+			# Extract the p-value
+			feature_ANOVA_pvalue <- summary(feature_ANOVA)[[1]]$"Pr(>F)"[1]
+			# Keep the feature if with a great impact
+			if (feature_ANOVA_pvalue <= 0.05) {
+				features_ANOVA <- append(features_ANOVA, feature)
 			}
-			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
-			# Define the control function of the RFE
-			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
-			# Run the RFE
-			rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess = preprocessing)
-			# Variable importance
-			variable_importance <- varImp(rfe_model$fit)
-			# Feature weights
-			feature_weights <- rfe_model$fit
-			# Model performances
-			if (selection_metric == "kappa" || selection_metric == "Kappa") {
-				fs_model_performance <- max(rfe_model$fit$results$Kappa)
-			} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
-				fs_model_performance <- max(rfe_model$fit$results$Accuracy)
+		}
+		# Predictors
+		predictors_feature_selection <- features_ANOVA
+	}
+	################################################################ KRUSKAL-WALLIS
+	if (feature_selection_method == "kruskal" || feature_selection_method == "kruskal-wallis" || feature_selection_method == "Kruskal-Wallis") {
+		feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
+		features_kruskal <- character()
+		# For each feature, calculate the impact on the classification capability by fitting an ANOVA
+		for (feature in feature_list){
+			# Isolate the peak intensities
+			intensity_vector <- peaklist [,feature]
+			# Compute an ANOVA based upon the discriminant attribute
+			feature_kruskal <- kruskal.test(intensity_vector ~ peaklist[,discriminant_attribute])
+			# Extract the p-value
+			feature_kruskal_pvalue <- feature_kruskal$p.value
+			# Keep the feature if with a great impact
+			if (feature_kruskal_pvalue <= 0.05) {
+				features_kruskal <- append(features_kruskal, feature)
+			}
+		}
+		# Predictors
+		predictors_feature_selection <- features_kruskal
+	}
+	################################################# CORRELATION FEATURE SELECTION
+	if (feature_selection_method == "correlation") {
+		# Take only the part of the matrix without Class and Sample
+		peaklist_features <- peaklist [,!(names(peaklist) %in% non_features)]
+		# Compute the correlation
+		feature_correlation <- cor(peaklist_features, method = correlation_method)
+		# Output the highly correlated features
+		highly_correlated <- findCorrelation(feature_correlation, correlation_threshold)
+		# List the highly correlated features
+		highly_correlated_features <- names(peaklist_features[,highly_correlated])
+		# Features to keep
+		low_correlation_features <- names(peaklist_features[,-highly_correlated])
+		print(paste("The number of selected features is", length(low_correlation_features), "out of", length(peaklist_features)))
+		# Predictors
+		predictors_feature_selection <- low_correlation_features
+	}
+	#################################################################### IMPORTANCE
+	if (feature_selection_method == "importance") {
+		feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
+		# For each feature, calculate the impact on the classification capability
+		model_control <- trainControl(method = "repeatedcv", number = k_fold_cv_control, repeats = cv_repeats_control)
+		# Compute a model based upon the discriminant attribute
+		feature_model <- train(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], method = "pls", preProcess = "scale", trControl = model_control)
+		# Estimate variable importance
+		feature_importance <- varImp(feature_model, scale = FALSE)
+		# Isolate the most important features (rank them according to their importance first!)
+		feature_importance_df <- feature_importance$importance
+		feature_importance_df$Features <- rownames(feature_importance_df)
+		feature_importance_df <- feature_importance_df [order(-feature_importance_df$Overall),]
+		# Predictors
+		predictors_feature_selection <- feature_importance_df$Features [1:features_to_select]
+	}
+	########################################################################### ROC
+	if (feature_selection_method == "ROC" || feature_selection_method == "roc") {
+		feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
+		# List of important features
+		features_ROC <- character()
+		##### Automatically select features
+		if (automatically_select_features == TRUE) {
+			# For each feature, calculate the impact on the classification capability by computing a ROC
+			for (feature in feature_list){
+				# Compute the ROC of the feature
+				feature_ROC <- roc(response = peaklist[,discriminant_attribute], predictor = peaklist[,feature])
+				# Extract the AUC
+				feature_ROC_AUC <- feature_ROC$auc
+				# Keep the feature if with a great impact
+				if (feature_ROC_AUC >= auc_threshold) {
+					features_ROC <- append(features_ROC, feature)
+				}
 			}
 		} else {
-			# Define the feature subset sizes
-			subset_sizes <- seq(2, features_to_select, by = 1)
-			# Set the seeds (for each resampling iteration in the cv)
-			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) +1
-			seeds <- vector(mode = "list", length = number_of_iterations)
-			# Plant the seed only if a specified value is entered
-			if (!is.null(seed)) {
-				# Make the randomness reproducible
-				set.seed(seed)
+			##### Select the most N important features
+			# For each feature, calculate the impact on the classification capability by computing a ROC
+			feature_ROC_vector <- numeric(length = length(feature_list))
+			names(feature_ROC_vector) <- feature_list
+			for (f in 1:length(feature_list)) {
+				# Compute the ROC of the feature
+				feature_ROC <- roc(response = peaklist[,discriminant_attribute], predictor = peaklist[,feature_list[f]])
+				# Append the AUC to a vector
+				feature_ROC_vector[f] <- feature_ROC$auc
 			}
-			for (s in 1:(number_of_iterations - 1)) {
-				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
-			}
-			# Plant the seed only if a specified value is entered
-			if (!is.null(seed)) {
-				# Make the randomness reproducible
-				set.seed(seed)
-			}
-			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
-			# Define the control function of the RFE
-			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
-			# Run the RFE
-			rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess = preprocessing)
-			# Variable importance
-			variable_importance <- varImp(rfe_model$fit)
-			# Feature weights
-			feature_weights <- rfe_model$fit
-			# Model performances
-			if (selection_metric == "kappa" || selection_metric == "Kappa") {
-				fs_model_performance <- max(rfe_model$fit$results$Kappa)
-			} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
-				fs_model_performance <- max(rfe_model$fit$results$Accuracy)
-			}
+			# Sort the vector
+			feature_ROC_vector_sorted <- sort(feature_ROC_vector, decreasing = TRUE)
+			# Take the first N features
+			features_ROC <- names(feature_ROC_vector_sorted)[1:features_to_select]
+		}
+		# Predictors
+		predictors_feature_selection <- features_ROC
+	}
+	########################################################################## Plot
+	if (generate_plots == TRUE) {
+		# Initialize
+		feature_selection_graphics <- NULL
+		if (feature_selection_method == "rfe" || feature_selection_method == "recursive feature elimination") {
+			feature_selection_graphics <- plot(rfe_model, type = c("g","o"))
+		}
+		if (feature_selection_method == "correlation") {
+		}
+		if (feature_selection_method == "importance") {
+			feature_selection_graphics <- plot(feature_importance)
+		}
+	} else {feature_selection_graphics <- NULL}
+	#################################################### Take the selected features
+	peaklist_feature_selection <- peaklist [,predictors_feature_selection]
+	# Add the non features back
+	for (i in 1:length(non_features)) {
+		peaklist_feature_selection <- cbind(peaklist_feature_selection, peaklist[,non_features[i]])
+	}
+	names(peaklist_feature_selection) <- c(as.character(predictors_feature_selection), non_features)
+	# Return the values
+	return(list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance, fs_model = fs_model))
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+##################### EMBEDDED FEATURE SELECTION (RECURSIVE FEATURE ELIMINATION)
+# This function runs the feature selection algorithm onto the peaklist matrix, returning the peaklist without the redundant/non-informative features, the original peaklist and the list of selected features, along with the model used for selecting the features.
+# The function allows for the use of several feature selection algorithms.
+embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "pls", selection_metric = "Kappa", cv_repeats_control = 5, k_fold_cv_control = 10, discriminant_attribute = "Class", non_features = c("Sample", "Class", "THY"), seed = NULL, automatically_select_features = TRUE, generate_plots = TRUE, preprocessing = c("center","scale"), allow_parallelization = TRUE, feature_reranking = FALSE) {
+	# Load the required libraries
+	install_and_load_required_packages(c("caret", "stats", "pROC"))
+	### PARALLEL BACKEND
+	# Detect the number of cores
+	cpu_thread_number <- detectCores(logical = TRUE) - 1
+	if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+		install_and_load_required_packages("doMC")
+		# Register the foreach backend
+		registerDoMC(cores = cpu_thread_number)
+	} else if (Sys.info()[1] == "Windows") {
+		install_and_load_required_packages("doParallel")
+		# Register the foreach backend
+		cl <- makeCluster(cpu_thread_number, type='PSOCK')
+		registerDoParallel(cl)
+	}
+	# Initialization
+	feature_weights <- NULL
+	variable_importance <- NULL
+	fs_model_performance <- NULL
+	# The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
+	if (automatically_select_features == TRUE) {
+		# Define the feature subset sizes
+		subset_sizes <- seq(2, features_to_select, by = 1)
+		# Set the seeds (for each resampling iteration in the cv)
+		number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
+		seeds <- vector(mode = "list", length = number_of_iterations)
+		# Plant the seed only if a specified value is entered
+		if (!is.null(seed)) {
+			# Make the randomness reproducible
+			set.seed(seed)
+		}
+		for (s in 1:(number_of_iterations - 1)) {
+			seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
+		}
+		# Plant the seed only if a specified value is entered
+		if (!is.null(seed)) {
+			# Make the randomness reproducible
+			set.seed(seed)
+		}
+		seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
+		# Define the control function of the RFE
+		rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
+		# Run the RFE
+		rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess = preprocessing)
+		# Extract the model
+		fs_model <- rfe_model$fit$finalModel
+		# Variable importance
+		variable_importance <- varImp(rfe_model$fit)
+		# Feature weights
+		feature_weights <- rfe_model$fit
+		# Model performances
+		if (selection_metric == "kappa" || selection_metric == "Kappa") {
+			fs_model_performance <- max(rfe_model$fit$results$Kappa)
+		} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
+			fs_model_performance <- max(rfe_model$fit$results$Accuracy)
 		}
 		# Output the best predictors after the RFE
 		predictors_rfe <- predictors(rfe_model)
 	} else {
 		############# NO AUTOMATIC DETERMINATION
-		if (selection_method != "") {
-			# Define the feature subset sizes
-			subset_sizes <- features_to_select
-			# Set the seeds (for each resampling iteration in the cv)
-			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
-			seeds <- vector(mode = "list", length = number_of_iterations)
-			# Plant the seed only if a specified value is entered
-			if (!is.null(seed)) {
-				# Make the randomness reproducible
-				set.seed(seed)
-			}
-			for (s in 1:(number_of_iterations - 1)) {
-				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
-			}
-			# Plant the seed only if a specified value is entered
-			if (!is.null(seed)) {
-				# Make the randomness reproducible
-				set.seed(seed)
-			}
-			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
-			# Define the control function of the RFE
-			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
-			# Run the RFE
-			rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess = preprocessing)
-			# Variable importance
-			variable_importance <- varImp(rfe_model$fit)
-			# Feature weights
-			feature_weights <- rfe_model$fit
-			# Model performances
-			if (selection_metric == "kappa" || selection_metric == "Kappa") {
-				fs_model_performance <- max(rfe_model$fit$results$Kappa)
-			} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
-				fs_model_performance <- max(rfe_model$fit$results$Accuracy)
-			}
-		} else {
-			# Define the feature subset sizes
-			subset_sizes <- features_to_select
-			# Set the seeds (for each resampling iteration in the cv)
-			number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
-			seeds <- vector(mode = "list", length = number_of_iterations)
-			# Plant the seed only if a specified value is entered
-			if (!is.null(seed)) {
-				# Make the randomness reproducible
-				set.seed(seed)
-			}
-			for (s in 1:(number_of_iterations - 1)) {
-				seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
-			}
-			# Plant the seed only if a specified value is entered
-			if (!is.null(seed)) {
-				# Make the randomness reproducible
-				set.seed(seed)
-			}
-			seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
-			# Define the control function of the RFE
-			rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
-			# Run the RFE
-			rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, metric = selection_metric, preProcess = preprocessing)
-			# Variable importance
-			variable_importance <- varImp(rfe_model$fit)
-			# Feature weights
-			feature_weights <- rfe_model$fit
-			# Model performances
-			if (selection_metric == "kappa" || selection_metric == "Kappa") {
-				fs_model_performance <- max(rfe_model$fit$results$Kappa)
-			} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
-				fs_model_performance <- max(rfe_model$fit$results$Accuracy)
-			}
+		# Define the feature subset sizes
+		subset_sizes <- features_to_select
+		# Set the seeds (for each resampling iteration in the cv)
+		number_of_iterations <- (k_fold_cv_control * cv_repeats_control) + 1
+		seeds <- vector(mode = "list", length = number_of_iterations)
+		# Plant the seed only if a specified value is entered
+		if (!is.null(seed)) {
+			# Make the randomness reproducible
+			set.seed(seed)
+		}
+		for (s in 1:(number_of_iterations - 1)) {
+			seeds[[s]] <- sample.int(nrow(peaklist), length(subset_sizes) + 1, replace = TRUE)
+		}
+		# Plant the seed only if a specified value is entered
+		if (!is.null(seed)) {
+			# Make the randomness reproducible
+			set.seed(seed)
+		}
+		seeds[number_of_iterations] <- sample.int(nrow(peaklist), 1)
+		# Define the control function of the RFE
+		rfe_ctrl <- rfeControl(functions = caretFuncs, method = "repeatedcv", repeats = cv_repeats_control, number = k_fold_cv_control, seeds = seeds, saveDetails = TRUE, allowParallel = allow_parallelization, rerank = feature_reranking)
+		# Run the RFE
+		rfe_model <- rfe(x = peaklist[,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], sizes = subset_sizes, rfeControl = rfe_ctrl, method = selection_method, metric = selection_metric, preProcess = preprocessing)
+		# Extract the model
+		fs_model <- rfe_model$fit$finalModel
+		# Variable importance
+		variable_importance <- varImp(rfe_model$fit)
+		# Feature weights
+		feature_weights <- rfe_model$fit
+		# Model performances
+		if (selection_metric == "kappa" || selection_metric == "Kappa") {
+			fs_model_performance <- max(rfe_model$fit$results$Kappa)
+		} else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
+			fs_model_performance <- max(rfe_model$fit$results$Accuracy)
 		}
 		# Output the best predictors after the RFE
-		predictors_rfe <- predictors(rfe_model) [1:features_to_select]
+		predictors_rfe <- predictors(rfe_model)[1:features_to_select]
 	}
 	# Predictors
 	predictors_feature_selection <- predictors_rfe
-}
-######################################################################### ANOVA
-if (feature_selection_method == "ANOVA") {
-	feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
-	features_ANOVA <- character()
-	# For each feature, calculate the impact on the classification capability by fitting an ANOVA
-	for (feature in feature_list){
-		# Isolate the peak intensities
-		intensity_vector <- peaklist [,feature]
-		# Compute an ANOVA based upon the discriminant attribute
-		feature_ANOVA <- aov(intensity_vector ~ peaklist[,discriminant_attribute])
-		# Extract the p-value
-		feature_ANOVA_pvalue <- summary(feature_ANOVA)[[1]]$"Pr(>F)"[1]
-		# Keep the feature if with a great impact
-		if (feature_ANOVA_pvalue <= 0.05) {
-			features_ANOVA <- append(features_ANOVA, feature)
-		}
-	}
-	# Predictors
-	predictors_feature_selection <- features_ANOVA
-}
-################################################################ KRUSKAL-WALLIS
-if (feature_selection_method == "kruskal" || feature_selection_method == "kruskal-wallis" || feature_selection_method == "Kruskal-Wallis") {
-	feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
-	features_kruskal <- character()
-	# For each feature, calculate the impact on the classification capability by fitting an ANOVA
-	for (feature in feature_list){
-		# Isolate the peak intensities
-		intensity_vector <- peaklist [,feature]
-		# Compute an ANOVA based upon the discriminant attribute
-		feature_kruskal <- kruskal.test(intensity_vector ~ peaklist[,discriminant_attribute])
-		# Extract the p-value
-		feature_kruskal_pvalue <- feature_kruskal$p.value
-		# Keep the feature if with a great impact
-		if (feature_kruskal_pvalue <= 0.05) {
-			features_kruskal <- append(features_kruskal, feature)
-		}
-	}
-	# Predictors
-	predictors_feature_selection <- features_kruskal
-}
-################################################# CORRELATION FEATURE SELECTION
-if (feature_selection_method == "correlation") {
-	# Take only the part of the matrix without Class and Sample
-	peaklist_features <- peaklist [,!(names(peaklist) %in% non_features)]
-	# Compute the correlation
-	feature_correlation <- cor(peaklist_features, method = correlation_method)
-	# Output the highly correlated features
-	highly_correlated <- findCorrelation(feature_correlation, correlation_threshold)
-	# List the highly correlated features
-	highly_correlated_features <- names(peaklist_features[,highly_correlated])
-	# Features to keep
-	low_correlation_features <- names(peaklist_features[,-highly_correlated])
-	print(paste("The number of selected features is", length(low_correlation_features), "out of", length(peaklist_features)))
-	# Predictors
-	predictors_feature_selection <- low_correlation_features
-}
-#################################################################### IMPORTANCE
-if (feature_selection_method == "importance") {
-	feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
-	# For each feature, calculate the impact on the classification capability
-	model_control <- trainControl(method = "repeatedcv", number = k_fold_cv_control, repeats = cv_repeats_control)
-	# Compute a model based upon the discriminant attribute
-	feature_model <- train(x = peaklist [,!(names(peaklist) %in% non_features)], y = peaklist[,discriminant_attribute], method = "pls", preProcess = "scale", trControl = model_control)
-	# Estimate variable importance
-	feature_importance <- varImp(feature_model, scale = FALSE)
-	# Isolate the most important features (rank them according to their importance first!)
-	feature_importance_df <- feature_importance$importance
-	feature_importance_df$Features <- rownames(feature_importance_df)
-	feature_importance_df <- feature_importance_df [order(-feature_importance_df$Overall),]
-	# Predictors
-	predictors_feature_selection <- feature_importance_df$Features [1:features_to_select]
-}
-########################################################################### ROC
-if (feature_selection_method == "ROC" || feature_selection_method == "roc") {
-	feature_list <- names(peaklist [,!(names(peaklist) %in% non_features)])
-	# List of important features
-	features_ROC <- character()
-	##### Automatically select features
-	if (automatically_select_features == TRUE) {
-		# For each feature, calculate the impact on the classification capability by computing a ROC
-		for (feature in feature_list){
-			# Compute the ROC of the feature
-			feature_ROC <- roc(response = peaklist[,discriminant_attribute], predictor = peaklist[,feature])
-			# Extract the AUC
-			feature_ROC_AUC <- feature_ROC$auc
-			# Keep the feature if with a great impact
-			if (feature_ROC_AUC >= auc_threshold) {
-				features_ROC <- append(features_ROC, feature)
-			}
-		}
-	} else {
-		##### Select the most N important features
-		# For each feature, calculate the impact on the classification capability by computing a ROC
-		feature_ROC_vector <- numeric(length = length(feature_list))
-		names(feature_ROC_vector) <- feature_list
-		for (f in 1:length(feature_list)) {
-			# Compute the ROC of the feature
-			feature_ROC <- roc(response = peaklist[,discriminant_attribute], predictor = peaklist[,feature_list[f]])
-			# Append the AUC to a vector
-			feature_ROC_vector[f] <- feature_ROC$auc
-		}
-		# Sort the vector
-		feature_ROC_vector_sorted <- sort(feature_ROC_vector, decreasing = TRUE)
-		# Take the first N features
-		features_ROC <- names(feature_ROC_vector_sorted)[1:features_to_select]
-	}
-	# Predictors
-	predictors_feature_selection <- features_ROC
-}
-########################################################################## Plot
-if (generate_plots == TRUE) {
-	# Initialize
-	feature_selection_graphics <- NULL
-	if (feature_selection_method == "rfe" || feature_selection_method == "recursive feature elimination") {
+	##### Plots
+	if (generate_plots == TRUE) {
 		feature_selection_graphics <- plot(rfe_model, type = c("g","o"))
+	} else {
+		feature_selection_graphics <- NULL
 	}
-	if (feature_selection_method == "correlation") {
+	##### Take the selected features
+	peaklist_feature_selection <- peaklist [, predictors_feature_selection]
+	# Add the non features back
+	for (i in 1:length(non_features)) {
+		peaklist_feature_selection <- cbind(peaklist_feature_selection, peaklist[, non_features[i]])
 	}
-	if (feature_selection_method == "importance") {
-		feature_selection_graphics <- plot(feature_importance)
+	names(peaklist_feature_selection) <- c(as.character(predictors_feature_selection), non_features)
+	# Close the parallelization cluster (on Windows)
+	if (Sys.info()[1] == "Windows") {
+		stopCluster(cl)
 	}
-} else {feature_selection_graphics <- NULL}
-#################################################### Take the selected features
-peaklist_feature_selection <- peaklist [,predictors_feature_selection]
-# Add the non features back
-for (i in 1:length(non_features)) {
-	peaklist_feature_selection <- cbind(peaklist_feature_selection, peaklist[,non_features[i]])
-}
-names(peaklist_feature_selection) <- c(as.character(predictors_feature_selection), non_features)
-# Return the values
-return (list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance))
+	# Return the values
+	return (list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance, feature_selection_model = fs_model))
 }
 
 
@@ -8855,17 +9001,27 @@ extract_feature_list_from_models <- function(filepath_R, model_names = list(svm 
 
 ################################################### GENETIC ALGORITHM FOR GRAPHS
 # The function takes an adjacency matrix as input, converts it into a graph (using the 'igraph' package) and runs the genetic algorithm on the chromosome population generated by the graph nodes. The aim of the genetic algorithm is to identify and isolate a set of highly correlated observations (clique) from the rest of the dataset (independent set) by performing vertex and triangle mutations (free low-grade vertices and bind high-grade vertices) and selecting (fitness function) the population with a minimal change compared to the original, in such a way that the maximum amount of information is preserved.
-genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Preferential", vertex_mutation = TRUE, triangle_mutation = TRUE, allow_parallelization = TRUE, vertex_independency_threshold = 200, iterations_with_no_change = 5, max_GA_generations = 10, seed = 12345) {
+genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Preferential", vertex_mutation = TRUE, triangle_mutation = TRUE, allow_parallelization = TRUE, number_of_high_degree_vertices_for_subgraph = 0, vertex_independency_threshold = 200, iterations_with_no_change = 5, max_GA_generations = 10, seed = 12345) {
 	##### Install and load the required packages
 	install_and_load_required_packages(c("MALDIquant", "parallel", "doParallel", "foreach", "iterators", "igraph", "GA"))
 	### Generate the graph
-	input_graph <- graph_from_adjacency_matrix(input_adjacency_matrix)
+	initial_graph <- graph_from_adjacency_matrix(input_adjacency_matrix)
+	### Generate a subgraph with only the high-degree vertices
+	if (!is.null(number_of_high_degree_vertices_for_subgraph) && number_of_high_degree_vertices_for_subgraph > 0 && number_of_high_degree_vertices_for_subgraph < length(V(initial_graph))) {
+		# Generate the dataframe with the vertex IDs and their degree
+		degree_dataframe <- data.frame(ID = seq(1:length(V(initial_graph))), degree = degree(initial_graph))
+		# Sort it according to the degree
+		degree_dataframe_sorted <- degree_dataframe[order(degree_dataframe$degree, decreasing = TRUE), ]
+		input_graph <- induced_subgraph(initial_graph, vids = degree_dataframe_sorted$ID[1:number_of_high_degree_vertices_for_subgraph], impl = "auto")
+	} else {
+		input_graph <- initial_graph
+	}
 	#### Define the graph typology
 	graph_type <- graph_type
 	########## Vertex mutation parameters
 	vertex_mutation <- vertex_mutation
 	# The vertex number is the number of spectra
-	vertex_number <- nrow(input_adjacency_matrix)
+	vertex_number <- length(V(initial_graph))
 	# Define the number of vertices to be sampled
 	independent_vertex_number_sampling <- round(0.28 * vertex_number)
 	# Define the threshold (number of bridges) below which the vertex is considered quasi-independent and almost belonging to the independent set.
@@ -8884,7 +9040,6 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
 	triangle_number_sampling <- round(0.75 * vertex_number)
 	# Isolate the triangles in the graph
 	graph_triangles <- triangles(input_graph)
-	#graph_triangles <- adjacent.triangles(graph_spectra)
 	# Extract the array displaying the triangles (vector of vertices, grouped by 3 for triangles) (ex x1,x2,x3,y1,y2,y3,z1,z2,z3,...)
 	triangle_array <- array(graph_triangles)
 	# Arrange the vertices in a matrix (each row is a triangle, three columns listing the vertices)
@@ -8968,11 +9123,26 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
 		# Return the mutated chromosome
 		return(mutated_chromosome)
 	}
+	###################### SPLIT GRAPH 2
+	FinalSplitGraph <- function(chromosome) {
+		# Calculate the size of the chromosome
+		chromosome_size <- length(chromosome)
+		# Calculate the number of 1 (simply the sum of the numbers in the chromosome, which is composed only of 0 and 1)
+		number_of_ones <- sum(chromosome)
+		# print(chromosome)
+		# print(number_of_ones)
+		# Generate the adjacency matrix (n x n)
+		chromosome_adjacency_matrix <- matrix(0, nrow = chromosome_size, ncol = chromosome_size)
+		# Fill in the adjacency matrix
+		chromosome_adjacency_matrix[which(chromosome == 1),] <- rep(chromosome, each = number_of_ones)
+		# Set the diagonal to zero
+		diag(chromosome_adjacency_matrix) <- 0
+		# Generate the graph from the adjacency matrix
+		chromosome_graph <- graph_from_adjacency_matrix(chromosome_adjacency_matrix, mode = "undirect")
+		# Return the graph
+		return(chromosome_graph)
+	}
 	################################################################################
-	## Refresh the functions
-	#FITN_SplitGraph_subfunction <- FITN_SplitGraph
-	#SplitMutation_subfunction <- SplitMutation
-	#FinalSplitGraph_subfunction <- FinalSplitGraph
 	#ptm <- proc.time()
 	# Pass the variables to the parallel backened
 	#clusterExport(cls, varlist = c("input_adjacency_matrix", "FITN_SplitGraph", "vertex_number", "SplitMutation", "max_GA_generations", "population_size", "GA_parallel", "seed", "triangle_mutation", "vertex_mutation"))
@@ -8998,8 +9168,18 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
 	if (Sys.info()[1] == "Windows") {
 		stopCluster(cls)
 	}
+	# Extract the final graph
+	best_solution <- GA_model@solution[1,]
+	final_graph <- FinalSplitGraph(best_solution)
+	# Generate the adjacency matrix again from the final graph
+	output_adjacency_matrix <- as.matrix(as_adjacency_matrix(final_graph, type = "both"))
+	if (is.matrix(GA_model@solution)) {
+		final_chromosome <- as.vector(GA_model@solution[1,])
+	} else {
+		final_chromosome <- as.vector(GA_model@solution)
+	}
 	### Return
-	return(list(GA_model = GA_model, input_graph = input_graph))
+	return(list(GA_model = GA_model, GA_model_solution = best_solution, input_graph = input_graph, final_graph = final_graph, output_adjacency_matrix = output_adjacency_matrix, final_chromosome = final_chromosome))
 }
 
 
@@ -9014,38 +9194,14 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
 
 ####################### FROM GENETIC ALGORITHM ON GRAPH TO SPECTRA AND MS IMAGES
 # The function takes the result of the genetic algorithm optimization (the genetic model object) and the list of spectra used to generate the adjacency matrix for the function 'genetic_algorithm_graph', it extracts the final chromosome (generated after the optimization) and it mirrors it onto the list of spectra, so that the output is a list of spectra belonging to the clique and a list of spectra belonging to the independent set. In addition, a list of spectra for plotting purposes is returned. 
-from_GA_to_MS <- function(GA_model, spectra, plot_figures = TRUE, plot_graphs = TRUE) {
+from_GA_to_MS <- function(final_chromosome_GA, spectra, plot_figures = TRUE, plot_graphs = TRUE) {
 	##### Install and load the required packages
 	install_and_load_required_packages(c("MALDIquant", "parallel", "doParallel", "igraph", "GA"))
-	###################### SPLIT GRAPH 2
-	FinalSplitGraph <- function(chromosome) {
-		# Calculate the size of the chromosome
-		chromosome_size <- length(chromosome)
-		# Calculate the number of 1 (simply the sum of the numbers in the chromosome, which is composed only of 0 and 1)
-		number_of_ones <- sum(chromosome)
-		# print(chromosome)
-		# print(number_of_ones)
-		# Generate the adjacency matrix (n x n)
-		chromosome_adjacency_matrix <- matrix(0, nrow = chromosome_size, ncol = chromosome_size)
-		# Fill in the adjacency matrix
-		chromosome_adjacency_matrix[which(chromosome == 1),] <- rep(chromosome, each = number_of_ones)
-		# Set the diagonal to zero
-		diag(chromosome_adjacency_matrix) <- 0
-		# Generate the graph from the adjacency matrix
-		chromosome_graph <- graph_from_adjacency_matrix(chromosome_adjacency_matrix, mode = "undirect")
-		# Return the graph
-		return(chromosome_graph)
-	}
 	########## Isolate the final chromosome (after mutations and fitness optimization)
 	## The spectra with identified with a 0 are the spectra outside the clique, while the spectra identified by a 1 belong to the clique (take only the first row if it is a matrix)
-	if (is.matrix(GA_model@solution)) {
-		final_chromosome <- as.vector(GA_model@solution[1,])
-	} else {
-		final_chromosome <- as.vector(GA_model@solution)
-	}
 	## Identify the spectra belonging to the clique and to the independent set
-	spectra_clique_id <- which(final_chromosome == 1)
-	spectra_independent_id <- which(final_chromosome == 0)
+	spectra_clique_id <- which(final_chromosome_GA == 1)
+	spectra_independent_id <- which(final_chromosome_GA == 0)
 	### Generate the lists (clique and independent)
 	spectra_clique <- spectra[spectra_clique_id]
 	spectra_independent <- spectra[spectra_independent_id]
@@ -9077,12 +9233,6 @@ from_GA_to_MS <- function(GA_model, spectra, plot_figures = TRUE, plot_graphs = 
 	#file_explan <- "Performance"
 	#FILE_NAME <- sprintf("%s%s%s%s%s",vertex_number,"_",graph_type,"_",file_explan)
 	#sizeGrWindow(10,5)
-	if (plot_figures == TRUE) {
-		ga_model_plot <- plot(GA_model)
-		#savePlot(filename = FILE_NAME, type = "jpeg", device = dev.cur(), restoreConsole = TRUE)
-	} else {
-		ga_model_plot <- NULL
-	}
 	##### Print outputs
 	#BestFitv <- abs(GA_model@fitnessValue)
 	#x <- (BestFitv/choose(vertex_number,2))*100
@@ -9090,22 +9240,10 @@ from_GA_to_MS <- function(GA_model, spectra, plot_figures = TRUE, plot_graphs = 
 	#print(x)
 	#print("cpu time")
 	#print(finaltime)
-	# Extract the final graph
-	Sol1 <- GA_model@solution[1,]
-	final_graph <- FinalSplitGraph(Sol1)
-	if (plot_graphs == TRUE) {
-		final_graph_plot <- plot(final_graph, layout = layout.auto, vertex.color = "green", vertex.size = 10)
-		#final_graph_plot_list[[prt]] <- recordPlot()
-		#savePlot(filename = FILE_NAME, type = "jpeg", device = dev.cur(), restoreConsole = TRUE)
-	} else {
-		final_graph_plot <- NULL
-	}
 	#file_explan <- "SolPlot"
 	#FILE_NAME <- sprintf("%s%s%s%s%s",vertex_number,"_",graph_type,"_",file_explan)
-	# Generate the adjacency matrix again from the final graph
-	output_adjacency_matrix <- as.matrix(as_adjacency_matrix(final_graph, type = "both"))
 	### Return
-	return(list(ga_model_plot = ga_model_plot, output_adjacency_matrix = output_adjacency_matrix, spectra_clique = spectra_clique, spectra_independent = spectra_independent, spectra_for_plotting = spectra_all_for_plotting, final_graph_plot = final_graph_plot))
+	return(list(spectra_clique = spectra_clique, spectra_independent = spectra_independent, spectra_for_plotting = spectra_all_for_plotting))
 }
 
 
@@ -9121,7 +9259,7 @@ from_GA_to_MS <- function(GA_model, spectra, plot_figures = TRUE, plot_graphs = 
 #################################################### GRAPH SEGMENTATION FUNCTION
 # The function returns (for the imzML MSI dataset provided as the variable spectra) the list of spectra in the clique, the list of spectra in the independent set and the MS images (with pixels related to spectra in the clique in red and pixels related to spectra in the independent set in green), the initial and the final graph.
 # It returns a NULL value if the segmentation is not possible due to incompatibilities between the features in the dataset and the ones provided by the model.
-graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalisation_algorithm = "TIC", normalisation_mass_range = NULL), process_spectra_in_packages_of = 0, allow_parallelization = TRUE, peak_picking_algorithm = "SuperSmoother", SNR = 5, tof_mode = "reflectron", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", use_features_from_models = TRUE, custom_feature_vector = NULL, filepath_R_models, list_of_models = c("svm", "pls", "nbc"), model_names = list(svm = "RSVM_model", pls = "pls_model", nbc = "nbc_model"), correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, partition_spectra = FALSE, number_of_spectra_partitions = 3, partitioning_method = "space", seed = 12345) {
+graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalisation_algorithm = "TIC", normalisation_mass_range = NULL), process_spectra_in_packages_of = 0, allow_parallelization = TRUE, peak_picking_algorithm = "SuperSmoother", SNR = 5, tof_mode = "reflectron", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", use_features_from_models = TRUE, custom_feature_vector = NULL, filepath_R_models, list_of_models = c("svm", "pls", "nbc"), model_names = list(svm = "RSVM_model", pls = "pls_model", nbc = "nbc_model"), correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, partition_spectra = FALSE, number_of_spectra_partitions = 3, partitioning_method = "space", seed = 12345) {
 	# Install and load the required packages
 	install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "parallel", "caret", "pls", "tcltk", "kernlab", "pROC", "e1071", "igraph", "GA"))
 	### Import the dataset (if filepath_imzml is not already a list of spectra)
@@ -9168,24 +9306,23 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 				# Compute the adjacency matrix
 				input_adjacency_matrix <- generate_adjacency_matrix(peaklist_matrix, correlation_method = correlation_method_for_adjacency_matrix, correlation_threshold = correlation_threshold_for_adjacency_matrix, pvalue_threshold = pvalue_threshold_for_adjacency_matrix)
 				# Run the genetic algorithm
-				GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
-				# Extract the model
-				GA_model <- GA_output$GA_model
+				GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
 				# Record the plots
 				if (plot_graphs == TRUE) {
 					graph_spectra_plot_list[[prt]] <- plot(GA_output$input_graph)
+					final_graph_plot_list[[prt]] <- plot(GA_output$final_graph)
 				} else {
 					graph_spectra_plot_list[[prt]] <- NULL
+					final_graph_plot_list[[prt]] <- NULL
 				}
 				if (plot_figures == TRUE) {
-					ga_model_plot_list[[prt]] <- plot(GA_model)
+					ga_model_plot_list[[prt]] <- plot(GA_output$GA_model)
 				} else {
 					ga_model_plot_list[[prt]] <- NULL
 				}
 				# From the optimised graph, extract the spectra for plotting, the adjacency matrix and the figures
-				MS_from_GA <- from_GA_to_MS(GA_model, spectra = spectra_partition, plot_figures = plot_figures, plot_graphs = plot_graphs)
+				MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra_partition, plot_figures = plot_figures, plot_graphs = plot_graphs)
 				# Record the plot
-				final_graph_plot_list[[prt]] <- MS_from_GA$final_graph_plot
 				final_spectra_clique[[prt]] <- MS_from_GA$spectra_clique
 				final_spectra_independent[[prt]] <- MS_from_GA$spectra_independent
 				# Extract the spectra for plotting and the spectra in the clique and in the independent set
@@ -9228,39 +9365,23 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 		if (!is.null(peaklist_matrix)) {
 			# Compute the adjacency matrix
 			input_adjacency_matrix <- generate_adjacency_matrix(peaklist_matrix, correlation_method = correlation_method_for_adjacency_matrix, correlation_threshold = correlation_threshold_for_adjacency_matrix, pvalue_threshold = pvalue_threshold_for_adjacency_matrix)
-			### Generate the graph
-			graph_spectra <- graph_from_adjacency_matrix(input_adjacency_matrix)
-			### Plot the graph
-			if (plot_graphs == TRUE) {
-				graph_spectra_plot <- plot(graph_spectra)
-				### Record the plot
-				#graph_spectra_plot <- recordPlot()
-			} else {
-				graph_spectra_plot <- NULL
-			}
 			# Run the genetic algorithm
-			GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
-			# Extract the model
-			GA_model <- GA_output$GA_model
+			GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
 			# Record the plots
 			if (plot_graphs == TRUE) {
 				graph_spectra_plot <- plot(GA_output$input_graph)
+				final_graph_plot <- plot(GA_output$final_graph)
 			} else {
 				graph_spectra_plot <- NULL
+				final_graph_plot <- NULL
 			}
 			if (plot_figures == TRUE) {
-				ga_model_plot <- plot(GA_model)
+				ga_model_plot <- plot(GA_output$GA_model)
 			} else {
 				ga_model_plot <- NULL
 			}
 			# From the optimised graph, extract the spectra for plotting, the adjacency matrix and the figures
-			MS_from_GA <- from_GA_to_MS(GA_model, spectra = spectra, plot_figures = plot_figures, plot_graphs = plot_graphs)
-			# Record the plot
-			if (plot_graphs == TRUE) {
-				final_graph_plot <- MS_from_GA$final_graph_plot
-			} else {
-				final_graph_plot <- NULL
-			}
+			MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra, plot_figures = plot_figures, plot_graphs = plot_graphs)
 			# Extract the spectra for plotting
 			spectra_all_for_plotting <- MS_from_GA$spectra_for_plotting
 			### Generate the MS images (slices)
@@ -9282,6 +9403,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 		}
 	}
 }
+
 
 
 
@@ -9356,7 +9478,24 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 
-################ SPECTRAL TYPER PROGRAM 2017.02.17
+#################### SPECTRAL TYPER PROGRAM ####################
+
+
+
+
+
+### Program version (Specified by the program writer!!!!)
+R_script_version <- "2017.02.24.1"
+### GitHub URL where the R file is
+github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER%20(TclTk).R"
+### Name of the file when downloaded
+script_file_name <- "SPECTRAL TYPER.R"
+# Change log
+change_log <- "1. New GUI\n2. Check for updates"
+
+
+
+
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
 install_and_load_required_packages(c("tcltk", "XLConnect", "ggplot2"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
@@ -9436,6 +9575,7 @@ baseline_subtraction_value <- "YES (SNIP , iterations: 200)"
 normalization_value <- "YES (TIC , mass range: )"
 mass_range_value <- "3000 , 15000"
 preprocess_spectra_in_packages_of_value <- "200"
+check_for_updates_value <- R_script_version
 
 
 
@@ -9443,6 +9583,113 @@ preprocess_spectra_in_packages_of_value <- "200"
 
 
 ##################################################### DEFINE WHAT THE BUTTONS DO
+
+##### Check for updates (from my GitHub page) (it just updates the label telling the user if there are updates) (it updates the check for updates value that is called by the label)
+check_for_updates_function <- function() {
+	### Initialize the version number
+	online_version_number <- NULL
+	### Initialize the variable that says if there are updates
+	update_available <- FALSE
+	### Initialize the change log
+	online_change_log <- "Bug fixes"
+	try({
+		### Read the file from the web (first 10 lines)
+		online_file <- readLines(con = github_R_url)
+		### Retrieve the version number
+		for (l in online_file) {
+			if (length(grep("R_script_version", l, fixed = TRUE)) > 0) {
+				# Isolate the "variable" value
+				online_version_number <- unlist(strsplit(l, "R_script_version <- ", fixed = TRUE))[2]
+				# Remove the quotes
+				online_version_number <- unlist(strsplit(online_version_number, "\""))[2]
+				break
+			}
+		}
+		### Retrieve the change log
+		for (l in online_file) {
+			if (length(grep("change_log", l, fixed = TRUE)) > 0) {
+				# Isolate the "variable" value
+				online_change_log <- unlist(strsplit(l, "change_log <- ", fixed = TRUE))[2]
+				# Remove the quotes
+				online_change_log_split <- unlist(strsplit(online_change_log, "\""))[2]
+				# Split at the \n
+				online_change_log_split <- unlist(strsplit(online_change_log_split, "\\\\n"))
+				# Put it back to the character
+				online_change_log <- ""
+				for (o in online_change_log_split) {
+					online_change_log <- paste(online_change_log, o, sep = "\n")
+				}
+				break
+			}
+		}
+		### Split the version number in YYYY.MM.DD
+		online_version_YYYYMMDDVV <- unlist(strsplit(online_version_number, ".", fixed=TRUE))
+		### Compare with the local version
+		local_version_YYYYMMDDVV = unlist(strsplit(R_script_version, ".", fixed = TRUE))
+		### Check the versions
+		for (v in 1:length(local_version_YYYYMMDDVV)) {
+			if (as.numeric(local_version_YYYYMMDDVV[v]) < as.numeric(online_version_YYYYMMDDVV[v])) {
+				update_available <- TRUE
+				break
+			}
+		}
+		### Return messages
+		if (is.null(online_version_number)) {
+			# The version number could not be ckecked due to internet problems
+			# Update the label
+			check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked: connection problems", sep = "")
+		} else {
+			if (update_available == TRUE) {
+				# Update the label
+				check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
+			} else {
+				# Update the label
+				check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
+			}
+		}
+	}, silent = TRUE)
+	### Something went wrong: library not installed, retrieving failed, errors in parsing the version number
+	if (is.null(online_version_number)) {
+		# Update the label
+		check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked: connection problems", sep = "")
+	}
+	# Escape the function
+	.GlobalEnv$update_available <- update_available
+	.GlobalEnv$online_change_log <- online_change_log
+	.GlobalEnv$check_for_updates_value <- check_for_updates_value
+}
+
+##### Download the updated file (from my GitHub page)
+download_updates_function <- function() {
+	# Download updates only if there are updates available
+	if (update_available == TRUE) {
+		# Initialize the variable which says if the file has been downloaded successfully
+		file_downloaded <- FALSE
+		# Choose where to save the updated script
+		tkmessageBox(title = "Download folder", message = "Select where to save the updated script file", icon = "info")
+		download_folder <- tclvalue(tkchooseDirectory())
+		if (!nchar(download_folder)) {
+			# Get the output folder from the default working directory
+			download_folder <- getwd()
+		}
+		# Go to the working directory
+		setwd(download_folder)
+		tkmessageBox(message = paste("The updated script file will be downloaded in:\n\n", download_folder, sep = ""))
+		# Download the file
+		try({
+			download.file(url = github_R_url, destfile = script_file_name, method = "auto")
+			file_downloaded <- TRUE
+		}, silent = TRUE)
+		if (file_downloaded == TRUE) {
+			tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
+			tkmessageBox(title = "Changelog", message = paste("The updated script contains the following changes:\n", online_change_log, sep = ""), icon = "info")
+		} else {
+			tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url, sep = ""), icon = "warning")
+		}
+	} else {
+		tkmessageBox(title = "No update available", message = "NO UPDATES AVAILABLE!\n\nThe latest version is running!", icon = "info")
+	}
+}
 
 ##### Preprocessing window
 preprocessing_window_function <- function() {
@@ -10634,6 +10881,9 @@ spectra_format_choice <- function() {
 
 ##################################################################### WINDOW GUI
 
+### Check for updates
+check_for_updates_function()
+
 ########## List of variables, whose values are taken from the entries in the GUI
 SNR <- tclVar("")
 intensity_correction_coefficient <- tclVar("")
@@ -10732,6 +10982,9 @@ if (system_os == "Windows") {
 		cantarell_title_bold = tkfont.create(family = "Cantarell", size = title_font_size, weight = "bold")
 		cantarell_other_normal = tkfont.create(family = "Cantarell", size = other_font_size, weight = "normal")
 		cantarell_other_bold = tkfont.create(family = "Cantarell", size = other_font_size, weight = "bold")
+		liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
+		liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
+		liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
 		# Use them in the GUI
 		title_font = cantarell_title_bold
 		label_font = cantarell_other_normal
@@ -10768,7 +11021,7 @@ if (system_os == "Windows") {
 
 # The "area" where we will put our input lines
 window <- tktoplevel()
-tktitle(window) <- "Spectral Typer"
+tktitle(window) <- "SPECTRAL TYPER"
 #### Browse
 # Library
 select_database_label <- tklabel(window, text="The library should be structured like this:\nMain folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/Spectrum_data", font = label_font)
@@ -10865,6 +11118,8 @@ set_file_name_entry <- tkentry(window, width = 30, textvariable = file_name, fon
 tkinsert(set_file_name_entry, "end", "Score")
 # Dump the database peaklist
 database_peaklist_dump_button <- tkbutton(window, text="Dump the database", command = database_dump_function, font = button_font)
+# Updates
+download_updates_button <- tkbutton(window, text="DOWNLOAD UPDATE", command = download_updates_function, font = button_font)
 
 
 
@@ -10883,6 +11138,7 @@ score_only_value_label <- tklabel(window, text = score_only_value, font = label_
 spectra_path_output_value_label <- tklabel(window, text = spectra_path_output_value, font = label_font)
 spectra_format_value_label <- tklabel(window, text = spectra_format_value, font = label_font)
 allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font)
+check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font)
 
 
 
@@ -10959,5 +11215,7 @@ tkgrid(database_peaklist_dump_button, row = 15, column = 3)
 #tkgrid(exit_label, row = 15, column = 1)
 #tkgrid(quit_button, row = 15, column = 2)
 tkgrid(end_session_button, row = 15, column = 4)
+tkgrid(download_updates_button, row = 15, column = 5)
+tkgrid(check_for_updates_value_label, row = 15, column = 6)
 #window_scrollbar
 
