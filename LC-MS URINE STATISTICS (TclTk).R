@@ -129,7 +129,7 @@ check_for_updates_function <- function() {
 	online_change_log <- "Bug fixes"
 	try({
 		### Read the file from the web (first 10 lines)
-		online_file <- readLines(con = github_R_url, n = 20)
+		online_file <- readLines(con = github_R_url)
 		### Retrieve the version number
 		for (l in online_file) {
 			if (length(grep("R_script_version", l, fixed = TRUE)) > 0) {
@@ -146,7 +146,14 @@ check_for_updates_function <- function() {
 				# Isolate the "variable" value
 				online_change_log <- unlist(strsplit(l, "change_log <- ", fixed = TRUE))[2]
 				# Remove the quotes
-				online_change_log <- unlist(strsplit(online_change_log, "\""))[2]
+				online_change_log_split <- unlist(strsplit(online_change_log, "\""))[2]
+				# Split at the \n
+				online_change_log_split <- unlist(strsplit(online_change_log_split, "\\\\n"))
+				# Put it back to the character
+				online_change_log <- ""
+				for (o in online_change_log_split) {
+					online_change_log <- paste(online_change_log, o, sep = "\n")
+				}
 				break
 			}
 		}
