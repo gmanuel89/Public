@@ -11,7 +11,7 @@ github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/mas
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS.R"
 # Change log
-change_log <- "Bug fixes"
+change_log <- "1. All the outputs are put in a subfolder named 'STATISTICS X'\n2. All the outputs in the subfolder are more organized\n3. The boxplots are generated also without the outliers\n4. The labels in the plots are correctly displayed."
 
 
 
