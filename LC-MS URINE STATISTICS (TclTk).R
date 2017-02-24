@@ -5,13 +5,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.02.24.1"
+R_script_version <- "2017.02.24.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS.R"
 # Change log
-change_log <- "1. All the outputs are put in a subfolder named 'STATISTICS X'\n2. All the outputs in the subfolder are more organized\n3. The boxplots are generated also without the outliers\n4. The labels in the plots are correctly displayed."
+change_log <- "1. All the outputs are put in a subfolder named 'STATISTICS X'\n2. All the outputs in the subfolder are more organized\n3. The boxplots are generated also without the outliers\n4. The labels in the plots are correctly displayed\n5. New GUI"
 
 
 
@@ -22,7 +22,7 @@ change_log <- "1. All the outputs are put in a subfolder named 'STATISTICS X'\n2
 # FUNCTION
 install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
 	# Update all the packages
-	try(update.packages(repos = repository, ask = FALSE))
+	try(update.packages(repos = repository, ask = FALSE), silent = TRUE)
 	# Retrieve the installed packages
 	installed_packages <- installed.packages()[,1]
 	# Determine the missing packages
@@ -181,7 +181,7 @@ check_for_updates_function <- function() {
 				check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
 			}
 		}
-	})
+	}, silent = TRUE)
 	### Something went wrong: library not installed, retrieving failed, errors in parsing the version number
 	if (is.null(online_version_number)) {
 		# Update the label
@@ -213,10 +213,10 @@ download_updates_function <- function() {
 		try({
 			download.file(url = github_R_url, destfile = script_file_name, method = "auto")
 			file_downloaded <- TRUE
-		})
+		}, silent = TRUE)
 		if (file_downloaded == TRUE) {
 			tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
-			tkmessageBox(title = "Changelog", message = paste("The updated script contains the following changes:\n\n", online_change_log, sep = ""), icon = "info")
+			tkmessageBox(title = "Changelog", message = paste("The updated script contains the following changes:\n", online_change_log, sep = ""), icon = "info")
 		} else {
 			tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url, sep = ""), icon = "warning")
 		}
@@ -325,14 +325,20 @@ file_import_function <- function() {
 		tkmessageBox(title = "Discriminant feature", message = "Select the discriminant feature", icon = "info")
 		discriminant_feature <- select.list(c(non_signals, "NONE"), title = "Choose the discriminant feature", preselect = ifelse("Class" %in% feature_vector, "Class", NULL))
 		# Features for correlation analysis
-		tkmessageBox(title = "Correlation analysis data", message = "Select the demographic data for correlation analysis", icon = "info")
-		non_signals_for_correlation_analysis <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for correlation analysis", multiple = TRUE)
+		if (correlation_analysis == TRUE) {
+			tkmessageBox(title = "Correlation analysis data", message = "Select the demographic data for correlation analysis", icon = "info")
+			non_signals_for_correlation_analysis <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for correlation analysis", multiple = TRUE)
+		}
 		# Features for two-level effect analysis
-		tkmessageBox(title = "Two-level effect analysis data", message = "Select the demographic data for two-level effect analysis", icon = "info")
-		two_level_effect_analysis_non_features <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for two-level effect analysis", multiple = TRUE)
-		# Features for multi-level effect analysis
-		tkmessageBox(title = "Multi-level effect analysis data", message = "Select the demographic data for multi-level effect analysis", icon = "info")
-		multi_level_effect_analysis_non_features <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for multi-level effect analysis", multiple = TRUE)
+		if (two_level_effect_analysis == TRUE) {
+			tkmessageBox(title = "Two-level effect analysis data", message = "Select the demographic data for two-level effect analysis", icon = "info")
+			two_level_effect_analysis_non_features <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for two-level effect analysis", multiple = TRUE)
+		}
+		if (multi_level_effect_analysis == TRUE) {
+			# Features for multi-level effect analysis
+			tkmessageBox(title = "Multi-level effect analysis data", message = "Select the demographic data for multi-level effect analysis", icon = "info")
+			multi_level_effect_analysis_non_features <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for multi-level effect analysis", multiple = TRUE)
+		}
 		## Class list
 		if (discriminant_feature == "NONE") {
 			class_list <- discriminant_feature
@@ -2151,10 +2157,8 @@ multi_level_effect_analysis_value_label <- tklabel(window, text = multi_level_ef
 remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_multi_level_effect_analysis_value, font = label_font)
 cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font)
 #### Geometry manager
-tkgrid(download_updates_button, row = 1, column = 3)
-tkgrid(check_for_updates_value_label, row = 1, column = 4)
-tkgrid(select_input_button, row = 1, column = 2)
-tkgrid(browse_output_button, row = 1, column = 1)
+tkgrid(download_updates_button, row = 1, column = 2)
+tkgrid(check_for_updates_value_label, row = 1, column = 3)
 tkgrid(output_file_type_export_entry, row = 2, column = 1)
 tkgrid(image_file_type_export_entry, row = 3, column = 1)
 tkgrid(data_record_entry, row = 4, column = 1)
@@ -2185,5 +2189,7 @@ tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 7, colum
 #tkgrid(TestPer_Base_entry, row = 7, column = 4)
 #tkgrid(TestPer_Adv_label, row = 8, column = 3)
 #tkgrid(TestPer_Adv_entry, row = 8, column = 4)
-tkgrid(run_statistics_function_button, row = 9, column = 2)
-tkgrid(end_session_button, row = 9, column = 3)
+tkgrid(browse_output_button, row = 9, column = 1)
+tkgrid(select_input_button, row = 9, column = 2)
+tkgrid(run_statistics_function_button, row = 9, column = 3)
+tkgrid(end_session_button, row = 9, column = 4)
