@@ -7,7 +7,7 @@
 ### Program version (Specified by the program writer!!!!)
 R_script_version <- "2017.02.27.0"
 ### GitHub URL where the R file is
-github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
+github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS.R"
 # Change log
