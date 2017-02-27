@@ -5,13 +5,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.02.24.5"
+R_script_version <- "2017.02.27.0"
 ### GitHub URL where the R file is
-github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS%20(TclTk).R"
+github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS.R"
 # Change log
-change_log <- "1. Correlation plots are now generated and saved\n2. All the outputs are put in a subfolder named 'STATISTICS X'\n3. All the outputs in the subfolder are more organized\n4. The boxplots are generated also without the outliers\n5. The labels in the plots are correctly displayed\n6. New GUI (adaptive fonts also on Windows 10)"
+change_log <- "1. Correlation plots are now generated and saved\n2. All the outputs are put in a subfolder named 'STATISTICS X'\n3. All the outputs in the subfolder are more organized\n4. The boxplots are generated also without the outliers\n5. The labels in the plots are correctly displayed\n6. New GUI (adaptive fonts also on Windows 10)\n7. New GitHub link"
 
 
 
