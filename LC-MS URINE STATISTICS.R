@@ -5,13 +5,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.02.27.0"
+R_script_version <- "2017.03.01.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS.R"
 # Change log
-change_log <- "1. Correlation plots are now generated and saved\n2. All the outputs are put in a subfolder named 'STATISTICS X'\n3. All the outputs in the subfolder are more organized\n4. The boxplots are generated also without the outliers\n5. The labels in the plots are correctly displayed\n6. New GUI (adaptive fonts also on Windows 10)\n7. New GitHub link"
+change_log <- "1. Table to see the up-down proteins"
 
 
 
@@ -1316,10 +1316,16 @@ run_statistics_function <- function() {
                 ############################### Dump the files
                 # For each signals of inference...
                 ### OUTLIERS
-                # Create the folder where to dump the files and go to it...
+                # Create the folder where to dump the plot files
                 plots_two_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots")
                 dir.create(plots_two_level_effect_analysis_subfolder)
-                setwd(plots_two_level_effect_analysis_subfolder)
+                # Create the folder where to dump the table files and go to it...
+                tables_two_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Tables")
+                dir.create(tables_two_level_effect_analysis_subfolder)
+                ##### UP-DOWN Table
+                up_down_matrix <- matrix(0, nrow = length(selected_signals_for_inference), ncol = length(levels(as.factor(temp_data_frame[, non_signal_variable]))))
+                rownames(up_down_matrix) <- selected_signals_for_inference
+                colnames(up_down_matrix) <- levels(as.factor(temp_data_frame[, non_signal_variable]))
                 for (s in selected_signals_for_inference) {
                     # Extract the intensity
                     signal_intensity <- selected_signals_for_inference_intensity_df[[s]]
@@ -1336,12 +1342,13 @@ run_statistics_function <- function() {
                     plot_name <- sprintf("%s%s", non_signal_variable,"_VS_Intensity")
                     file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
                     jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                    setwd(plots_two_level_effect_analysis_subfolder)
                     ggsave(jitter_plot, file = file_name, width = 4, height = 4)
-                    
                     ##### Box plot
                     plot_name <- sprintf("%s%s", non_signal_variable,"_boxplot") 
                     file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
                     box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                    setwd(plots_two_level_effect_analysis_subfolder)
                     ggsave(box_plot, file = file_name, width = 4, height = 4)
                     
                     ##### Scatter plot
@@ -1353,14 +1360,42 @@ run_statistics_function <- function() {
                     file_name <- sprintf("%s%s%s%s", " ", s, plot_name, image_format)
                     graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
                     scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                    setwd(plots_two_level_effect_analysis_subfolder)
                     ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                    ##### UP-DOWN MATRIX
+                    s_split <- group_dependent_variable(selected_signals_for_inference_intensity_df[, s], as.factor(selected_signals_for_inference_intensity_df[, non_signal_variable]))
+                    for (x in 1:length(s_split)) {
+                        # Run the Shapiro test to see if to output the mean or the median
+                        if (length(s_split[[x]]) >= 3 && length(s_split[[x]]) <= 5000) {
+                            shapiro_test <- shapiro.test(s_split[[x]])
+                            shapiro_test_pvalue <- shapiro_test$p.value
+                            if (shapiro_test_pvalue <= pvalue_tests) {
+                                distribution_type <- "non-normal"
+                            } else {
+                                distribution_type <- "normal"
+                            }
+                        } else {
+                            distribution_type <- "non-normal"
+                        }
+                        # Fill the matrix
+                        if (distribution_type == "normal") {
+                            up_down_matrix[s, x] <- mean(s_split[[x]], na.rm = TRUE)
+                        } else if (distribution_type == "non-normal") {
+                            up_down_matrix[s, x] <- median(s_split[[x]], na.rm = TRUE)
+                        }
+                    }
                 }
+                setwd(tables_two_level_effect_analysis_subfolder)
+                write_file(file_name = "Up-Down matrix", data = up_down_matrix, file_format = file_format)
                 ### NO OUTLIERS
                 if (remove_outliers_two_level_effect_analysis == TRUE) {
                     # Create the folder where to dump the files and go to it...
                     plots_two_level_effect_analysis_no_outliers_subfolder <- file.path(combination_subfolder, "Plots (Without outliers)")
                     dir.create(plots_two_level_effect_analysis_no_outliers_subfolder)
-                    setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
+                    ##### UP-DOWN Table
+                    up_down_matrix_no_outliers <- matrix(0, nrow = length(selected_signals_for_inference), ncol = length(levels(as.factor(temp_data_frame[, non_signal_variable]))))
+                    rownames(up_down_matrix_no_outliers) <- selected_signals_for_inference
+                    colnames(up_down_matrix_no_outliers) <- levels(as.factor(temp_data_frame[, non_signal_variable]))
                     for (s in selected_signals_for_inference) {
                         # Extract the intensity
                         signal_intensity <- selected_signals_for_inference_intensity_df_no_outliers[[s]]
@@ -1377,14 +1412,14 @@ run_statistics_function <- function() {
                         plot_name <- sprintf("%s%s", non_signal_variable,"_VS_Intensity")
                         file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
                         jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                        setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
                         ggsave(jitter_plot, file = file_name, width = 4, height = 4)
-                        
                         ##### Box plot
                         plot_name <- sprintf("%s%s", non_signal_variable,"_boxplot") 
                         file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
                         box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                        setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
                         ggsave(box_plot, file = file_name, width = 4, height = 4)
-                        
                         ##### Scatter plot
                         plot_name <- sprintf("%s%s", non_signal_variable,"_factor-Ordered_Spectrum__VS__Intensity") 
                         # Sort the dataframe rows according to the values of the non-signal variable
@@ -1394,12 +1429,34 @@ run_statistics_function <- function() {
                         file_name <- sprintf("%s%s%s%s", " ", s, plot_name, image_format)
                         graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
                         scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                        setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
                         ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                        ##### UP-DOWN MATRIX
+                        s_split <- group_dependent_variable(selected_signals_for_inference_intensity_df_no_outliers[, s], as.factor(selected_signals_for_inference_intensity_df_no_outliers[, non_signal_variable]))
+                        for (x in 1:length(s_split)) {
+                            # Run the Shapiro test to see if to output the mean or the median
+                            if (length(s_split[[x]]) >= 3 && length(s_split[[x]]) <= 5000) {
+                                shapiro_test <- shapiro.test(s_split[[x]])
+                                shapiro_test_pvalue <- shapiro_test$p.value
+                                if (shapiro_test_pvalue <= pvalue_tests) {
+                                    distribution_type <- "non-normal"
+                                } else {
+                                    distribution_type <- "normal"
+                                }
+                            } else {
+                                distribution_type <- "non-normal"
+                            }
+                            # Fill the matrix
+                            if (distribution_type == "normal") {
+                                up_down_matrix_no_outliers[s, x] <- mean(s_split[[x]], na.rm = TRUE)
+                            } else if (distribution_type == "non-normal") {
+                                up_down_matrix_no_outliers[s, x] <- median(s_split[[x]], na.rm = TRUE)
+                            }
+                        }
                     }
+                    setwd(tables_two_level_effect_analysis_subfolder)
+                    write_file(file_name = "Up-Down matrix (no outliers)", data = up_down_matrix_no_outliers, file_format = file_format)
                 }
-                # Create the folder where to dump the files and go to it...
-                tables_two_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Tables")
-                dir.create(tables_two_level_effect_analysis_subfolder)
                 setwd(tables_two_level_effect_analysis_subfolder)
                 ### Dump the files
                 write_file(file_name = "Patient number matrix", data = patient_number_matrix, file_format = file_format)
@@ -1857,7 +1914,13 @@ run_statistics_function <- function() {
                 # Create the folder where to dump the files and go to it...
                 plots_multi_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots")
                 dir.create(plots_multi_level_effect_analysis_subfolder)
-                setwd(plots_multi_level_effect_analysis_subfolder)
+                # Create the folder where to dump the table files and go to it...
+                tables_multi_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Tables")
+                dir.create(tables_multi_level_effect_analysis_subfolder)
+                ##### UP-DOWN Table
+                up_down_matrix <- matrix(0, nrow = length(selected_signals_for_inference), ncol = length(levels(as.factor(temp_data_frame[, non_signal_variable]))))
+                rownames(up_down_matrix) <- selected_signals_for_inference
+                colnames(up_down_matrix) <- levels(as.factor(temp_data_frame[, non_signal_variable]))
                 # For each signals of inference...
                 for (s in selected_signals_for_inference) {
                     # Extract the intensity
@@ -1875,11 +1938,13 @@ run_statistics_function <- function() {
                     plot_name <- sprintf("%s%s", non_signal_variable,"_VS_Intensity")
                     file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
                     jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                    setwd(plots_multi_level_effect_analysis_subfolder)
                     ggsave(jitter_plot, file = file_name, width = 4, height = 4)
                     ##### Box plot
                     plot_name <- sprintf("%s%s", non_signal_variable,"_boxplot") 
                     file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
                     box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                    setwd(plots_multi_level_effect_analysis_subfolder)
                     ggsave(box_plot, file = file_name, width = 4, height = 4)
                     ##### Scatter plot
                     plot_name <- sprintf("%s%s", non_signal_variable,"_factor-Ordered_Spectrum__VS__Intensity") 
@@ -1890,14 +1955,42 @@ run_statistics_function <- function() {
                     file_name <- sprintf("%s%s%s%s", " ", s, plot_name, image_format)
                     graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
                     scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                    setwd(plots_multi_level_effect_analysis_subfolder)
                     ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                    ##### UP-DOWN MATRIX
+                    s_split <- group_dependent_variable(selected_signals_for_inference_intensity_df[, s], as.factor(selected_signals_for_inference_intensity_df[, non_signal_variable]))
+                    for (x in 1:length(s_split)) {
+                        # Run the Shapiro test to see if to output the mean or the median
+                        if (length(s_split[[x]]) >= 3 && length(s_split[[x]]) <= 5000) {
+                            shapiro_test <- shapiro.test(s_split[[x]])
+                            shapiro_test_pvalue <- shapiro_test$p.value
+                            if (shapiro_test_pvalue <= pvalue_tests) {
+                                distribution_type <- "non-normal"
+                            } else {
+                                distribution_type <- "normal"
+                            }
+                        } else {
+                            distribution_type <- "non-normal"
+                        }
+                        # Fill the matrix
+                        if (distribution_type == "normal") {
+                            up_down_matrix[s, x] <- mean(s_split[[x]], na.rm = TRUE)
+                        } else if (distribution_type == "non-normal") {
+                            up_down_matrix[s, x] <- median(s_split[[x]], na.rm = TRUE)
+                        }
+                    }
                 }
+                setwd(tables_multi_level_effect_analysis_subfolder)
+                write_file(file_name = "Up-Down matrix", data = up_down_matrix, file_format = file_format)
                 ### NO OUTLIERS
                 if (remove_outliers_multi_level_effect_analysis == TRUE) {
                     # Create the folder where to dump the files and go to it...
                     plots_multi_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots (Without outliers)")
                     dir.create(plots_multi_level_effect_analysis_subfolder)
-                    setwd(plots_multi_level_effect_analysis_subfolder)
+                    ##### UP-DOWN Table
+                    up_down_matrix_no_outliers <- matrix(0, nrow = length(selected_signals_for_inference), ncol = length(levels(as.factor(temp_data_frame[, non_signal_variable]))))
+                    rownames(up_down_matrix_no_outliers) <- selected_signals_for_inference
+                    colnames(up_down_matrix_no_outliers) <- levels(as.factor(temp_data_frame[, non_signal_variable]))
                     # For each signals of inference...
                     for (s in selected_signals_for_inference) {
                         # Extract the intensity
@@ -1915,11 +2008,13 @@ run_statistics_function <- function() {
                         plot_name <- sprintf("%s%s", non_signal_variable,"_VS_Intensity")
                         file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
                         jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = s, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                        setwd(plots_multi_level_effect_analysis_no_outliers_subfolder)
                         ggsave(jitter_plot, file = file_name, width = 4, height = 4)
                         ##### Box plot
                         plot_name <- sprintf("%s%s", non_signal_variable,"_boxplot") 
                         file_name <- sprintf("%s%s%s%s", s, " ", plot_name, image_format)
                         box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = s, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                        setwd(plots_multi_level_effect_analysis_no_outliers_subfolder)
                         ggsave(box_plot, file = file_name, width = 4, height = 4)
                         ##### Scatter plot
                         plot_name <- sprintf("%s%s", non_signal_variable,"_factor-Ordered_Spectrum__VS__Intensity") 
@@ -1930,14 +2025,14 @@ run_statistics_function <- function() {
                         file_name <- sprintf("%s%s%s%s", " ", s, plot_name, image_format)
                         graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
                         scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = s, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                        setwd(plots_multi_level_effect_analysis_no_outliers_subfolder)
                         ggsave(scatter_plot, file = file_name , width = 4, height = 4)
                     }
+                    setwd(tables_multi_level_effect_analysis_subfolder)
+                    write_file(file_name = "Up-Down matrix (no outliers)", data = up_down_matrix_no_outliers, file_format = file_format)
                 }
                 ### Dump the files
-                # Create the folder where to dump the files and go to it...
-                tables_multi_level_effect_analysis <- file.path(combination_subfolder, "Tables")
-                dir.create(tables_multi_level_effect_analysis)
-                setwd(tables_multi_level_effect_analysis)
+                setwd(tables_multi_level_effect_analysis_subfolder)
                 write_file(file_name = "Patient number matrix", data = patient_number_matrix_multi, file_format = file_format)
                 write_file(file_name = "Outliers", data = outlier_matrix_multi, file_format = file_format)
                 write_file(file_name = "Methods", data = inference_signals_method_matrix, file_format = file_format)
