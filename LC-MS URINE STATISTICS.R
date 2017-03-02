@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.02.2"
+R_script_version <- "2017.03.02.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -1017,7 +1017,7 @@ run_statistics_function <- function() {
                                 if (plot_correlation_graphs == TRUE) {
                                     plot_name <- sprintf("%s%s%s%s", "Correlation ", m, " vs ", ns, " (without outliers)")
                                     file_name <- sprintf("%s%s", plot_name, image_format)
-                                    scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = plot_name, ylab = ns, xlab = m)
+                                    scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = sprintf("%s%s%s%s", "Correlation ", m, " vs ", ns, "\n(without outliers)"), ylab = ns, xlab = m)
                                     setwd(correlation_plot_subfolder_no_outliers)
                                     ggsave(scatter_plot, file = file_name , width = 4, height = 4)
                                 }
@@ -1454,24 +1454,24 @@ run_statistics_function <- function() {
                         ##### Jitter plot
                         plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " (without outliers)")
                         file_name <- sprintf("%s%s", plot_name, image_format)
-                        jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = plot_name, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                        jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, "\n(without outliers)"), alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
                         setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
                         ggsave(jitter_plot, file = file_name, width = 4, height = 4)
                         ##### Box plot
-                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot (without outliers)") 
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot (without outliers)")
                         file_name <- sprintf("%s%s", plot_name, image_format)
-                        box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = plot_name, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                        box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot\n(without outliers)"), geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
                         setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
                         ggsave(box_plot, file = file_name, width = 4, height = 4)
                         ##### Scatter plot
-                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " (without outliers)") 
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " (without outliers)")
                         # Sort the dataframe rows according to the values of the non-signal variable
                         ordered_signal_dataframe <- signal_dataframe[order(non_signal_as_ordered_factor),]
                         ordered_signal_dataframe <- cbind(ordered_signal_dataframe, c(1:nrow(signal_dataframe[order(non_signal_as_ordered_factor),])))
                         colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
                         file_name <- sprintf("%s%s", plot_name, image_format)
                         graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
-                        scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = plot_name, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                        scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, "\n(without outliers)"), color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
                         setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
                         ggsave(scatter_plot, file = file_name , width = 4, height = 4)
                         ##### UP-DOWN MATRIX
@@ -2052,24 +2052,24 @@ run_statistics_function <- function() {
                         ##### Jitter plot    
                         plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " (without outliers)")
                         file_name <- sprintf("%s%s", plot_name, image_format)
-                        jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = plot_name, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                        jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, "\n(without outliers)"), alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
                         setwd(plots_multi_level_effect_analysis_no_outliers_subfolder)
                         ggsave(jitter_plot, file = file_name, width = 4, height = 4)
                         ##### Box plot
-                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot (without outliers)") 
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot (without outliers)")
                         file_name <- sprintf("%s%s",plot_name, image_format)
-                        box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = plot_name, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                        box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot\n(without outliers)"), geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
                         setwd(plots_multi_level_effect_analysis_no_outliers_subfolder)
                         ggsave(box_plot, file = file_name, width = 4, height = 4)
                         ##### Scatter plot
-                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " (without outliers)") 
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " (without outliers)")
                         # Sort the dataframe rows according to the values of the non-signal variable
                         ordered_signal_dataframe <- signal_dataframe[order(non_signal_as_ordered_factor),]
                         ordered_signal_dataframe <- cbind(ordered_signal_dataframe, c(1:nrow(signal_dataframe[order(non_signal_as_ordered_factor),])))
                         colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
                         file_name <- sprintf("%s%s", plot_name, image_format)
                         graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
-                        scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = plot_name, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                        scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, "\n(without outliers)"), color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
                         setwd(plots_multi_level_effect_analysis_no_outliers_subfolder)
                         ggsave(scatter_plot, file = file_name , width = 4, height = 4)
                     }
