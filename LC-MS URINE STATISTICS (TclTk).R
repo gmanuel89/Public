@@ -5,13 +5,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.01.0"
+R_script_version <- "2017.03.02.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS.R"
 # Change log
-change_log <- "1. Table to see the up-down proteins"
+change_log <- "1. Table to see the up-down proteins\n2. Possibility to decide whether to generate the correlation plots"
 
 
 
@@ -91,6 +91,8 @@ remove_outliers_multi_level_effect_analysis <- FALSE
 # Age binning
 age_binning <- FALSE
 age_bins <- 6
+# Plot correlation graphs
+plot_correlation_graphs <- FALSE
 
 
 
@@ -108,6 +110,7 @@ remove_outliers_two_level_effect_analysis_value <- "NO"
 multi_level_effect_analysis_value <- "YES"
 remove_outliers_multi_level_effect_analysis_value <- "NO"
 cumulative_class_in_two_level_effect_analysis_value <- "NO"
+plot_correlation_graphs_value <- "NO"
 check_for_updates_value <- R_script_version
 
 
@@ -457,6 +460,32 @@ remove_outliers_correlation_analysis_choice <- function() {
     # Escape the function
     .GlobalEnv$remove_outliers_correlation_analysis <- remove_outliers_correlation_analysis
     .GlobalEnv$remove_outliers_correlation_analysis_value <- remove_outliers_correlation_analysis_value
+}
+
+##### Plot Correlation graphs
+plot_correlation_graphs_choice <- function() {
+    #### Messagebox
+    tkmessageBox(title = "Plot correlation graphs is resource hungry", message = "The activity of computing, generating and saving correlation plots is resource hungry. By activating it, the overall computation speed becomes slower.", icon = "warning")
+    # Catch the value from the menu
+    plot_correlation_graphs <- select.list(c("YES","NO"), title="Choose")
+    # Default
+    if (plot_correlation_graphs == "YES") {
+        plot_correlation_graphs <- TRUE
+    }
+    if (plot_correlation_graphs == "NO" || plot_correlation_graphs == "") {
+        plot_correlation_graphs <- FALSE
+    }
+    # Set the value of the displaying label
+    if (plot_correlation_graphs == TRUE) {
+        plot_correlation_graphs_value <- "YES"
+    } else {
+        plot_correlation_graphs_value <- "NO"
+    }
+    plot_correlation_graphs_value_label <- tklabel(window, text = plot_correlation_graphs_value, font = label_font)
+    tkgrid(plot_correlation_graphs_value_label, row = 8, column = 4)
+    # Escape the function
+    .GlobalEnv$plot_correlation_graphs <- plot_correlation_graphs
+    .GlobalEnv$plot_correlation_graphs_value <- plot_correlation_graphs_value
 }
 
 ##### Two-level effect analysis
@@ -889,12 +918,14 @@ run_statistics_function <- function() {
             correlation_subfolder <- file.path(output_folder, "Correlation")
             dir.create(correlation_subfolder)
             setwd(correlation_subfolder)
-            ##### Create the folder for the correlation scatter plots
-            correlation_plot_subfolder <- file.path(correlation_subfolder, "Plots")
-            dir.create(correlation_plot_subfolder)
-            ##### Create the folder for the correlation scatter plots (no outliers)
-            correlation_plot_subfolder_no_outliers <- file.path(correlation_subfolder, "Plots (Without outliers)")
-            dir.create(correlation_plot_subfolder_no_outliers)
+            if (plot_correlation_graphs == TRUE) {
+                ##### Create the folder for the correlation scatter plots
+                correlation_plot_subfolder <- file.path(correlation_subfolder, "Plots")
+                dir.create(correlation_plot_subfolder)
+                ##### Create the folder for the correlation scatter plots (no outliers)
+                correlation_plot_subfolder_no_outliers <- file.path(correlation_subfolder, "Plots (Without outliers)")
+                dir.create(correlation_plot_subfolder_no_outliers)
+            }
             ##### Create the folder for the correlation data tables
             correlation_tables_subfolder <- file.path(correlation_subfolder, "Tables")
             dir.create(correlation_tables_subfolder)
@@ -944,11 +975,13 @@ run_statistics_function <- function() {
                             mass_x <- mass_x[!is.na(non_signal_column_original)]
                             non_signal_column <- non_signal_column_original[!is.na(non_signal_column_original)]
                             ### Generate a graph before the removal of outliers
-                            plot_name <- paste("Correlation", m, "vs", ns)
-                            file_name <- sprintf("%s%s", plot_name, image_format)
-                            scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = plot_name, ylab = ns, xlab = m)
-                            setwd(correlation_plot_subfolder)
-                            ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                            if (plot_correlation_graphs == TRUE) {
+                                plot_name <- paste("Correlation", m, "vs", ns)
+                                file_name <- sprintf("%s%s", plot_name, image_format)
+                                scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = plot_name, ylab = ns, xlab = m)
+                                setwd(correlation_plot_subfolder)
+                                ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                            }
                             ### Outlier detection
                             if (isTRUE(remove_outliers_correlation_analysis)) {
                                 # Detect the outliers (fence)
@@ -975,11 +1008,13 @@ run_statistics_function <- function() {
                                 mass_x_no_outliers <- mass_x[!is.na(mass_x)]
                                 non_signal_column_no_outliers <- non_signal_column[!is.na(mass_x)]
                                 ### Generate a graph after the removal of outliers
-                                plot_name <- paste("Correlation", m, "vs", ns, "(Without outliers)")
-                                file_name <- sprintf("%s%s", plot_name, image_format)
-                                scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = plot_name, ylab = ns, xlab = m)
-                                setwd(correlation_plot_subfolder_no_outliers)
-                                ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                                if (plot_correlation_graphs == TRUE) {
+                                    plot_name <- paste("Correlation", m, "vs", ns, "(Without outliers)")
+                                    file_name <- sprintf("%s%s", plot_name, image_format)
+                                    scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = plot_name, ylab = ns, xlab = m)
+                                    setwd(correlation_plot_subfolder_no_outliers)
+                                    ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                                }
                             }
                             ### Compute the results
                             correlation_result_vector <- c(cor.test(mass_x, as.numeric(non_signal_column), method = "spearman")$estimate, cor.test(mass_x, as.numeric(non_signal_column), method = "spearman")$p.value)
@@ -2253,12 +2288,12 @@ window <- tktoplevel()
 tktitle(window) <- "LC-MS PEAK STATISTICS"
 #### Browse
 select_input_button <- tkbutton(window, text="Import file...", command = file_import_function, font = button_font)
-browse_output_button <- tkbutton(window, text="Browse output folder", command = browse_output_function, font = button_font)
+browse_output_button <- tkbutton(window, text="Browse\noutput folder", command = browse_output_function, font = button_font)
 #### Entries
-output_file_type_export_entry <- tkbutton(window, text="Output file type", command = output_file_type_export_choice, font = button_font)
-image_file_type_export_entry <- tkbutton(window, text="Image file type", command = image_file_type_export_choice, font = button_font)
+output_file_type_export_entry <- tkbutton(window, text="Output\nfile type", command = output_file_type_export_choice, font = button_font)
+image_file_type_export_entry <- tkbutton(window, text="Image\nfile type", command = image_file_type_export_choice, font = button_font)
 data_record_entry <- tkbutton(window, text="Data REC", command = data_record_choice, font = button_font)
-correlation_analysis_entry <- tkbutton(window, text="Correlation analysis", command = correlation_analysis_choice, font = button_font)
+correlation_analysis_entry <- tkbutton(window, text="Correlation\nanalysis", command = correlation_analysis_choice, font = button_font)
 remove_outliers_correlation_analysis_entry <- tkbutton(window, text="Remove outliers\nCorrelation analysis", command = remove_outliers_correlation_analysis_choice, font = button_font)
 two_level_effect_analysis_entry <- tkbutton(window, text="Two-level effect\nanalysis", command = two_level_effect_analysis_choice, font = button_font)
 remove_outliers_two_level_effect_analysis_entry <- tkbutton(window, text="Remove outliers\nTwo-level effect\nanalysis", command = remove_outliers_two_level_effect_analysis_choice, font = button_font)
@@ -2274,6 +2309,7 @@ pvalue_tests_label <- tklabel(window, text="p-value for significance\nin statist
 pvalue_tests_entry <- tkentry(window, width = 10, textvariable = pvalue_tests, font = entry_font)
 tkinsert(pvalue_tests_entry, "end", "0.05")
 cumulative_class_in_two_level_effect_analysis_entry <- tkbutton(window, text="Cumulative class in the\ntwo-level effect analysis", command = cumulative_class_in_two_level_effect_analysis_choice, font = button_font)
+plot_correlation_graphs_entry <- tkbutton(window, text = "Plot correlation\ngraphs", command = plot_correlation_graphs_choice, font = button_font)
 #TestPer_Base_label <- tklabel(window, text="TestPer_Base", font = label_font)
 #TestPer_Base_entry <- tkentry(window, width = 10, textvariable = TestPer_Base, font = entry_font)
 #tkinsert(TestPer_Base_entry, "end", "0.17")
@@ -2281,8 +2317,8 @@ cumulative_class_in_two_level_effect_analysis_entry <- tkbutton(window, text="Cu
 #TestPer_Adv_entry <- tkentry(window, width = 10, textvariable = TestPer_Adv, font = entry_font)
 #tkinsert(TestPer_Adv_entry, "end", "0.19")
 # Buttons
-download_updates_button <- tkbutton(window, text="DOWNLOAD UPDATE", command = download_updates_function, font = button_font)
-run_statistics_function_button <- tkbutton(window, text="RUN STATISTICS", command = run_statistics_function, font = button_font)
+download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE", command = download_updates_function, font = button_font)
+run_statistics_function_button <- tkbutton(window, text="RUN\nSTATISTICS", command = run_statistics_function, font = button_font)
 end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
 #### Displaying labels
 check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font)
@@ -2296,6 +2332,7 @@ remove_outliers_two_level_effect_analysis_value_label <- tklabel(window, text = 
 multi_level_effect_analysis_value_label <- tklabel(window, text = multi_level_effect_analysis_value, font = label_font)
 remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_multi_level_effect_analysis_value, font = label_font)
 cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font)
+plot_correlation_graphs_value_label <- tklabel(window, text = plot_correlation_graphs_value, font = label_font)
 #### Geometry manager
 tkgrid(download_updates_button, row = 1, column = 2)
 tkgrid(check_for_updates_value_label, row = 1, column = 3)
@@ -2325,6 +2362,8 @@ tkgrid(pvalue_tests_label, row = 8, column = 1)
 tkgrid(pvalue_tests_entry, row = 8, column = 2)
 tkgrid(cumulative_class_in_two_level_effect_analysis_entry, row = 7, column = 3)
 tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 7, column = 4)
+tkgrid(plot_correlation_graphs_entry, row = 8, column = 3)
+tkgrid(plot_correlation_graphs_value_label, row = 8, column = 4)
 #tkgrid(TestPer_Base_label, row = 7, column = 3)
 #tkgrid(TestPer_Base_entry, row = 7, column = 4)
 #tkgrid(TestPer_Adv_label, row = 8, column = 3)
