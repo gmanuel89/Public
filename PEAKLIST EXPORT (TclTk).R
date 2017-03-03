@@ -125,14 +125,38 @@ custom_peaklist_intensity_matrix <- function (spectra, features_to_add = numeric
 # If the rows are named according to the sample name, an additional column for the class is added
 matrix_add_class_and_sample <- function (signal_matrix, peaks = list(), class_list = list(), spectra_format = "imzml", sample_output = TRUE, class_output = TRUE, row_labels = "Sample") {
     # Convert the input matrix/dataframe into a matrix
-    signal_matrix <- as.matrix(signal_matrix)
+    if (!is.matrix(signal_matrix)) {
+        signal_matrix <- as.matrix(signal_matrix)
+    }
     # Determine the number of spectra/peaklists
     if (isMassPeaksList(peaks)) {
         number_of_spectra <- length(peaks)
     } else if (isMassPeaks(peaks)) {
         number_of_spectra <- 1
     }
-    ####################################### FILE VECTOR
+    ####################################### PATH and FILE VECTORS
+    ##### Path vector
+    # Create the empty vector
+    path_vector <- character()
+    # Add the file names recursively, scrolling the whole spectral dataset
+    if (isMassPeaksList(peaks)) {
+        for (i in 1:length(peaks)) {
+            if (spectra_format == "imzml" || spectra_format == "imzML") {
+                path_vector <- append(path_vector, peaks[[i]]@metaData$file[1])
+            } else if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+                path_vector <- append(path_vector, peaks[[i]]@metaData$sampleName[1])
+            }
+        }
+    } else if (isMassPeaks(peaks)) {
+        if (spectra_format == "imzml" || spectra_format == "imzML") {
+            path_vector <- append(path_vector, peaks@metaData$file[1])
+        } else if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+            path_vector <- append(path_vector, peaks@metaData$sampleName[1])
+        }
+    }
+    ##### File vector
+    # Replace the path with the sample name in the peaks list
+    peaks <- replace_sample_name(peaks, spectra_format = spectra_format)
     # Create the empty vector
     file_vector <- character()
     # Add the file names recursively, scrolling the whole spectral dataset
@@ -155,7 +179,7 @@ matrix_add_class_and_sample <- function (signal_matrix, peaks = list(), class_li
     if ((class_output == FALSE && sample_output == TRUE) || (class_output == TRUE && length(class_list) == 0 && sample_output == TRUE)) {
         # Create the sample matrix column and append it to the global matrix
         # Sample as rownames
-        if ("sample" %in% row_labels) {
+        if ("sample" %in% row_labels || "Sample" %in% row_labels) {
             rownames(signal_matrix) <- file_vector
         } else {
             sample_column <- matrix("", ncol = 1, nrow = number_of_spectra)
@@ -168,7 +192,7 @@ matrix_add_class_and_sample <- function (signal_matrix, peaks = list(), class_li
     if (class_output == TRUE && length(class_list) >= 1 && sample_output == TRUE) {
         # Create the sample matrix column and append it to the global matrix
         # Sample as rownames
-        if (row_labels == "sample") {
+        if ("sample" %in% row_labels || "Sample" %in% row_labels) {
         rownames(signal_matrix) <- file_vector
         } else {
             sample_column <- matrix("", ncol = 1, nrow = number_of_spectra)
@@ -179,7 +203,7 @@ matrix_add_class_and_sample <- function (signal_matrix, peaks = list(), class_li
         ### Add the class column
         class_list <- sort(class_list)
         # Rename the classes according to the class_list vector (the match should be /class/ to avoid catching the name of the class in previous folders)
-        class_vector <- file_vector
+        class_vector <- path_vector
         for (p in 1:length(class_vector)) {
             for (w in 1:length(class_list)) {
                 if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
@@ -194,7 +218,7 @@ matrix_add_class_and_sample <- function (signal_matrix, peaks = list(), class_li
             }
         }
         # Class as rownames
-        if (row_labels == "class") {
+        if ("class" %in% row_labels || "Class" %in% row_labels) {
             rownames(signal_matrix) <- class_vector
         } else {
             class_column <- matrix("", ncol = 1, nrow = number_of_spectra)
@@ -208,7 +232,7 @@ matrix_add_class_and_sample <- function (signal_matrix, peaks = list(), class_li
     if (class_output == TRUE && length(class_list) >= 1 && sample_output == FALSE) {
         class_list <- sort(class_list)
         # Rename the classes according to the class_list vector (the match should be /class/ to avoid catching the name of the class in previous folders)
-        class_vector <- file_vector
+        class_vector <- path_vector
         for (p in 1:length(class_vector)) {
             for (w in 1:length(class_list)) {
                 if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
@@ -222,7 +246,7 @@ matrix_add_class_and_sample <- function (signal_matrix, peaks = list(), class_li
                 }
             }
         }
-        if ("class" %in% row_labels) {
+        if ("class" %in% row_labels || "Class" %in% row_labels) {
             rownames(signal_matrix) <- class_vector
         } else {
             ### Add the class column
@@ -8370,6 +8394,11 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 
+
+
+
+
+
 ####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
 
@@ -8409,13 +8438,13 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.03.1"
+R_script_version <- "2017.03.03.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
 script_file_name <- "PEAKLIST EXPORT.R"
 # Change log
-change_log <- "1. New GUI\n2. Check for updates"
+change_log <- "1. New GUI\n2. Fix output matrix\n3. Adaptive fonts"
 
 
 
@@ -8901,21 +8930,36 @@ file_type_export_choice <- function() {
 ##### File name (export)
 set_file_name <- function() {
     filename <- tclvalue(file_name)
+    # Add the date and time to the filename
+    current_date <- unlist(strsplit(as.character(Sys.time()), " "))[1]
+    current_date_split <- unlist(strsplit(current_date, "-"))
+    current_time <- unlist(strsplit(as.character(Sys.time()), " "))[2]
+    current_time_split <- unlist(strsplit(current_time, ":"))
+    final_date <- ""
+    for (x in 1:length(current_date_split)) {
+        final_date <- paste(final_date, current_date_split[x], sep="")
+    }
+    final_time <- ""
+    for (x in 1:length(current_time_split)) {
+        final_time <- paste(final_time, current_time_split[x], sep="")
+    }
+    final_date_time <- paste(final_date, final_time, sep = "_")
+    filename <- paste(filename, " (", final_date_time, ")", sep = "")
     # Add the extension if it is not present in the filename
     if (file_type_export == "csv") {
         if (length(grep(".csv", filename, fixed = TRUE)) == 1) {
             filename <- filename
-        }    else {filename <- paste (filename, ".csv", sep="")}
+        }    else {filename <- paste(filename, ".csv", sep="")}
     }
     if (file_type_export == "xlsx") {
         if (length(grep(".xlsx", filename, fixed = TRUE)) == 1) {
             filename <- filename
-        }    else {filename <- paste (filename, ".xlsx", sep="")}
+        }    else {filename <- paste(filename, ".xlsx", sep="")}
     }
     if (file_type_export == "xls") {
         if (length(grep(".xls", filename, fixed = TRUE)) == 1) {
             filename <- filename
-        }    else {filename <- paste (filename, ".xls", sep="")}
+        }    else {filename <- paste(filename, ".xls", sep="")}
     }
     # Set the value for displaying purposes
     filename_value <- filename
@@ -9138,7 +9182,7 @@ run_peaklist_export_function <- function() {
         # Generate the signal matrix
         peaklist <- intensityMatrix(peaks, spectra)
         # Add the sample and the class to the matrix
-        peaklist <- matrix_add_class_and_sample(peaklist, peaks = peaks, class_list = class_list, spectra_format = spectra_format, sample_output = TRUE, class_output = TRUE, row_labels="Sample")
+        peaklist <- matrix_add_class_and_sample(peaklist, peaks = peaks, class_list = class_list, spectra_format = spectra_format, sample_output = TRUE, class_output = TRUE, row_labels = NULL)
         # Save the files (CSV)
         if (file_type_export == "csv") {
             filename <- set_file_name()
@@ -9384,6 +9428,15 @@ if (system_os == "Windows") {
         # Retrieve the values
         screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
         screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
+    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
+    # Windows 10
+        # Determine the font size according to the resolution
+        total_number_of_pixels <- screen_width * screen_height
+        # Determine the scaling factor (according to a complex formula)
+        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
     }
 } else if (system_os == "Linux") {
     # Get system info
@@ -9497,7 +9550,7 @@ title_label <- tklabel(window, text="PEAKLIST EXPORT", font = title_font)
 # Library
 select_samples_button <- tkbutton(window, text="BROWSE\nSPECTRA...", command = select_samples_function, font = button_font)
 # Output
-browse_output_button <- tkbutton(window, text="BROWSE\nOUTPUT FOLDER", command = browse_output_function, font = button_font)
+browse_output_button <- tkbutton(window, text="BROWSE\nOUTPUT FOLDER...", command = browse_output_function, font = button_font)
 #### Entries
 # Peak picking mode
 peak_picking_mode_entry <- tkbutton(window, text="PEAK PICKING\nMODE", command = peak_picking_mode_choice, font = button_font)
@@ -9508,23 +9561,23 @@ signals_to_take_label <- tklabel(window, text="Most intense signals to take\n(if
 signals_to_take_entry <- tkentry(window, width = 10, textvariable = signals_to_take, font = entry_font)
 tkinsert(signals_to_take_entry, "end", "25")
 # SNR
-SNR_label <- tklabel(window, text="Signal-to-noise ratio", font = label_font)
+SNR_label <- tklabel(window, text="Signal-to-noise\nratio", font = label_font)
 SNR_entry <- tkentry(window, width = 10, textvariable = SNR, font = entry_font)
 tkinsert(SNR_entry, "end", "5")
 # Peaks filtering
-peaks_filtering_entry <- tkbutton(window, text="PEAK FILTERING", command = peaks_filtering_choice, font = button_font)
+peaks_filtering_entry <- tkbutton(window, text="PEAK\nFILTERING", command = peaks_filtering_choice, font = button_font)
 # Peaks filtering threshold
-peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold frequency percentage", font = label_font)
+peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold\nfrequency percentage", font = label_font)
 peaks_filtering_threshold_percent_entry <- tkentry(window, width = 10, textvariable = peaks_filtering_threshold_percent, font = entry_font)
 tkinsert(peaks_filtering_threshold_percent_entry, "end", "5")
 # Low intensity peaks removal
 low_intensity_peaks_removal_entry <- tkbutton(window, text="LOW INTENSITY\nPEAK REMOVAL", command = low_intensity_peaks_removal_choice, font = button_font)
 # Intensity percentage threshold
-intensity_percentage_threshold_label <- tklabel(window, text="Intensity percentage threshold", font = label_font)
+intensity_percentage_threshold_label <- tklabel(window, text="Intensity\npercentage threshold", font = label_font)
 intensity_percentage_threshold_entry <- tkentry(window, width = 10, textvariable = intensity_percentage_threshold, font = entry_font)
 tkinsert(intensity_percentage_threshold_entry, "end", "0.1")
 # Intensiry percentage theshold method
-intensity_threshold_method_entry <- tkbutton(window, text="INTENSITY THRESHOLD\nMETHOD", command = intensity_threshold_method_choice, font = button_font)
+intensity_threshold_method_entry <- tkbutton(window, text="INTENSITY\nTHRESHOLD\nMETHOD", command = intensity_threshold_method_choice, font = button_font)
 # File format
 spectra_format_entry <- tkbutton(window, text="SPECTRA\nFORMAT", command = spectra_format_choice, font = button_font)
 # File type export
@@ -9535,20 +9588,20 @@ average_replicates_button <- tkbutton(window, text="AVERAGE\nREPLICATES", comman
 #end_session_label <- tklabel(window, text="Quit", font = label_font)
 end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
 # Import the spectra
-import_spectra_button <- tkbutton(window, text="SPECTRA IMPORT AND\nPREPROCESSING", command = import_spectra_function, font = button_font)
+import_spectra_button <- tkbutton(window, text="IMPORT AND\nPREPROCESS\nSPECTRA", command = import_spectra_function, font = button_font)
 # Peak picking
 peak_picking_button <- tkbutton(window, text="PEAK\nPICKING", command = peak_picking_function, font = button_font)
 # Run the Peaklist Export!!
-peaklist_export_button <- tkbutton(window, text="EXPORT THE PEAKLIST", command = run_peaklist_export_function, font = button_font)
+peaklist_export_button <- tkbutton(window, text="EXPORT\nPEAKLIST", command = run_peaklist_export_function, font = button_font)
 # Average number of signals and standard deviation
 signals_avg_and_sd_button <- tkbutton(window, text="MEAN +/- SD of\nnumber of signals", command = signals_avg_and_sd_function, font = button_font)
 # Multicore
-allow_parallelization_button <- tkbutton(window, text="ALLOW PARALLELIZATION", command = allow_parallelization_choice, font = button_font)
+allow_parallelization_button <- tkbutton(window, text="ALLOW\nPARALLEL\nCOMPUTING", command = allow_parallelization_choice, font = button_font)
 # Spectra preprocessing button
-spectra_preprocessing_button <- tkbutton(window, text="SPECTRA PREPROCESSING\nPARAMETERS", command = preprocessing_window_function, font = button_font)
+spectra_preprocessing_button <- tkbutton(window, text="SPECTRA\nPREPROCESSING\nPARAMETERS", command = preprocessing_window_function, font = button_font)
 # Set the file name
-set_file_name_label <- tklabel(window, text="<-- Set the\nfile name", font = label_font)
-set_file_name_entry <- tkentry(window, width = 30, textvariable = file_name, font = entry_font)
+set_file_name_label <- tklabel(window, text="<--- Set the file name", font = label_font)
+set_file_name_entry <- tkentry(window, textvariable = file_name, font = entry_font)
 tkinsert(set_file_name_entry, "end", "Peaklist")
 # Updates
 download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE", command = download_updates_function, font = button_font)
@@ -9608,4 +9661,3 @@ tkgrid(signals_avg_and_sd_button, row = 8, column = 5)
 tkgrid(end_session_button, row = 8, column = 6)
 tkgrid(download_updates_button, row = 1, column = 5)
 tkgrid(check_for_updates_value_label, row = 1, column = 6)
-
