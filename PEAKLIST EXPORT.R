@@ -8438,7 +8438,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.03.4"
+R_script_version <- "2017.03.03.5"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -9429,14 +9429,14 @@ if (system_os == "Windows") {
         screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
         screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
     } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
-    # Windows 10
-        # Determine the font size according to the resolution
-        total_number_of_pixels <- screen_width * screen_height
-        # Determine the scaling factor (according to a complex formula)
-        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
-        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
-        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
-        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+        # Windows 10
+        # Get system info
+        screen_info <- system("wmic path Win32_VideoController get VideoModeDescription", intern = TRUE)[2]
+        # Get the resolution
+        screen_resolution <- unlist(strsplit(screen_info, "x"))
+        # Retrieve the values
+        screen_height <- as.numeric(screen_resolution[2])
+        screen_width <- as.numeric(screen_resolution[1])
     }
 } else if (system_os == "Linux") {
     # Get system info
@@ -9466,15 +9466,15 @@ if (system_os == "Windows") {
         scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
         title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
         other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
-    }  else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
+    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
         # Windows 10
-        # Get system info
-        screen_info <- system("wmic path Win32_VideoController get VideoModeDescription", intern = TRUE)[2]
-        # Get the resolution
-        screen_resolution <- unlist(strsplit(screen_info, "x"))
-        # Retrieve the values
-        screen_height <- as.numeric(screen_resolution[2])
-        screen_width <- as.numeric(screen_resolution[1])
+        # Determine the font size according to the resolution
+        total_number_of_pixels <- screen_width * screen_height
+        # Determine the scaling factor (according to a complex formula)
+        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
     }
     # Define the fonts
     garamond_title_bold = tkfont.create(family = "Garamond", size = title_font_size, weight = "bold")
@@ -9670,4 +9670,5 @@ tkgrid(signals_avg_and_sd_button, row = 8, column = 5)
 tkgrid(end_session_button, row = 8, column = 6)
 tkgrid(download_updates_button, row = 1, column = 5)
 tkgrid(check_for_updates_value_label, row = 1, column = 6)
+
 
