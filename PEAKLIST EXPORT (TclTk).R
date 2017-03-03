@@ -8409,7 +8409,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.03.0"
+R_script_version <- "2017.03.03.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -8423,7 +8423,7 @@ change_log <- "1. New GUI\n2. Check for updates"
 
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
-install_and_load_required_packages(c("tcltk", "XLConnect", "parallel"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
+install_and_load_required_packages(c("tcltk", "parallel"), repository="http://cran.mirror.garr.it/mirrors/CRAN/")
 
 
 
@@ -8887,6 +8887,9 @@ file_type_export_choice <- function() {
     # Default
     if (file_type_export == "") {
         file_type_export <<- "csv"
+    }
+    if (file_type_export == "xls" || file_type_export == "xlsx") {
+        install_and_load_required_packages("XLConnect")
     }
     # Escape the function
     #.GlobalEnv$file_type_export <- file_type_export
