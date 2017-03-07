@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2017.03.03
+###################### FUNCTIONS - MASS SPECTROMETRY 2017.03.07
 
 # Update the packages
 try(update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE), silent = TRUE)
@@ -107,6 +107,63 @@ custom_peaklist_intensity_matrix <- function (spectra, features_to_add = numeric
     }
     ##### Return the final matrix with the custom features (plus the original ones if a matrix is specified as input)
     return(final_sample_matrix)
+}
+
+
+
+
+
+###############################################################################
+
+
+
+
+
+########################################################### ENSEMBLE VOTE MATRIX
+# The function takes as input the result matrix of an ensemble classification: each row is an observation/spectrum (patient or pixel) and each column is the predicted class of that observation by one model.
+# The function returns a single column matrix with the ensemble classification results computed according to the input parameters (such as vote weights and method).
+ensemble_vote_classification <- function(classification_matrix, class_list = NULL, decision_method = "majority", vote_weights = "equal") {
+    ### Class list
+    # Retrieve the class list according to the present classes (if not specified):
+    if (is.null(class_list) || length(class_list) == 0) {
+        # Initialize the class vector
+        class_vector <- character()
+        # Fill the class vector with the classification matrix columns
+        for (cl in 1:ncol(classification_matrix)) {
+            class_vector <- append(class_vector, as.character(classification_matrix[, cl]))
+        }
+        # Convert it into a factor
+        class_vector <- as.factor(class_vector)
+        # Extract the levels
+        class_list <- levels(class_vector)
+    }
+    
+    ########## Vote
+    ##### Majority vote
+    if (decision_method == "majority" && vote_weights == "equal") {
+        # Function for matrix apply (x = row)
+        majority_vote_function <- function(x, class_list) {
+            # Generate the vote vector (same length as the class list, with the number of the votes for each class, labeled)
+            votes <- integer(length = length(class_list))
+            names(votes) <- class_list
+            # Count the votes for each class
+            for (class in class_list) {
+                votes[which(class_list == class)] <- length(which(x == class))
+            }
+            # Determine the final majority vote
+            final_vote <- names(votes)[which(votes == max(votes))]
+            # Even vote
+            if (length(final_vote) != 1) {
+                final_vote <- NA
+            }
+            # Return the vote
+            return(final_vote)
+        }
+        # For each spectrum (matrix row), establish the final majority vote
+        classification_ensemble_matrix <- cbind(apply(X = classification_matrix, MARGIN = 1, FUN = function(x) majority_vote_function(x, class_list)))
+        colnames(classification_ensemble_matrix) <- "Ensemble classification"
+    }
+    return(classification_ensemble_matrix)
 }
 
 
@@ -306,7 +363,7 @@ outcome_and_class_to_MS <- function(class_list = c("HP", "PTC"), outcome_list = 
             class_list <- append(class_list, outcome_list[length(class_list) + i])
         }
     }
-    # Generate the matrix
+    # Generate the matrix (classes)
     class_outcome_matrix <- matrix("", nrow = greater_number, ncol = 3)
     # Define the colnames
     colnames(class_outcome_matrix) <- c("Class", "Outcome", "Number")
@@ -316,38 +373,44 @@ outcome_and_class_to_MS <- function(class_list = c("HP", "PTC"), outcome_list = 
     # Generate the numbers
     outcome_list_as_number <- outcome_list
     for (ou in 1:length(outcome_list)) {
+        # Benign = 0.5 (green pixels)
         if (length(grep("ben", outcome_list[ou])) > 0 || outcome_list[ou] == "b") {
             outcome_list_as_number[ou] <- 0.5
         } else if (length(grep("mal", outcome_list[ou])) > 0 || outcome_list[ou] == "m") {
+        # Malignant = 1 (red pixels)
             outcome_list_as_number[ou] <- 1
+        } else if (is.na(outcome_list[ou])) {
+        # Other cases = 0 (black pixels)
+            outcome_list_as_number[ou] <- 0
         } else {
+        # Other cases = 0 (black pixels)
             outcome_list_as_number[ou] <- 0
         }
     }
-    # Fill in the matrix column
+    # Fill in the matrix column (outcome as number + NA)
     class_outcome_matrix[,3] <- cbind(outcome_list_as_number)
     # Convert it into a dataframe
-    class_outcome_matrix <- as.data.frame(class_outcome_matrix)
+    class_outcome_df <- as.data.frame(class_outcome_matrix)
     # Convert the dataframe variables
-    class_outcome_matrix$Class <- as.character(class_outcome_matrix$Class)
-    class_outcome_matrix$Outcome <- as.character(class_outcome_matrix$Outcome)
-    if (is.factor(class_outcome_matrix$Number)) {
-        class_outcome_matrix$Number <- as.numeric(levels(class_outcome_matrix$Number))
-    } else if (is.character(class_outcome_matrix$Number)) {
-        class_outcome_matrix$Number <- as.numeric(class_outcome_matrix$Number)
-    }
+    class_outcome_df$Class <- as.character(class_outcome_df$Class)
+    class_outcome_df$Outcome <- as.character(class_outcome_df$Outcome)
+    class_outcome_df$Number <- as.numeric(levels(as.factor(class_outcome_df$Number)))
     ### Convert the class vector (if not null)
     if (!is.null(class_vector)) {
         for (cv in 1:length(class_vector)) {
-            for (ou in 1:length(class_outcome_matrix$Class)) {
-                if (class_vector[cv] == class_outcome_matrix$Class[ou]) {
-                    class_vector[cv] <- as.numeric(class_outcome_matrix$Number[ou])
+            for (ou in 1:length(class_outcome_df$Class)) {
+                if (is.na(class_vector[cv])) {
+                    class_vector[cv] <- as.numeric(0)
+                } else if (class_vector[cv] == class_outcome_df$Class[ou]) {
+                    class_vector[cv] <- as.numeric(class_outcome_df$Number[ou])
                 }
             }
         }
     }
+    # Convert the final vector into numeric
+    class_vector <- as.numeric(class_vector)
     # Return the dataframe
-    return(list(class_outcome_matrix = class_outcome_matrix, class_vector_as_numeric = as.numeric(class_vector)))
+    return(list(class_outcome_matrix = class_outcome_matrix, class_vector_as_numeric = class_vector))
 }
 
 
@@ -3346,7 +3409,7 @@ return (list(classification_hca_results_avg = classification_hca_results_avg, cl
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the models with the name of the model objects in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The features in the model must be aligned to the features in the dataset.
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the model list and the average spectrum of the patients with red bars on the signals used by the models to classify it, a matrix with the ensemble classification (patient's average spectrum).
-spectral_classification_profile <- function(spectra_path, filepath_R, spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(4000,15000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment = FALSE, tof_mode = "linear", peak_picking_algorithm = "SuperSmoother", preprocess_spectra_in_packages_of = length(sample_spectra), allow_parallelization = TRUE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal") {
+spectral_classification_profile <- function(spectra_path, filepath_R, model_list_object = "model_list", spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(4000,15000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment = FALSE, tof_mode = "linear", peak_picking_algorithm = "SuperSmoother", preprocess_spectra_in_packages_of = length(sample_spectra), allow_parallelization = TRUE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal") {
     ########## Load the required packages
     install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest","nnet"))
     # Rename the trim function
@@ -3414,7 +3477,7 @@ spectral_classification_profile <- function(spectra_path, filepath_R, spectra_pr
         # Load the workspace
         load(filepath_R, envir = temporary_environment)
         # Get the models (R objects) from the workspace
-        model_list <- get("model_list", pos = temporary_environment)
+        model_list <- get(model_list_object, pos = temporary_environment)
         # Get the list of models
         list_of_models <- names(model_list)
         # For each model...
@@ -3442,10 +3505,8 @@ spectral_classification_profile <- function(spectra_path, filepath_R, spectra_pr
                     colnames(final_sample_matrix)[n] <- name
                 }
                 # Predictions
-                if (model_ID == "rf" || model_ID == "knn" || model_ID == "nnet") {
-                    predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "class"))
-                } else if (model_ID == "lda" || model_ID == "nbc") {
-                    predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "class")$class)
+                if (model_ID == "rf" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda" || model_ID == "nbc") {
+                    predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "raw"))
                 } else {
                     predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix))
                 }
@@ -3530,44 +3591,33 @@ spectral_classification_profile <- function(spectra_path, filepath_R, spectra_pr
         } else {
             final_result_matrix_all <- rbind(final_result_matrix_all, final_result_matrix)
         }
-    }
-    
-    ######################################## ENSEMBLE VOTE
-    if (length(model_list) > 1 && !is.null(final_result_matrix)) {
-        ########## Ensemble results
-        classification_ensemble_matrix <- final_result_matrix
-        ########## Vote
-        ##### Majority vote
-        if (decision_method_ensemble == "majority" && vote_weights_ensemble == "equal") {
-            # Function for matrix apply (x = row)
-            majority_vote_function <- function (x, class_list) {
-                # Sort the class list for reproducibility
-                class_list <- sort(class_list)
-                # Generate the vote vector (same length as the class list, with the number of the votes for each class, labeled)
-                votes <- integer(length = length(class_list))
-                names(votes) <- class_list
-                # Record the vote numbers
-                for (class in class_list) {
-                    votes [which(class_list == class)] <- length(which(x == class))
-                }
-                # Establish the final vote
-                final_vote <- names(votes)[which(votes == max(votes))]
-                # Even vote
-                if (length(final_vote) != 1) {
-                    final_vote <- NA
-                }
-                # Return
-                return(final_vote)
+        ######################################## ENSEMBLE VOTE
+        ### The ensemble classification can be possible only if: there is the classifiation matrix, there are at least 3 models and if the classes/outcomes are the same for each model
+        classes_are_the_same_for_each_model <- TRUE
+        for (md in 1:(length(model_list) - 1)) {
+            if (isTRUE(model_list[[md]]$class_list != model_list[[md + 1]]$class_list)) {
+                classes_are_the_same_for_each_model <- FALSE
+                break
             }
-            # For each spectrum (matrix row), establish the final majority vote
-            classification_ensemble_matrix <- cbind(apply(X = final_result_matrix, MARGIN = 1, FUN = function(x) majority_vote_function(x, class_list)))
-            colnames(classification_ensemble_matrix) <- "Ensemble classification"
-            # Store the ensemble classification matrix in the final output list
-            if (is.null(classification_ensemble_matrix_all)) {
-                classification_ensemble_matrix_all <- classification_ensemble_matrix
-            } else {
-                classification_ensemble_matrix_all <- rbind(classification_ensemble_matrix_all, classification_ensemble_matrix)
+        }
+        outcomes_are_the_same_for_each_model <- TRUE
+        for (md in 1:(length(model_list) - 1)) {
+            if (isTRUE(model_list[[md]]$outcome_list != model_list[[md + 1]]$outcome_list)) {
+                outcomes_are_the_same_for_each_model <- FALSE
+                break
             }
+        }
+        if (length(list_of_models) > 2 && !is.null(final_result_matrix) && classes_are_the_same_for_each_model == TRUE && outcomes_are_the_same_for_each_model == TRUE) {
+            ########## Ensemble results
+            classification_ensemble_matrix <- ensemble_vote_classification(classification_matrix = final_result_matrix, class_list = model_list[[1]]$class_list, decision_method = decision_method_ensemble, vote_weights = vote_weights_ensemble)
+        } else {
+            classification_ensemble_matrix <- NULL
+        }
+        # Store the ensemble classification matrix in the final output list
+        if (is.null(classification_ensemble_matrix_all)) {
+            classification_ensemble_matrix_all <- classification_ensemble_matrix
+        } else {
+            classification_ensemble_matrix_all <- rbind(classification_ensemble_matrix_all, classification_ensemble_matrix)
         }
     }
     return(list(final_result_matrix = final_result_matrix_all, average_spectra_with_bars_list = average_spectra_with_bars_list, model_list = model_list, classification_ensemble_matrix = classification_ensemble_matrix_all))
@@ -3613,10 +3663,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 colnames(final_sample_matrix)[n] <- paste("X", colnames(final_sample_matrix)[n], sep = "")
             }
             ##### Predictions (spectra by spectra) (class, no probabilities)
-            if (model_ID == "rf" || model_ID == "knn" || model_ID == "nnet") {
-                predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "class"))
-            } else if (model_ID == "lda" || model_ID == "nbc") {
-                predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "class")$class)
+            if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "raw"))
             } else {
                 predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix))
             }
@@ -3690,10 +3738,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     colnames(sample_bin_matrix)[n] <- paste("X", colnames(sample_bin_matrix)[n], sep = "")
                 }
                 ##### Predictions (AVG spectrum) (class, no probabilities)
-                if (model_ID == "rf" || model_ID == "knn" || model_ID == "nn") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_bin_matrix, type = "class"))
-                } else if (model_ID == "lda") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_bin_matrix, type = "class")$class)
+                if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                    predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "raw"))
                 } else {
                     predicted_class_avg <- as.character(predict(model_object, newdata = sample_bin_matrix))
                 }
@@ -3784,10 +3830,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     colnames(sample_hca_matrix)[x] <- paste("X", colnames(sample_hca_matrix)[x], sep = "")
                 }
                 ##### Predictions (AVG spectrum) (class, no probabilities)
-                if (model_ID == "rf" || model_ID == "knn" || model_ID == "nn") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_hca_matrix, type = "class"))
-                } else if (model_ID == "lda") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_hca_matrix, type = "class")$class)
+                if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_hca_matrix, type = "raw"))
                 } else {
                     predicted_class_avg <- as.character(predict(model_object, newdata = sample_hca_matrix))
                 }
@@ -3867,10 +3911,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
                 }
                 ##### Predictions (AVG spectrum) (class, no probabilities)
-                if (model_ID == "rf" || model_ID == "knn" || model_ID == "nn") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "class"))
-                } else if (model_ID == "lda") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "class")$class)
+                if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "raw"))
                 } else {
                     predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix))
                 }
@@ -3901,10 +3943,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     colnames(sample_independent_matrix)[x] <- paste("X", colnames(sample_independent_matrix)[x], sep = "")
                 }
                 ##### Predictions (AVG spectrum) (class, no probabilities)
-                if (model_ID == "rf" || model_ID == "knn" || model_ID == "nn") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "class"))
-                } else if (model_ID == "lda") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "class")$class)
+                if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "raw"))
                 } else {
                     predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix))
                 }
@@ -3982,10 +4022,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
                 }
                 ##### Predictions (AVG spectrum) (class, no probabilities)
-                if (model_ID == "rf" || model_ID == "knn" || model_ID == "nn") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "class"))
-                } else if (model_ID == "lda") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "class")$class)
+                if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "raw"))
                 } else {
                     predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix))
                 }
@@ -4011,10 +4049,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     colnames(sample_independent_matrix)[x] <- paste("X", colnames(sample_independent_matrix)[x], sep = "")
                 }
                 ##### Predictions (AVG spectrum) (class, no probabilities)
-                if (model_ID == "rf" || model_ID == "knn" || model_ID == "nn") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "class"))
-                } else if (model_ID == "lda") {
-                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "class")$class)
+                if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                    predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "raw"))
                 } else {
                     predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix))
                 }
@@ -4088,7 +4124,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel), MS images with the pixel-by-pixel classification, the model list, a matrix with the ensemble classification (pixel-by-pixel) and MS images with the pixel-by-pixel ensemble classification.
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
-spectral_classification_pixelbypixel <- function(spectra_path, filepath_R, peak_picking_algorithm = "SuperSmoother", preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(4000,15000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment = FALSE, tof_mode = "linear", spectra_preprocessing = TRUE, preprocess_spectra_in_packages_of = 0, allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, partition_spectra_graph = TRUE, number_of_spectra_partitions_graph = 4, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE) {
+spectral_classification_pixelbypixel <- function(spectra_path, filepath_R, model_list_object = "model_list", peak_picking_algorithm = "SuperSmoother", preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(4000,15000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment = FALSE, tof_mode = "linear", spectra_preprocessing = TRUE, preprocess_spectra_in_packages_of = 0, allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, partition_spectra_graph = TRUE, number_of_spectra_partitions_graph = 4, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE) {
     # Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda"))
     # Default pixel grouping
@@ -4156,79 +4192,71 @@ spectral_classification_pixelbypixel <- function(spectra_path, filepath_R, peak_
         # Load the workspace
         load(filepath_R, envir = temporary_environment)
         # Get the models (R objects) from the workspace
-        model_list <- get("model_list", pos = temporary_environment)
+        model_list <- get(model_list_object, pos = temporary_environment)
         # Get the list of models
         list_of_models <- names(model_list)
         # For each model...
         for (md in 1:length(list_of_models)) {
-            ########## Outputs
-            classification_msi_model <- list()
             # Perform the classification
             model_classification <- single_model_classification_of_spectra(spectra = sample_spectra, model_x = model_list[[md]], model_name = list_of_models[md], spectra_preprocessing = FALSE, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 3, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", tof_mode = tof_mode, allow_parallelization = allow_parallelization, pixel_grouping = pixel_grouping, number_of_hca_nodes = number_of_hca_nodes, moving_window_size = moving_window_size, final_result_matrix = final_result_matrix_patient, seed = seed, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change_GA, partition_spectra = partition_spectra_graph, number_of_spectra_partitions = number_of_spectra_partitions_graph, partitioning_method = partitioning_method_graph, plot_figures = plot_figures, plot_graphs = plot_graphs)
             # MSI classification
             if (plot_figures == TRUE) {
-                classification_msi_model[[md]] <- model_classification$classification_msi_model
+                classification_msi_model <- model_classification$classification_msi_model
             } else {
-                classification_msi_model[[md]] <- NULL
+                classification_msi_model <- NULL
             }
             # Add the model result matrix to the final matrix (the classification function automatically attach the result to a result matrix if provided)
             final_result_matrix_patient <- model_classification$final_result_matrix
+            # Append the classification image list to the final list
+            classification_msi_patient[[md]] <- classification_msi_model
         }
-        # Append the classification image list to the final list
-        classification_msi_patient <- append(classification_msi_patient, classification_msi_model)
         ######################################## Store the matrix with the classification from all the models in the final list of matrices
         final_result_matrix_list[[p]] <- final_result_matrix_patient
         ######################################## Store all the MS images in the element of the final list of MS images
         classification_msi_list[[p]] <- classification_msi_patient
         ######################################## ENSEMBLE VOTE
-        if (length(model_names) > 1 && !is.null(final_result_matrix_patient)) {
-            ########## Ensemble results
-            classification_ensemble_matrix <- final_result_matrix_patient
-            ########## Vote
-            ##### Majority vote
-            if (decision_method_ensemble == "majority" && vote_weights_ensemble == "equal") {
-                # Function for matrix apply (x = row)
-                majority_vote_function <- function(x, class_list) {
-                    # Generate the vote vector (same length as the class list, with the number of the votes for each class, labeled)
-                    votes <- integer(length = length(class_list))
-                    names(votes) <- class_list
-                    # Count the votes for each class
-                    for (class in class_list) {
-                        votes[which(class_list == class)] <- length(which(x == class))
-                    }
-                    # Determine the final majority vote
-                    final_vote <- names(votes)[which(votes == max(votes))]
-                    # Even vote
-                    if (length(final_vote) != 1) {
-                        final_vote <- class_list[1]
-                    }
-                    # Return the vote
-                    return(final_vote)
-                }
-                # For each spectrum (matrix row), establish the final majority vote
-                classification_ensemble_matrix <- cbind(apply(X = final_result_matrix_patient, MARGIN = 1, FUN = function(x) majority_vote_function(x, class_list)))
-                colnames(classification_ensemble_matrix) <- "Ensemble classification"
-                # Store the ensemble classification matrix in the final output list
-                classification_ensemble_matrix_list[[p]] <- classification_ensemble_matrix
-                ########## Generate a molecular image of the classification
-                # Generate the "predicted classes" vector from the ensemble classification matrix
-                predicted_classes <- as.character(classification_ensemble_matrix)
-                # Define the class as number depending on the outcome
-                outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = c("benign", "malignant"), class_vector = predicted_classes)
-                # Replace the spectra intensities with the class number for plotting purposes
-                class_as_number <- outcome_and_class$class_vector_as_numeric
-                spectra_for_plotting <- sample_spectra
-                for (s in 1:length(spectra_for_plotting)) {
-                    spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
-                }
-                slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
-                plotMsiSlice(slices, legend = FALSE, scale = F)
-                legend(x = "bottomright", legend = class_list, fill = c("green", "red"), xjust = 0.5, yjust = 0.5)
-                legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
-                legend(x = "topleft", legend = "Ensemble classifier", xjust = 0.5, yjust = 0.5)
-                # Store the plot into the list of images
-                classification_ensemble_msi_list[[p]] <- recordPlot()
+        ### The ensemble classification can be possible only if: there is the classifiation matrix, there are at least 3 models and if the classes/outcomes are the same for each model
+        classes_are_the_same_for_each_model <- TRUE
+        for (md in 1:(length(model_list) - 1)) {
+            if (isTRUE(model_list[[md]]$class_list != model_list[[md + 1]]$class_list)) {
+                classes_are_the_same_for_each_model <- FALSE
+                break
             }
+        }
+        outcomes_are_the_same_for_each_model <- TRUE
+        for (md in 1:(length(model_list) - 1)) {
+            if (isTRUE(model_list[[md]]$outcome_list != model_list[[md + 1]]$outcome_list)) {
+                outcomes_are_the_same_for_each_model <- FALSE
+                break
+            }
+        }
+        ########## Ensemble results
+        if (length(list_of_models) > 2 && !is.null(final_result_matrix_patient) && classes_are_the_same_for_each_model == TRUE && outcomes_are_the_same_for_each_model == TRUE) {
+            ### Classification matrix
+            classification_ensemble_matrix <- ensemble_vote_classification(classification_matrix = final_result_matrix_patient, class_list = model_list[[1]]$class_list, decision_method = decision_method_ensemble, vote_weights = vote_weights_ensemble)
+            # Store the ensemble classification matrix in the final output list
+            classification_ensemble_matrix_list[[p]] <- classification_ensemble_matrix
+            ### Molecular image of the classification
+            # Generate the "predicted classes" vector from the ensemble classification matrix
+            predicted_classes <- as.character(classification_ensemble_matrix)
+            # Define the class as number depending on the outcome
+            outcome_and_class <- outcome_and_class_to_MS(class_list = model_list[[1]]$class_list, outcome_list = model_list[[1]]$outcome_list, class_vector = predicted_classes)
+            # Replace the spectra intensities with the class number for plotting purposes
+            class_as_number <- outcome_and_class$class_vector_as_numeric
+            spectra_for_plotting <- sample_spectra
+            for (s in 1:length(spectra_for_plotting)) {
+                spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+            }
+            slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
+            plotMsiSlice(slices, legend = FALSE, scale = F)
+            legend(x = "bottomright", legend = class_list, fill = c("green", "red"), xjust = 0.5, yjust = 0.5)
+            legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+            legend(x = "topleft", legend = "Ensemble classifier", xjust = 0.5, yjust = 0.5)
+            # Store the plot into the list of images
+            classification_ensemble_msi_list[[p]] <- recordPlot()
+        } else {
+            classification_ensemble_matrix <- NULL
+            classification_ensemble_msi_list[[p]] <- NULL
         }
     }
     # Return the results
@@ -4822,9 +4850,9 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
     feature_weights <- rfe_model$fit
     # Model performances
     if (selection_metric == "kappa" || selection_metric == "Kappa") {
-        fs_model_performance <- max(rfe_model$fit$results$Kappa)
+        fs_model_performance <- max(rfe_model$fit$results$Kappa, na.rm = TRUE)
     } else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
-        fs_model_performance <- max(rfe_model$fit$results$Accuracy)
+        fs_model_performance <- max(rfe_model$fit$results$Accuracy, na.rm = TRUE)
     }
     if (automatically_select_features == TRUE) {
         # Output the best predictors after the RFE
@@ -4860,9 +4888,9 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         fs_model <- train(x = peaklist_feature_selection[, !(names(peaklist_feature_selection) %in% non_features)], y = peaklist_feature_selection[, discriminant_attribute], method = selection_method, preProcess = preprocessing, tuneGrid = expand.grid(model_tune_grid), trControl = train_ctrl, metric = selection_metric)
         # Model performances
         if (selection_metric == "kappa" || selection_metric == "Kappa") {
-            fs_model_performance <- max(fs_model$results$Kappa)
+            fs_model_performance <- max(fs_model$results$Kappa, na.rm = TRUE)
         } else if (selection_metric == "accuracy" || selection_metric == "Accuracy") {
-            fs_model_performance <- max(fs_model$results$Accuracy)
+            fs_model_performance <- max(fs_model$results$Accuracy, na.rm = TRUE)
         }
     }
     if (allow_parallelization == TRUE) {
