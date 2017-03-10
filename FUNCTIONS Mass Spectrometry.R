@@ -4972,7 +4972,7 @@ automated_embedded_rfe <- function(peaklist, features_to_select = 20, selection_
         # Inizialize the output of combination of parameters
         parameter_combination <- list()
         # Define the parameters to be tested
-        preprocessing_values <- list(NULL, "center", "scale", c("center", "scale"), "pca")
+        preprocessing_values <- list(NULL, c("center", "scale"))
         feature_reranking_values <- list(TRUE, FALSE)
         # Generate the combination list (each list element is a combination of values)
         for (p in 1:length(preprocessing_values)) {
