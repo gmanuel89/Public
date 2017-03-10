@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2017.03.07
+###################### FUNCTIONS - MASS SPECTROMETRY 2017.03.10
 
 # Update the packages
 try(update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE), silent = TRUE)
@@ -410,7 +410,7 @@ outcome_and_class_to_MS <- function(class_list = c("HP", "PTC"), outcome_list = 
     # Convert the final vector into numeric
     class_vector <- as.numeric(class_vector)
     # Return the dataframe
-    return(list(class_outcome_matrix = class_outcome_matrix, class_vector_as_numeric = class_vector))
+    return(list(class_outcome_matrix = class_outcome_df, class_vector_as_numeric = class_vector))
 }
 
 
@@ -3496,7 +3496,7 @@ spectral_classification_profile <- function(spectra_path, filepath_R, model_list
             # Model name
             model_name <- list_of_models[md]
             ### Generate the intensity matrix with the features from the model
-            final_sample_matrix <- generate_custom_intensity_matrix(sample_spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization)
+            final_sample_matrix <- generate_custom_intensity_matrix(spectra = sample_spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 3, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization)
             ### Run only if there is compatibility between the spectral features and the model features (it is NULL if there is no compatibility)
             if (!is.null(final_sample_matrix)) {
                 # Put the X at the beginning of the peak names
@@ -3884,7 +3884,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
         sample_name <- spectra[[1]]@metaData$file[1]
         rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
         ########## GRAPH SEGMENTATION
-        graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, SNR = peak_picking_SNR, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, filepath_R_models = filepath_R, use_features_from_models = FALSE, custom_feature_vector = features_model, list_of_models = model_ID, model_names = NULL, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, partition_spectra = partition_spectra, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed)
+        graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, SNR = peak_picking_SNR, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, custom_feature_vector = features_model, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_induced_in_subgraph = "independent", max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, partition_spectra = partition_spectra, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed)
         ### Extract the spectra from the clique and from the independent set (mind that they are two lists if the spectra are taken all at the same time or they are two lists of lists if the spectra are partitioned)
         if (partition_spectra == TRUE && number_of_spectra_partitions > 1) {
             spectra_clique <- graph_segmentation$spectra_clique
@@ -4249,7 +4249,7 @@ spectral_classification_pixelbypixel <- function(spectra_path, filepath_R, model
             }
             slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
             plotMsiSlice(slices, legend = FALSE, scale = F)
-            legend(x = "bottomright", legend = class_list, fill = c("green", "red"), xjust = 0.5, yjust = 0.5)
+            legend(x = "bottomright", legend = model_list[[1]]$class_list, fill = c("green", "red"), xjust = 0.5, yjust = 0.5)
             legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
             legend(x = "topleft", legend = "Ensemble classifier", xjust = 0.5, yjust = 0.5)
             # Store the plot into the list of images
@@ -4779,9 +4779,9 @@ feature_selection <- function(peaklist, feature_selection_method = "ANOVA", feat
 ##################### EMBEDDED FEATURE SELECTION (RECURSIVE FEATURE ELIMINATION)
 # This function runs the feature selection algorithm onto the peaklist matrix, returning the peaklist without the redundant/non-informative features, the original peaklist and the list of selected features, along with the model used for selecting the features.
 # The function allows for the use of several feature selection algorithms.
-embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "pls", model_tuning = TRUE, model_tuning_mode = c("embedded", "after"), model_tune_grid = list(), selection_metric = "Accuracy", cv_repeats_control = 5, k_fold_cv_control = 10, discriminant_attribute = "Class", non_features = c("Sample", "Class", "THY"), seed = NULL, automatically_select_features = TRUE, generate_plots = TRUE, preprocessing = c("center","scale"), allow_parallelization = TRUE, feature_reranking = TRUE, external_peaklist = NULL, positive_class_cv = "HP") {
+embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "pls", model_tuning = TRUE, model_tuning_mode = c("embedded", "after"), model_tune_grid = list(), selection_metric = "Accuracy", cv_repeats_control = 5, k_fold_cv_control = 10, discriminant_attribute = "Class", non_features = c("Sample", "Class"), seed = NULL, automatically_select_features = TRUE, generate_plots = TRUE, preprocessing = c("center","scale"), allow_parallelization = TRUE, feature_reranking = TRUE, external_peaklist = NULL, positive_class_cv = "HP") {
     # Load the required libraries
-    install_and_load_required_packages(c("caret", "stats", "pROC", "nnet", "e1071", "kernlab", "randomForest", "klaR", "MASS", "pls", "iterators"))
+    install_and_load_required_packages(c("caret", "stats", "pROC", "nnet", "e1071", "kernlab", "randomForest", "klaR", "MASS", "pls", "iterators", "nnet", "SparseM"))
     ### Define better the (helper) functions to be used in rfe control
     rfe_helper_functions <- list(summary = defaultSummary,
                                  fit = function(x, y, ...) {
@@ -4913,6 +4913,9 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         # Create the outcomes dataframe
         classification_results_model <- data.frame(Sample = external_peaklist$Sample, Predicted = predicted_classes_model, True = external_peaklist$Class)
         # Generate the confusion matrix to evaluate the performances
+        if (is.null(positive_class_cv) || !(positive_class_cv %in% levels(as.factor(peaklist[, discriminant_attribute])))) {
+            positive_class_cv <- levels(as.factor(peaklist[, discriminant_attribute]))[1]
+        }
         test_performances_model <- confusionMatrix(data = predicted_classes_model, external_peaklist$Class, positive = positive_class_cv)
         ## ROC analysis
         model_roc <- list()
@@ -4946,6 +4949,56 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
     }
     ### Return the values
     return(list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance, feature_selection_model = fs_model, class_list = levels(as.factor(peaklist[, discriminant_attribute])), pie_chart_classification = pie_chart_classification, model_roc = model_roc))
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+########### AUTOMATED EMBEDDED FEATURE SELECTION (RECURSIVE FEATURE ELIMINATION)
+# This function iteratively runs the embedded-rfe feature selection function onto the same input objects as that function, in order to find the best combination of parameters (preprocessing, feature reranking) for the feature selection. It returns the same elements of the embedded_rfe function, but the best chosen after trying all of the parameter combinations.
+# The function allows for the use of several feature selection algorithms.
+automated_embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "pls", model_tuning = TRUE, model_tuning_mode = c("embedded", "after"), model_tune_grid = data.frame(ncomp = 1:5), selection_metric = "Accuracy", cv_repeats_control = 5, k_fold_cv_control = 10, discriminant_attribute = "Class", non_features = c("Sample", "Class"), seed = NULL, automatically_select_features = TRUE, generate_plots = TRUE, preprocessing = c("center","scale"), allow_parallelization = TRUE, feature_reranking = TRUE, external_peaklist = NULL, positive_class_cv = "HP", try_combination_of_parameters = TRUE) {
+    # Load the required libraries
+    install_and_load_required_packages(c("caret", "stats", "pROC", "nnet", "e1071", "kernlab", "randomForest", "klaR", "MASS", "pls", "iterators", "nnet", "SparseM"))
+    if (try_combination_of_parameters == TRUE) {
+        ### Establish the combination of parameters (preprocessing + feature reranking) to establish the best model
+        # Inizialize the output of combination of parameters
+        parameter_combination <- list()
+        # Define the parameters to be tested
+        preprocessing_values <- list(NULL, "center", "scale", c("center", "scale"), "pca")
+        feature_reranking_values <- list(TRUE, FALSE)
+        # Generate the combination list (each list element is a combination of values)
+        for (p in 1:length(preprocessing_values)) {
+            for (f in 1:length(feature_reranking_values)) {
+                parameter_combination[[(length(parameter_combination) + 1)]] <- list(preprocessing = preprocessing_values[[p]], feature_reranking = feature_reranking_values[[f]])
+            }
+        }
+        ### Test every combination...
+        # Store the best performance value and the best model
+        best_model_performance <- NULL
+        best_rfe_model <- NULL
+        # Run every combination, storing the result if good
+        for (comb in 1:length(parameter_combination)) {
+            single_rfe_model <- embedded_rfe(peaklist, features_to_select = features_to_select, selection_method = selection_method, model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = model_tune_grid, selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = parameter_combination[[comb]]$preprocessing, allow_parallelization = allow_parallelization, feature_reranking = parameter_combination[[comb]]$feature_reranking, external_peaklist = external_peaklist, positive_class_cv = positive_class_cv)
+            ### Check (and store) the performance values and the model
+            if (is.null(best_model_performance) || single_rfe_model$fs_model_performance > best_model_performance) {
+                best_model_performance <- single_rfe_model$fs_model_performance
+                best_rfe_model <- single_rfe_model
+            }
+        }
+    } else {
+    ### NO combinations, run the single function...
+        best_rfe_model <- embedded_rfe(peaklist, features_to_select = features_to_select, selection_method = selection_method, model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = model_tune_grid, selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, external_peaklist = external_peaklist, positive_class_cv = positive_class_cv)
+    }
+    ### Return the values
+    return(best_rfe_model)
 }
 
 
@@ -7332,32 +7385,31 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
             }
         }
         # Convert the custom feature vector in numeric
-        custom_feature_vector <- as.numeric(custom_feature_vector)
+        custom_feature_vector <- sort(as.numeric(custom_feature_vector))
         # Retrieve the peaks in the spectral dataset
-        spectra_peaks <- as.numeric(colnames(peaklist_matrix))
-        # Generate a temporary vector for the custom peaks
-        custom_feature_vector_final <- vector()
+        spectra_peaks <- sort(as.numeric(colnames(peaklist_matrix)))
         ### Check the compatibility between the spectra and the provided mass list
-        # Check if every element of the custom vector is within the mass range of the spectral dataset (and create another vector with the compatible custom features) (The spectral datataset might contain no peaks at all!!!)
-        for (f in 1:length(custom_feature_vector)) {
-            # If there are peaks...
-            if (length(spectra_peaks) > 0) {
-                if (custom_feature_vector[f] >= spectra_peaks[1] && custom_feature_vector[f] <= spectra_peaks[length(spectra_peaks)]) {
-                    custom_feature_vector_final <- append(custom_feature_vector_final, custom_feature_vector[f])
-                }
-            } else if (length(spectra_peaks) == 0) {
-                # If there are peaks...
-                custom_feature_vector_final <- append(custom_feature_vector_final, character())
-            }
-        }
-        # Define the compatibility (if there are no overlapping features)
-        if (length(custom_feature_vector_final) == 0) {
-            feature_compatibility <- FALSE
-        } else {
+        if (spectra_peaks[1] <= custom_feature_vector[1] && spectra_peaks[length(spectra_peaks)] >= custom_feature_vector[length(custom_feature_vector)]) {
             feature_compatibility <- TRUE
+        } else {
+            feature_compatibility <- FALSE
         }
         ### If there is feature compatibility...
         if (feature_compatibility == TRUE) {
+            # Generate a temporary vector for the custom peaks
+            custom_feature_vector_final <- vector()
+            # Generate the final list of ovrlapping features
+            for (f in 1:length(custom_feature_vector)) {
+                # If there are peaks...
+                if (length(spectra_peaks) > 0) {
+                    if (custom_feature_vector[f] >= spectra_peaks[1] && custom_feature_vector[f] <= spectra_peaks[length(spectra_peaks)]) {
+                        custom_feature_vector_final <- append(custom_feature_vector_final, custom_feature_vector[f])
+                    }
+                } else if (length(spectra_peaks) == 0) {
+                    # If there are peaks...
+                    custom_feature_vector_final <- append(custom_feature_vector_final, character())
+                }
+            }
             # Isolate the dataset features (sorted)
             spectral_dataset_features <- sort(as.numeric(colnames(peaklist_matrix)))
             # Sort the custom features
@@ -7979,7 +8031,7 @@ extract_feature_list_from_models <- function(filepath_R, model_names = list(svm 
 
 ################################################### GENETIC ALGORITHM FOR GRAPHS
 # The function takes an adjacency matrix as input, converts it into a graph (using the 'igraph' package) and runs the genetic algorithm on the chromosome population generated by the graph nodes. The aim of the genetic algorithm is to identify and isolate a set of highly correlated observations (clique) from the rest of the dataset (independent set) by performing vertex and triangle mutations (free low-grade vertices and bind high-grade vertices) and selecting (fitness function) the population with a minimal change compared to the original, in such a way that the maximum amount of information is preserved.
-genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Preferential", vertex_mutation = TRUE, triangle_mutation = TRUE, allow_parallelization = TRUE, number_of_high_degree_vertices_for_subgraph = 0, vertex_independency_threshold = 200, iterations_with_no_change = 5, max_GA_generations = 10, seed = 12345) {
+genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Preferential", vertex_mutation = TRUE, triangle_mutation = TRUE, allow_parallelization = TRUE, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), vertex_independency_threshold = 200, iterations_with_no_change = 5, max_GA_generations = 10, seed = 12345) {
     ##### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "parallel", "doParallel", "foreach", "iterators", "igraph", "GA"))
     ### Generate the graph
@@ -7991,15 +8043,17 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
         # Sort it according to the degree
         degree_dataframe_sorted <- degree_dataframe[order(degree_dataframe$degree, decreasing = TRUE), ]
         input_graph <- induced_subgraph(initial_graph, vids = degree_dataframe_sorted$ID[1:number_of_high_degree_vertices_for_subgraph], impl = "auto")
+        # Regenerate the adjacency matrix according to the new graph
+        input_adjacency_matrix <- as.matrix(as_adjacency_matrix(input_graph))
     } else {
         input_graph <- initial_graph
+        input_adjacency_matrix <- input_adjacency_matrix
     }
     #### Define the graph typology
     graph_type <- graph_type
     ########## Vertex mutation parameters
-    vertex_mutation <- vertex_mutation
-    # The vertex number is the number of spectra
-    vertex_number <- length(V(initial_graph))
+    # The vertex number is the number of spectra in the graph
+    vertex_number <- length(V(input_graph))
     # Define the number of vertices to be sampled
     independent_vertex_number_sampling <- round(0.28 * vertex_number)
     # Define the threshold (number of bridges) below which the vertex is considered quasi-independent and almost belonging to the independent set.
@@ -8013,7 +8067,6 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
     # Compute the number of quasi-independent vertices
     independent_vertex_number_graph <- length(quasi_independent_vertices)
     ########## Triangle mutation parameters
-    triangle_mutation <- TRUE
     # Define the number of triangles to be sampled
     triangle_number_sampling <- round(0.75 * vertex_number)
     # Isolate the triangles in the graph
@@ -8057,7 +8110,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
         # print(chromosome)
         # print(number_of_ones)
         # Generate the adjacency matrix (n x n)
-        chromosome_adjacency_matrix <- matrix(0,nrow = chromosome_size, ncol = chromosome_size)
+        chromosome_adjacency_matrix <- matrix(0, nrow = chromosome_size, ncol = chromosome_size)
         # Fill in the adjacency matrix
         chromosome_adjacency_matrix[which(chromosome == 1),] <- rep(chromosome, each = number_of_ones)
         # Set the diagonal to zero
@@ -8065,12 +8118,13 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
         # Generate the graph from the adjacency matrix
         chromosome_graph <- graph_from_adjacency_matrix(chromosome_adjacency_matrix, mode = "undirect")
         # Return the fitness value (the changes made, the difference between the original matrix and the matrix after the mutation: since the fitness has to be maximized, it is calculated as the negative sum of the differences between the matrices). Since the matrix is symmetrical, the difference has to be divided by 2, to avoid it being considered twice.
-        return(-sum(abs(input_adjacency_matrix - chromosome_adjacency_matrix))/2)
+        fitness_GA <- -sum(abs(input_adjacency_matrix - chromosome_adjacency_matrix))/2
+        return(fitness_GA)
     }
     ###################### SPLIT MUTATION
     # This mutation functions puts some vertices in a triangle and some vertices in the independent set.
     SplitMutation <- function(object, parent_ind) {
-        parent_chromosome <- object@population[parent_ind,]
+        parent_chromosome <- as.vector(object@population[parent_ind, ])
         #parentCR <- c(1,0,0,1,0,1,0,1,0,1)
         # Calculate the size of the chromosome
         chromosome_length <- length(parent_chromosome)
@@ -8079,10 +8133,10 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
         ### Triangle Mutation
         if (triangle_mutation == TRUE) {
             # Compute the uniform distribution
-            rsamp_RowIX <- runif(triangle_number_sampling,1,triangle_number_graph)
+            rsamp_RowIX <- runif(triangle_number_sampling, 1, triangle_number_graph)
             RoundedSampl_RowIX <- round(rsamp_RowIX)
             # For each triangle to be sampled, extract the triangle to be sampled from the triangle matrix (so this extracts the vertices of the triangles) and set them to 1 (be part of a triangle) in the mutated chromosome.
-            for (i in 1 : triangle_number_sampling) {
+            for (i in 1:triangle_number_sampling) {
                 triangle_sample <- triangle_matrix[RoundedSampl_RowIX[i],]
                 mutated_chromosome[triangle_sample] <- 1
             }
@@ -8099,7 +8153,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
         # output for user defined selection
         # mutated_chromosome <- list(population = object@population[sel, , drop = FALSE], fitness = f[sel])
         # Return the mutated chromosome
-        return(mutated_chromosome)
+        return(as.vector(mutated_chromosome))
     }
     ###################### SPLIT GRAPH 2
     FinalSplitGraph <- function(chromosome) {
@@ -8151,10 +8205,45 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
     final_graph <- FinalSplitGraph(best_solution)
     # Generate the adjacency matrix again from the final graph
     output_adjacency_matrix <- as.matrix(as_adjacency_matrix(final_graph, type = "both"))
-    if (is.matrix(GA_model@solution)) {
-        final_chromosome <- as.vector(GA_model@solution[1,])
+    ########## Extract the final chromosome (with the vertex IDs) and Reassign the leftover vertices
+    ##### Subgraph generated
+    if (!is.null(number_of_high_degree_vertices_for_subgraph) && number_of_high_degree_vertices_for_subgraph > 0 && number_of_high_degree_vertices_for_subgraph < length(V(initial_graph))) {
+        # Extract the final chromosome (with the vertex IDs)
+        if (is.matrix(GA_model@solution)) {
+            final_chromosome <- as.vector(GA_model@solution[1,])
+            names(final_chromosome) <- degree_dataframe_sorted$ID[1:number_of_high_degree_vertices_for_subgraph]
+        } else {
+            final_chromosome <- as.vector(GA_model@solution)
+            names(final_chromosome) <- degree_dataframe_sorted$ID[1:number_of_high_degree_vertices_for_subgraph]
+        }
+        ##### Independent set
+        if (vertices_not_in_induced_subgraph == "independent") {
+            # Extract the vertex IDs in the chromosome
+            vertex_IDs_chromosome <- as.numeric(names(final_chromosome))
+            # Extract the vertex IDs not in the chromosome
+            vertex_IDs_outside_chromosome <- as.numeric(V(initial_graph)[!(V(initial_graph) %in% vertex_IDs_chromosome)])
+            # Generate the vector of 0 (all the vertices go into the independent set)
+            vertices_outside_chromosome <- numeric(length=length(vertex_IDs_outside_chromosome))
+            names(vertices_outside_chromosome) <- vertex_IDs_outside_chromosome
+            # Add this vector to the final chromosome
+            final_chromosome <- append(final_chromosome, vertices_outside_chromosome)
+            # Convert it into a dataframe to sort it according to the names
+            final_chromosome_df <- as.data.frame(cbind(ID = as.numeric(names(final_chromosome)), Value = as.numeric(final_chromosome)))
+            final_chromosome_df <- final_chromosome_df[order(final_chromosome_df$ID), ]
+            # Convert it back to a vector
+            final_chromosome <- as.vector(final_chromosome_df$Value)
+            names(final_chromosome) <- final_chromosome_df$ID
+        }
     } else {
-        final_chromosome <- as.vector(GA_model@solution)
+    ##### NO subgraph generated
+        # Extract the final chromosome (with the vertex IDs)
+        if (is.matrix(GA_model@solution)) {
+            final_chromosome <- as.vector(GA_model@solution[1,])
+            names(final_chromosome) <- colnames(GA_model@solution[1,])
+        } else {
+            final_chromosome <- as.vector(GA_model@solution)
+            names(final_chromosome) <- names(GA_model@solution)
+        }
     }
     ### Return
     return(list(GA_model = GA_model, GA_model_solution = best_solution, input_graph = input_graph, final_graph = final_graph, output_adjacency_matrix = output_adjacency_matrix, final_chromosome = final_chromosome))
@@ -8172,7 +8261,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
 
 ####################### FROM GENETIC ALGORITHM ON GRAPH TO SPECTRA AND MS IMAGES
 # The function takes the result of the genetic algorithm optimization (the genetic model object) and the list of spectra used to generate the adjacency matrix for the function 'genetic_algorithm_graph', it extracts the final chromosome (generated after the optimization) and it mirrors it onto the list of spectra, so that the output is a list of spectra belonging to the clique and a list of spectra belonging to the independent set. In addition, a list of spectra for plotting purposes is returned. 
-from_GA_to_MS <- function(final_chromosome_GA, spectra, plot_figures = TRUE, plot_graphs = TRUE) {
+from_GA_to_MS <- function(final_chromosome_GA, spectra, plot_figures = TRUE, plot_graphs = TRUE, spectra_format = "imzml") {
     ##### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "parallel", "doParallel", "igraph", "GA"))
     ########## Isolate the final chromosome (after mutations and fitness optimization)
@@ -8208,6 +8297,8 @@ from_GA_to_MS <- function(final_chromosome_GA, spectra, plot_figures = TRUE, plo
     }
     ## Append to the final spectral lists
     spectra_all_for_plotting <- append(spectra_clique_for_plotting, spectra_independent_for_plotting)
+    # Fix the spectra name (for output)
+    spectra_all_for_plotting <- replace_sample_name(spectra_all_for_plotting, spectra_format = spectra_format)
     #file_explan <- "Performance"
     #FILE_NAME <- sprintf("%s%s%s%s%s",vertex_number,"_",graph_type,"_",file_explan)
     #sizeGrWindow(10,5)
@@ -8237,7 +8328,7 @@ from_GA_to_MS <- function(final_chromosome_GA, spectra, plot_figures = TRUE, plo
 #################################################### GRAPH SEGMENTATION FUNCTION
 # The function returns (for the imzML MSI dataset provided as the variable spectra) the list of spectra in the clique, the list of spectra in the independent set and the MS images (with pixels related to spectra in the clique in red and pixels related to spectra in the independent set in green), the initial and the final graph.
 # It returns a NULL value if the segmentation is not possible due to incompatibilities between the features in the dataset and the ones provided by the model.
-graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalisation_algorithm = "TIC", normalisation_mass_range = NULL), process_spectra_in_packages_of = 0, allow_parallelization = TRUE, peak_picking_algorithm = "SuperSmoother", SNR = 5, tof_mode = "reflectron", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", use_features_from_models = TRUE, custom_feature_vector = NULL, filepath_R_models, list_of_models = c("svm", "pls", "nbc"), model_names = list(svm = "RSVM_model", pls = "pls_model", nbc = "nbc_model"), correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, partition_spectra = FALSE, number_of_spectra_partitions = 3, partitioning_method = "space", seed = 12345) {
+graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalisation_algorithm = "TIC", normalization_mass_range = NULL), process_spectra_in_packages_of = 0, allow_parallelization = TRUE, peak_picking_algorithm = "SuperSmoother", SNR = 5, tof_mode = "reflectron", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, partition_spectra = FALSE, number_of_spectra_partitions = 3, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
     # Install and load the required packages
     install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "parallel", "caret", "pls", "tcltk", "kernlab", "pROC", "e1071", "igraph", "GA"))
     ### Import the dataset (if filepath_imzml is not already a list of spectra)
@@ -8250,19 +8341,8 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
     } else if (isMassSpectrumList(filepath_imzml) || isMassSpectrum(filepath_imzml)) {
         spectra <- filepath_imzml
     }
-    ### Extract the feature list from the models
-    if (use_features_from_models == TRUE) {
-        if (!is.null(list_of_models) && !is.null(model_names)) {
-            feature_list_from_models <- extract_feature_list_from_models(filepath_R_models, model_names = model_names, list_of_models = list_of_models)
-            custom_features <- feature_list_from_models[[1]][[1]]
-        } else {
-            custom_features <- NULL
-        }
-    } else if (use_features_from_models == FALSE && !is.null(custom_feature_vector)) {
-        custom_features <- custom_feature_vector
-    } else {
-        custom_features <- NULL
-    }
+    ### Rearrange spectra for reproducibility
+    spectra <- rearrange_spectral_dataset(spectra = spectra, rearranging_method = "space", seed = seed)
     #################### Partition the spectra
     if (partition_spectra == TRUE && number_of_spectra_partitions > 1) {
         # Initialize the output
@@ -8280,11 +8360,11 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
             ##### Do everything only of there are more than one spectra in the partition
             if (isMassSpectrumList(spectra_partition)) {
                 ### Use only the features from the model
-                peaklist_matrix <- generate_custom_intensity_matrix(spectra_partition, custom_feature_vector = custom_features, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
+                peaklist_matrix <- generate_custom_intensity_matrix(spectra_partition, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
                 # Compute the adjacency matrix
                 input_adjacency_matrix <- generate_adjacency_matrix(peaklist_matrix, correlation_method = correlation_method_for_adjacency_matrix, correlation_threshold = correlation_threshold_for_adjacency_matrix, pvalue_threshold = pvalue_threshold_for_adjacency_matrix)
                 # Run the genetic algorithm
-                GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
+                GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, vertices_not_in_induced_subgraph = vertices_not_in_induced_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
                 # Record the plots
                 if (plot_graphs == TRUE) {
                     graph_spectra_plot_list[[prt]] <- plot(GA_output$input_graph)
@@ -8338,13 +8418,13 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
         ga_model_plot <- NULL
         final_graph_plot <- NULL
         ### Use only the features from the model
-        peaklist_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = custom_features, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = 0, allow_parallelization = allow_parallelization)
+        peaklist_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
         ### If a NULL value is returned, it means that the model is incompatible with the features in the dataset
         if (!is.null(peaklist_matrix)) {
             # Compute the adjacency matrix
             input_adjacency_matrix <- generate_adjacency_matrix(peaklist_matrix, correlation_method = correlation_method_for_adjacency_matrix, correlation_threshold = correlation_threshold_for_adjacency_matrix, pvalue_threshold = pvalue_threshold_for_adjacency_matrix)
             # Run the genetic algorithm
-            GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
+            GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, vertices_not_in_induced_subgraph = vertices_not_in_induced_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
             # Record the plots
             if (plot_graphs == TRUE) {
                 graph_spectra_plot <- plot(GA_output$input_graph)
