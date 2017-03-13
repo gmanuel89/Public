@@ -2937,7 +2937,7 @@ peak_picking <- function(spectra, peak_picking_algorithm = "SuperSmoother", tof_
     }
     ##### Deisotope peaklist
     if (deisotope_peaklist == TRUE && (tof_mode == "reflectron" || tof_mode == "reflector" || tof_mode == "R")) {
-        peaks <- deisotope_peaks(peaks, pattern_model_correlation = 0.95, isotopic_tolerance = 10^(-4), isotope_pattern_distance = 1.00235, isotopic_pattern_size = 3L:10L, allow_parallelization = TRUE)
+        peaks <- deisotope_peaks(peaks, pattern_model_correlation = 0.95, isotopic_tolerance = 10^(-4), isotope_pattern_distance = 1.00235, isotopic_pattern_size = 3L:10L, allow_parallelization = allow_parallelization)
     }
     ##### Return
     return(peaks)
@@ -2965,7 +2965,7 @@ deisotope_peaks <- function(peaks, pattern_model_correlation = 0.95, isotopic_to
             # Detect the number of cores
             cpu_thread_number <- detectCores(logical = TRUE) - 1
             if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                peaks_deisotoped <- mclapply(peaks, FUN = function(peaks) monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, sice = isotopic_pattern_size), mc.cores = cpu_thread_number)
+                peaks_deisotoped <- mclapply(peaks, FUN = function(peaks) monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, size = isotopic_pattern_size), mc.cores = cpu_thread_number)
             } else if (Sys.info()[1] == "Windows") {
                 # Make the CPU cluster for parallelisation
                 cl <- makeCluster(cpu_thread_number)
@@ -2974,19 +2974,19 @@ deisotope_peaks <- function(peaks, pattern_model_correlation = 0.95, isotopic_to
                 # Pass the variables to the cluster for running the function
                 clusterExport(cl = cl, varlist = c("peaks", "pattern_model_correlation", "isotopic_tolerance", "isotope_pattern_distance", "isotopic_pattern_size"), envir = environment())
                 # Apply the multicore function
-                peaks_deisotoped <- parLapply(cl, peaks, fun = function(peaks) monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, sice = isotopic_pattern_size))
+                peaks_deisotoped <- parLapply(cl, peaks, fun = function(peaks) monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, size = isotopic_pattern_size))
                 stopCluster(cl)
             } else {
                 # Run the algorithm
-                peaks_deisotoped <- monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, sice = isotopic_pattern_size)
+                peaks_deisotoped <- monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, size = isotopic_pattern_size)
             }
         } else {
             # Run the algorithm
-            peaks_deisotoped <- monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, sice = isotopic_pattern_size)
+            peaks_deisotoped <- monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, size = isotopic_pattern_size)
         }
     } else {
         # Run the algorithm
-        peaks_deisotoped <- monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, sice = isotopic_pattern_size)
+        peaks_deisotoped <- monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, size = isotopic_pattern_size)
     }
     # Return
     return(peaks_deisotoped)
@@ -8842,6 +8842,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 
+
 ####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
 
@@ -8881,7 +8882,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.13.1"
+R_script_version <- "2017.03.13.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
