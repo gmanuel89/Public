@@ -4019,14 +4019,15 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
         ### Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
         if (!is.null(final_sample_matrix)) {
             # Put the X at the beginning of the peak names
-            for (n in 1:length(colnames(final_sample_matrix))) {
-                colnames(final_sample_matrix)[n] <- paste("X", colnames(final_sample_matrix)[n], sep = "")
-            }
+            #for (n in 1:length(colnames(final_sample_matrix))) {
+            #    colnames(final_sample_matrix)[n] <- paste("X", colnames(final_sample_matrix)[n], sep = "")
+            #}
             ##### Predictions (spectra by spectra) (class, no probabilities)
             if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
                 predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "raw"))
             } else {
                 predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix))
+                #predicted_classes <- as.character(apply(X = final_sample_matrix, MARGIN = 1, FUN = function(x) predict(model_object, as.matrix(rbind(x)))))
             }
             # Generate a matrix with the results
             result_matrix_model <- matrix(nrow = length(predicted_classes), ncol = 1)
@@ -4244,7 +4245,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
         sample_name <- spectra[[1]]@metaData$file[1]
         rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
         ########## GRAPH SEGMENTATION
-        graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, SNR = peak_picking_SNR, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, custom_feature_vector = features_model, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_induced_in_subgraph = "independent", max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, partition_spectra = partition_spectra, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed)
+        graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, , deisotope_peaklist = deisotope_peaklist, SNR = peak_picking_SNR, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, custom_feature_vector = features_model, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = "independent", max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, partition_spectra = partition_spectra, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed)
         ### Extract the spectra from the clique and from the independent set (mind that they are two lists if the spectra are taken all at the same time or they are two lists of lists if the spectra are partitioned)
         if (partition_spectra == TRUE && number_of_spectra_partitions > 1) {
             spectra_clique <- graph_segmentation$spectra_clique
@@ -8587,7 +8588,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
     # Generate the matrix listing the degrees (for each vertex, each vertex being a row)
     degree_matrix <- cbind(ids = 1:vertex_number, degree_sequence)
     # Pick the quasi-independent vertices according to the degree threshold
-    quasi_independent_vertices <- which(degree_matrix[,"degree_sequence"] <= degree_threshold_independency)
+    quasi_independent_vertices <- which(degree_matrix[, "degree_sequence"] <= degree_threshold_independency)
     # Compute the number of quasi-independent vertices
     independent_vertex_number_graph <- length(quasi_independent_vertices)
     ########## Triangle mutation parameters
@@ -8603,24 +8604,30 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
     triangle_number_graph <- nrow(triangle_matrix)
     # Population size
     population_size <- vertex_number * 10
-    ### PARALLEL BACKEND
-    # Detect the number of cores
-    cpu_thread_number <- detectCores(logical = TRUE)
-    cpu_thread_number <- cpu_thread_number / 2
-    if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-        install_and_load_required_packages("doMC")
-        # Register the foreach backend
-        registerDoMC(cores = cpu_thread_number)
-    } else if (Sys.info()[1] == "Windows") {
-        install_and_load_required_packages("doParallel")
-        # Register the foreach backend
-        cls <- makeCluster(cpu_thread_number)
-        registerDoParallel(cls)
+    if (allow_parallelization == TRUE) {
+        ### PARALLEL BACKEND
+        # Detect the number of cores
+        cpu_thread_number <- detectCores(logical = TRUE)
+        cpu_thread_number <- cpu_thread_number / 2
+        if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            install_and_load_required_packages("doMC")
+            # Register the foreach backend
+            registerDoMC(cores = cpu_thread_number)
+        } else if (Sys.info()[1] == "Windows") {
+            install_and_load_required_packages("doParallel")
+            # Register the foreach backend
+            cls <- makeCluster(cpu_thread_number)
+            registerDoParallel(cls)
+        }
     }
     # Establish if the parallel computation can be performed or not in the GA (otherwise it returns an error)
-    if (cpu_thread_number > 1 && allow_parallelization == TRUE) {
-        GA_parallel <- TRUE
-    } else if (cpu_thread_number <= 1 || allow_parallelization == FALSE) {
+    if (allow_parallelization == TRUE) {
+        if (cpu_thread_number > 1) {
+            GA_parallel <- TRUE
+        } else {
+            GA_parallel <- FALSE
+        }
+    } else if (allow_parallelization == FALSE) {
         GA_parallel <- FALSE
     }
     ########## Run the genetic algorithm
@@ -8722,7 +8729,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
     #out <- summary(GA_model)
     #print(out)
     # Stop the cluster for parallel computing (only on Windows)
-    if (Sys.info()[1] == "Windows") {
+    if (Sys.info()[1] == "Windows" && allow_parallelization == TRUE) {
         stopCluster(cls)
     }
     # Extract the final graph
@@ -8786,7 +8793,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
 
 ####################### FROM GENETIC ALGORITHM ON GRAPH TO SPECTRA AND MS IMAGES
 # The function takes the result of the genetic algorithm optimization (the genetic model object) and the list of spectra used to generate the adjacency matrix for the function 'genetic_algorithm_graph', it extracts the final chromosome (generated after the optimization) and it mirrors it onto the list of spectra, so that the output is a list of spectra belonging to the clique and a list of spectra belonging to the independent set. In addition, a list of spectra for plotting purposes is returned. 
-from_GA_to_MS <- function(final_chromosome_GA, spectra, plot_figures = TRUE, plot_graphs = TRUE, spectra_format = "imzml") {
+from_GA_to_MS <- function(final_chromosome_GA, spectra, spectra_format = "imzml") {
     ##### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "parallel", "doParallel", "igraph", "GA"))
     ########## Isolate the final chromosome (after mutations and fitness optimization)
@@ -8853,7 +8860,7 @@ from_GA_to_MS <- function(final_chromosome_GA, spectra, plot_figures = TRUE, plo
 #################################################### GRAPH SEGMENTATION FUNCTION
 # The function returns (for the imzML MSI dataset provided as the variable spectra) the list of spectra in the clique, the list of spectra in the independent set and the MS images (with pixels related to spectra in the clique in red and pixels related to spectra in the independent set in green), the initial and the final graph.
 # It returns a NULL value if the segmentation is not possible due to incompatibilities between the features in the dataset and the ones provided by the model.
-graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalisation_algorithm = "TIC", normalization_mass_range = NULL), process_spectra_in_packages_of = 0, allow_parallelization = FALSE, peak_picking_algorithm = "SuperSmoother", SNR = 5, tof_mode = "reflectron", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, partition_spectra = FALSE, number_of_spectra_partitions = 3, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
+graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalisation_algorithm = "TIC", normalization_mass_range = NULL), process_spectra_in_packages_of = 0, allow_parallelization = FALSE, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, SNR = 5, tof_mode = "reflectron", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, partition_spectra = FALSE, number_of_spectra_partitions = 3, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
     # Install and load the required packages
     install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "parallel", "caret", "pls", "tcltk", "kernlab", "pROC", "e1071", "igraph", "GA"))
     ### Import the dataset (if filepath_imzml is not already a list of spectra)
@@ -8885,26 +8892,29 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
             ##### Do everything only of there are more than one spectra in the partition
             if (isMassSpectrumList(spectra_partition)) {
                 ### Use only the features from the model
-                peaklist_matrix <- generate_custom_intensity_matrix(spectra_partition, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
+                peaklist_matrix <- generate_custom_intensity_matrix(spectra_partition, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
                 # Compute the adjacency matrix
                 input_adjacency_matrix <- generate_adjacency_matrix(peaklist_matrix, correlation_method = correlation_method_for_adjacency_matrix, correlation_threshold = correlation_threshold_for_adjacency_matrix, pvalue_threshold = pvalue_threshold_for_adjacency_matrix)
                 # Run the genetic algorithm
                 GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, vertices_not_in_induced_subgraph = vertices_not_in_induced_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
                 # Record the plots
                 if (plot_graphs == TRUE) {
-                    graph_spectra_plot_list[[prt]] <- plot(GA_output$input_graph)
-                    final_graph_plot_list[[prt]] <- plot(GA_output$final_graph)
+                    plot(GA_output$input_graph)
+                    graph_spectra_plot_list[[prt]] <- recordPlot()
+                    plot(GA_output$final_graph)
+                    final_graph_plot_list[[prt]] <- recordPlot()
                 } else {
                     graph_spectra_plot_list[[prt]] <- NULL
                     final_graph_plot_list[[prt]] <- NULL
                 }
                 if (plot_figures == TRUE) {
-                    ga_model_plot_list[[prt]] <- plot(GA_output$GA_model)
+                    plot(GA_output$GA_model)
+                    ga_model_plot_list[[prt]] <- recordPlot()
                 } else {
                     ga_model_plot_list[[prt]] <- NULL
                 }
                 # From the optimised graph, extract the spectra for plotting, the adjacency matrix and the figures
-                MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra_partition, plot_figures = plot_figures, plot_graphs = plot_graphs)
+                MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra_partition)
                 # Record the plot
                 final_spectra_clique[[prt]] <- MS_from_GA$spectra_clique
                 final_spectra_independent[[prt]] <- MS_from_GA$spectra_independent
@@ -8943,7 +8953,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
         ga_model_plot <- NULL
         final_graph_plot <- NULL
         ### Use only the features from the model
-        peaklist_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
+        peaklist_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
         ### If a NULL value is returned, it means that the model is incompatible with the features in the dataset
         if (!is.null(peaklist_matrix)) {
             # Compute the adjacency matrix
@@ -8952,19 +8962,22 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
             GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, vertices_not_in_induced_subgraph = vertices_not_in_induced_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
             # Record the plots
             if (plot_graphs == TRUE) {
-                graph_spectra_plot <- plot(GA_output$input_graph)
-                final_graph_plot <- plot(GA_output$final_graph)
+                plot(GA_output$input_graph)
+                graph_spectra_plot <- recordPlot()
+                plot(GA_output$final_graph)
+                final_graph_plot <- recordPlot()
             } else {
                 graph_spectra_plot <- NULL
                 final_graph_plot <- NULL
             }
             if (plot_figures == TRUE) {
-                ga_model_plot <- plot(GA_output$GA_model)
+                plot(GA_output$GA_model)
+                ga_model_plot <- recordPlot()
             } else {
                 ga_model_plot <- NULL
             }
             # From the optimised graph, extract the spectra for plotting, the adjacency matrix and the figures
-            MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra, plot_figures = plot_figures, plot_graphs = plot_graphs)
+            MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra)
             # Extract the spectra for plotting
             spectra_all_for_plotting <- MS_from_GA$spectra_for_plotting
             ### Generate the MS images (slices)
@@ -8978,6 +8991,8 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
                 legend(x = "topleft", legend = "Graph segmentation", xjust = 0.5, yjust = 0.5)
                 # Record the plot
                 msi_segmentation <- recordPlot()
+            } else {
+                msi_segmentation <- NULL
             }
             ### Return
             return(list(spectra_for_plotting = spectra_all_for_plotting, spectra_clique = MS_from_GA$spectra_clique, spectra_independent = MS_from_GA$spectra_independent, msi_segmentation = msi_segmentation, graph_spectra_plot = graph_spectra_plot, final_graph_plot = final_graph_plot, ga_model_plot = ga_model_plot))
@@ -8986,6 +9001,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
         }
     }
 }
+
 
 
 
@@ -9075,13 +9091,13 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.15.0"
+R_script_version <- "2017.03.15.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
 script_file_name <- "PEAKLIST EXPORT.R"
 # Change log
-change_log <- "1. Deisotope peaklist\n2. Better parallelization"
+change_log <- "1. Deisotope peaklist\n2. Better parallelization\n3. Bugfix"
 
 
 
@@ -9607,7 +9623,7 @@ set_file_name <- function() {
 }
 
 ##### Samples
-select_samples_function <-function() {
+select_samples_function <- function() {
     setwd(getwd())
     ########## Prompt if a folder has to be selected or a single file
     # Catch the value from the popping out menu
@@ -9658,85 +9674,80 @@ end_session_function <- function () {
 
 ##### Import the spectra
 import_spectra_function <- function() {
-    # Load the required libraries
-    install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
-    ###### Get the values
-    # Generate the list of spectra (library and test)
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
-        ### Load the spectra
-        if (!is.null(mass_range)) {
-            spectra <- importBrukerFlex(filepath_import, massRange = mass_range)
-            # Preprocessing
-            spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = FALSE, spectra_alignment_method="cubic")
-        } else {
-            spectra <- importBrukerFlex(filepath_import)
-            # Preprocessing
-            spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = FALSE, spectra_alignment_method="cubic")
-        }
-    }
-    if (spectra_format == "imzml" | spectra_format == "imzML") {
-        # List all the imzML files (if the path is not already an imzML file)
-        if (length(grep(".imzML", filepath_import, fixed = TRUE)) <= 0) {
-            imzml_files <- read_spectra_files(filepath_import, spectra_format="imzml", full_path = TRUE)
-        } else {
-            imzml_files <- filepath_import
-        }
-        # Generate the spectra list
-        spectra <- list()
-        ### Load the spectra
-        if (!is.null(mass_range)) {
-            # Read and import one imzML file at a time
-            if (length(imzml_files) > 0) {
-                for (imzml in 1:length(imzml_files)) {
-                    # Read and import the imzML file
-                    spectra_imzml <- importImzMl(imzml_files[imzml], massRange = mass_range)
-                    # Preprocessing
-                    spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = FALSE, spectra_alignment_method="cubic")
-                    # Average the replicates (one AVG spectrum for each imzML file)
-                    if (average_replicates == TRUE) {
-                        spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
-                        # Preprocessing AVG
-                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = FALSE, spectra_alignment_method="cubic")
-                    }
-                    # Append it to the final list of spectra
-                    spectra <- append(spectra, spectra_imzml)
-                }
-            }
-        } else {
-            # Read and import one imzML file at a time
-            if (length(imzml_files) > 0) {
-                for (imzml in 1:length(imzml_files)) {
-                    # Read and import the imzML file
-                    spectra_imzml <- importImzMl(imzml_files[imzml])
-                    # Preprocessing
-                    spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = FALSE, spectra_alignment_method="cubic")
-                    # Average the replicates (one AVG spectrum for each imzML file)
-                    if (average_replicates == TRUE) {
-                        spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
-                        # Preprocessing AVG
-                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = FALSE, spectra_alignment_method="cubic")
-                    }
-                    # Append it to the final list of spectra
-                    spectra <- append(spectra, spectra_imzml)
-                }
+    ##### Run only if the spectra path has been set!
+    if (!is.null(filepath_import)) {
+        # Load the required libraries
+        install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
+        ###### Get the values
+        # Generate the list of spectra (library and test)
+        if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+            ### Load the spectra
+            if (!is.null(mass_range)) {
+                spectra <- importBrukerFlex(filepath_import, massRange = mass_range)
+                # Preprocessing
+                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = spectral_alignment, spectra_alignment_method = spectral_alignment_algorithm)
+            } else {
+                spectra <- importBrukerFlex(filepath_import)
+                # Preprocessing
+                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = spectral_alignment, spectra_alignment_method = spectral_alignment_algorithm)
             }
         }
+        if (spectra_format == "imzml" | spectra_format == "imzML") {
+            # List all the imzML files (if the path is not already an imzML file)
+            if (length(grep(".imzML", filepath_import, fixed = TRUE)) <= 0) {
+                imzml_files <- read_spectra_files(filepath_import, spectra_format="imzml", full_path = TRUE)
+            } else {
+                imzml_files <- filepath_import
+            }
+            # Generate the spectra list
+            spectra <- list()
+            ### Load the spectra
+            if (!is.null(mass_range)) {
+                # Read and import one imzML file at a time
+                if (length(imzml_files) > 0) {
+                    for (imzml in 1:length(imzml_files)) {
+                        # Read and import the imzML file
+                        spectra_imzml <- importImzMl(imzml_files[imzml], massRange = mass_range)
+                        # Preprocessing
+                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = spectral_alignment, spectra_alignment_method = spectral_alignment_algorithm)
+                        # Average the replicates (one AVG spectrum for each imzML file)
+                        if (average_replicates == TRUE) {
+                            spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
+                            # Preprocessing AVG
+                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = FALSE, spectra_alignment_method="cubic")
+                        }
+                        # Append it to the final list of spectra
+                        spectra <- append(spectra, spectra_imzml)
+                    }
+                }
+            } else {
+                # Read and import one imzML file at a time
+                if (length(imzml_files) > 0) {
+                    for (imzml in 1:length(imzml_files)) {
+                        # Read and import the imzML file
+                        spectra_imzml <- importImzMl(imzml_files[imzml])
+                        # Preprocessing
+                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = spectral_alignment, spectra_alignment_method = spectral_alignment_algorithm)
+                        # Average the replicates (one AVG spectrum for each imzML file)
+                        if (average_replicates == TRUE) {
+                            spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
+                            # Preprocessing AVG
+                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, align_spectra = FALSE, spectra_alignment_method="cubic")
+                        }
+                        # Append it to the final list of spectra
+                        spectra <- append(spectra, spectra_imzml)
+                    }
+                }
+            }
+        }
+        # Exit the function and put the variable into the R workspace
+        .GlobalEnv$spectra <- spectra
+        ### Messagebox
+        tkmessageBox(title = "Import successful", message = "The spectra have been successfully imported and preprocessed", icon = "info")
+    } else {
+        ### Messagebox
+        tkmessageBox(title = "Import not possible", message = "No spectra files or folder have been selected!", icon = "warning")
     }
-    ## Spectral alignment
-#    if (isMassSpectrumList(spectra)) {
-#        if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-#            half_window_alignment <- 20
-#            tolerance_ppm <- 2000
-#        } else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-#            half_window_alignment <- 5
-#            tolerance_ppm <- 200
-#        }
-#        spectra <- alignSpectra(spectra, halfWindowSize = half_window_alignment, SNR = 3, tolerance=(tolerance_ppm/10^6), warpingMethod="cubic")
-#    }
-    # Exit the function and put the variable into the R workspace
-    .GlobalEnv$spectra <- spectra
-    ### Messagebox
-    tkmessageBox(title = "Import successful", message = "The spectra have been successfully imported and preprocessed", icon = "info")
 }
 
 ##### Peak picking function
