@@ -1,7 +1,7 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2017.03.15
+###################### FUNCTIONS - MASS SPECTROMETRY 2017.03.16
 
 # Update the packages
-try(update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE), silent = TRUE)
+try(update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE, checkBuilt = TRUE), silent = TRUE)
 
 
 ########################################################################## MISC
@@ -10,7 +10,7 @@ try(update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FA
 # This function installs and loads the selected packages
 install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
     # Update all the packages
-    try(update.packages(repos = repository, ask = FALSE), silent = TRUE)
+    try(update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE), silent = TRUE)
     # Retrieve the installed packages
     installed_packages <- installed.packages()[,1]
     # Determine the missing packages
@@ -23,11 +23,11 @@ install_and_load_required_packages <- function(required_packages, repository = "
     # If a repository is specified
     if (repository != "" || !is.null(repository)) {
         if (length(missing_packages) > 0) {
-            install.packages(missing_packages, repos = repository)
+            install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
         }
     } else {
         if (length(missing_packages) > 0) {
-            install.packages(missing_packages)
+            install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
         }
     }
     # Load the packages
@@ -363,14 +363,14 @@ outcome_and_class_to_MS <- function(class_list = c("HP", "PTC"), outcome_list = 
             class_list <- append(class_list, outcome_list[length(class_list) + i])
         }
     }
-    # Generate the matrix (classes)
-    class_outcome_matrix <- matrix("", nrow = greater_number, ncol = 3)
+    ### Generate the matrix (classes)
+    class_outcome_matrix <- matrix("", nrow = greater_number, ncol = 4)
     # Define the colnames
-    colnames(class_outcome_matrix) <- c("Class", "Outcome", "Number")
+    colnames(class_outcome_matrix) <- c("Class", "Outcome", "Number", "Color")
     # Fill the matrix
     class_outcome_matrix[,1] <- cbind(class_list)
     class_outcome_matrix[,2] <- cbind(outcome_list)
-    # Generate the numbers
+    ### Generate the numbers
     outcome_list_as_number <- outcome_list
     for (ou in 1:length(outcome_list)) {
         # Benign = 0.5 (green pixels)
@@ -389,28 +389,42 @@ outcome_and_class_to_MS <- function(class_list = c("HP", "PTC"), outcome_list = 
     }
     # Fill in the matrix column (outcome as number + NA)
     class_outcome_matrix[,3] <- cbind(outcome_list_as_number)
-    # Convert it into a dataframe
-    class_outcome_df <- as.data.frame(class_outcome_matrix)
-    # Convert the dataframe variables
-    class_outcome_df$Class <- as.character(class_outcome_df$Class)
-    class_outcome_df$Outcome <- as.character(class_outcome_df$Outcome)
-    class_outcome_df$Number <- as.numeric(levels(as.factor(class_outcome_df$Number)))
+    ### Generate the colors
+    outcome_list_as_color <- outcome_list
+    for (ou in 1:length(outcome_list)) {
+        # Benign = 0.5 (green pixels)
+        if (length(grep("ben", outcome_list[ou])) > 0 || outcome_list[ou] == "b") {
+            outcome_list_as_color[ou] <- "green"
+        } else if (length(grep("mal", outcome_list[ou])) > 0 || outcome_list[ou] == "m") {
+            # Malignant = 1 (red pixels)
+            outcome_list_as_color[ou] <- "red"
+        } else if (is.na(outcome_list[ou])) {
+            # Other cases = 0 (black pixels)
+            outcome_list_as_color[ou] <- "black"
+        } else {
+            # Other cases = 0 (black pixels)
+            outcome_list_as_color[ou] <- "black"
+        }
+    }
+    # Fill in the matrix column (outcome as number + NA)
+    class_outcome_matrix[,4] <- cbind(outcome_list_as_color)
     ### Convert the class vector (if not null)
     if (!is.null(class_vector)) {
         for (cv in 1:length(class_vector)) {
-            for (ou in 1:length(class_outcome_df$Class)) {
+            for (ou in 1:length(class_outcome_matrix[, "Class"])) {
                 if (is.na(class_vector[cv])) {
                     class_vector[cv] <- as.numeric(0)
-                } else if (class_vector[cv] == class_outcome_df$Class[ou]) {
-                    class_vector[cv] <- as.numeric(class_outcome_df$Number[ou])
+                } else if (class_vector[cv] == class_outcome_matrix[, "Class"][ou]) {
+                    class_vector[cv] <- as.numeric(class_outcome_matrix[, "Number"][ou])
                 }
             }
         }
     }
     # Convert the final vector into numeric
     class_vector <- as.numeric(class_vector)
-    # Return the dataframe
-    return(list(class_outcome_matrix = class_outcome_df, class_vector_as_numeric = class_vector))
+    ### 
+    ### Return
+    return(list(class_outcome_matrix = class_outcome_matrix, class_vector_as_numeric = class_vector, legend_text = class_list, legend_fill = outcome_list_as_color))
 }
 
 
@@ -4010,6 +4024,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
     model_ID <- model_x$model_ID
     # Model object
     model_object <- model_x$model
+    # Outcomes
+    outcome_list <- model_x$outcome_list
     ########## SINGLE PIXEL CLASSIFICATION
     if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(spectra)) {
         ##### Rearrange the spectra according to the space coordinates (for reproducibility purposes)
@@ -4027,6 +4043,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "raw"))
             } else {
                 predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix))
+                #predicted_classes <- as.character(apply(X = final_sample_matrix, MARGIN = 1, FUN = function(x) predict(model_object, as.matrix(rbind(x)))))
             }
             # Generate a matrix with the results
             result_matrix_model <- matrix(nrow = length(predicted_classes), ncol = 1)
@@ -4049,9 +4066,13 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             for (s in 1:length(spectra_for_plotting)) {
                 spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
             }
+            # Generate the MS image
             slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
             plotMsiSlice(slices, legend = FALSE, scale = F)
-            legend(x = "bottomright", legend = class_list, fill = c("green","red"), xjust = 0.5, yjust = 0.5)
+            # Define the legend
+            legend_text <- outcome_and_class$legend_text
+            legend_fill <- outcome_and_class$legend_fill
+            legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
             legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
             legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
             # Store the plot into the list of images (for model)
@@ -4139,9 +4160,13 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             for (s in 1:length(spectra_for_plotting)) {
                 spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
             }
+            # Generate the MS images
             slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
             plotMsiSlice(slices, legend = FALSE, scale = F)
-            legend(x = "bottomright", legend = class_list, fill = c("green","red"), xjust = 0.5, yjust = 0.5)
+            # Define the legend
+            legend_text <- outcome_and_class$legend_text
+            legend_fill <- outcome_and_class$legend_fill
+            legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
             legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
             legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
             # Store the plot into the list of images (for model)
@@ -4215,10 +4240,13 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             for (s in 1:length(spectra_for_plotting)) {
                 spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
             }
-            # MSI
+            # Generate the MS images
             slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
             plotMsiSlice(slices, legend = FALSE, scale = F)
-            legend(x = "bottomright", legend = class_list, fill = c("green","red"), xjust = 0.5, yjust = 0.5)
+            # Define the legend
+            legend_text <- outcome_and_class$legend_text
+            legend_fill <- outcome_and_class$legend_fill
+            legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
             legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
             legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
             # Store the plot into the list of images (for SVM)
@@ -4244,7 +4272,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
         sample_name <- spectra[[1]]@metaData$file[1]
         rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
         ########## GRAPH SEGMENTATION
-        graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, SNR = peak_picking_SNR, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, custom_feature_vector = features_model, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_induced_in_subgraph = "independent", max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, partition_spectra = partition_spectra, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed)
+        graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, , deisotope_peaklist = deisotope_peaklist, SNR = peak_picking_SNR, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, custom_feature_vector = features_model, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = "independent", max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, partition_spectra = partition_spectra, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed)
         ### Extract the spectra from the clique and from the independent set (mind that they are two lists if the spectra are taken all at the same time or they are two lists of lists if the spectra are partitioned)
         if (partition_spectra == TRUE && number_of_spectra_partitions > 1) {
             spectra_clique <- graph_segmentation$spectra_clique
@@ -4331,10 +4359,13 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             }
             ### Run only if there are some spectra classified
             if (length(spectra_for_plotting) > 0) {
-                # MSI
+                # Generate the MS images
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                legend(x = "bottomright", legend = class_list, fill = c("green","red"), xjust = 0.5, yjust = 0.5)
+                # Define the legend
+                legend_text <- outcome_and_class$legend_text
+                legend_fill <- outcome_and_class$legend_fill
+                legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
                 legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
                 legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
                 # Store the plot into the list of images (for SVM)
@@ -4432,10 +4463,13 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             }
             ### Run only if there are some spectra classified
             if (length(spectra_for_plotting) > 0) {
-                # MSI
+                # Generate the MS images
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                legend(x = "bottomright", legend = class_list, fill = c("green","red"), xjust = 0.5, yjust = 0.5)
+                # Define the legend
+                legend_text <- outcome_and_class$legend_text
+                legend_fill <- outcome_and_class$legend_fill
+                legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
                 legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
                 legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
                 # Store the plot into the list of images
@@ -4486,7 +4520,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
 spectral_classification_pixelbypixel <- function(spectra_path, filepath_R, model_list_object = "model_list", peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(4000,15000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment = FALSE, spectra_alignment_method = "cubic", tof_mode = "linear", spectra_preprocessing = TRUE, preprocess_spectra_in_packages_of = 0, allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, partition_spectra_graph = TRUE, number_of_spectra_partitions_graph = 4, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE) {
     # Install and load the required packages
-    install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda"))
+    install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda", "caret"))
     # Default pixel grouping
     if (pixel_grouping == "") {
         pixel_grouping <- "single"
@@ -4607,9 +4641,13 @@ spectral_classification_pixelbypixel <- function(spectra_path, filepath_R, model
             for (s in 1:length(spectra_for_plotting)) {
                 spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
             }
+            # Generate the MS images
             slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
             plotMsiSlice(slices, legend = FALSE, scale = F)
-            legend(x = "bottomright", legend = model_list[[1]]$class_list, fill = c("green", "red"), xjust = 0.5, yjust = 0.5)
+            # Define the legend
+            legend_text <- outcome_and_class$legend_text
+            legend_fill <- outcome_and_class$legend_fill
+            legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
             legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
             legend(x = "topleft", legend = "Ensemble classifier", xjust = 0.5, yjust = 0.5)
             # Store the plot into the list of images
@@ -7970,14 +8008,14 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
             peak_alignment_subfunction <- function(peaks, reference_masses, tolerance_ppm) {
                 # Scroll the peaks
                 for (l in 1:length(reference_masses)) {
-                    # Scroll the reference masses
-                    for (m in 1:length(peaks@mass)) {
-                        # If there is a match
-                        if (abs((as.numeric(peaks@mass[m]) - as.numeric(reference_masses[l])) / as.numeric(reference_masses[l]) * 10^6) <= tolerance_ppm) {
-                            # Replace the value with the reference value
-                            peaks@mass[m] <- as.numeric(reference_masses[l])
-                            break
-                        }
+                    # Identify the peak to be aligned to the reference
+                    peak_id <- which(abs((as.numeric(peaks@mass) - as.numeric(reference_masses[l])) / as.numeric(reference_masses[l]) * 10^6) <= tolerance_ppm)
+                    # If there is one peak, align it with the reference
+                    if (length(peak_id == 1)) {
+                        peaks@mass[peak_id] <- as.numeric(reference_masses[l])
+                    } else if (length(peak_id) > 1) {
+                        # If there is more than one peak, align only the first with the reference
+                        peaks@mass[peak_id[1]] <- as.numeric(reference_masses[l])
                     }
                 }
                 # Return
@@ -8587,7 +8625,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
     # Generate the matrix listing the degrees (for each vertex, each vertex being a row)
     degree_matrix <- cbind(ids = 1:vertex_number, degree_sequence)
     # Pick the quasi-independent vertices according to the degree threshold
-    quasi_independent_vertices <- which(degree_matrix[,"degree_sequence"] <= degree_threshold_independency)
+    quasi_independent_vertices <- which(degree_matrix[, "degree_sequence"] <= degree_threshold_independency)
     # Compute the number of quasi-independent vertices
     independent_vertex_number_graph <- length(quasi_independent_vertices)
     ########## Triangle mutation parameters
@@ -8603,24 +8641,30 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
     triangle_number_graph <- nrow(triangle_matrix)
     # Population size
     population_size <- vertex_number * 10
-    ### PARALLEL BACKEND
-    # Detect the number of cores
-    cpu_thread_number <- detectCores(logical = TRUE)
-    cpu_thread_number <- cpu_thread_number / 2
-    if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-        install_and_load_required_packages("doMC")
-        # Register the foreach backend
-        registerDoMC(cores = cpu_thread_number)
-    } else if (Sys.info()[1] == "Windows") {
-        install_and_load_required_packages("doParallel")
-        # Register the foreach backend
-        cls <- makeCluster(cpu_thread_number)
-        registerDoParallel(cls)
+    if (allow_parallelization == TRUE) {
+        ### PARALLEL BACKEND
+        # Detect the number of cores
+        cpu_thread_number <- detectCores(logical = TRUE)
+        cpu_thread_number <- cpu_thread_number / 2
+        if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            install_and_load_required_packages("doMC")
+            # Register the foreach backend
+            registerDoMC(cores = cpu_thread_number)
+        } else if (Sys.info()[1] == "Windows") {
+            install_and_load_required_packages("doParallel")
+            # Register the foreach backend
+            cls <- makeCluster(cpu_thread_number)
+            registerDoParallel(cls)
+        }
     }
     # Establish if the parallel computation can be performed or not in the GA (otherwise it returns an error)
-    if (cpu_thread_number > 1 && allow_parallelization == TRUE) {
-        GA_parallel <- TRUE
-    } else if (cpu_thread_number <= 1 || allow_parallelization == FALSE) {
+    if (allow_parallelization == TRUE) {
+        if (cpu_thread_number > 1) {
+            GA_parallel <- TRUE
+        } else {
+            GA_parallel <- FALSE
+        }
+    } else if (allow_parallelization == FALSE) {
         GA_parallel <- FALSE
     }
     ########## Run the genetic algorithm
@@ -8722,7 +8766,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
     #out <- summary(GA_model)
     #print(out)
     # Stop the cluster for parallel computing (only on Windows)
-    if (Sys.info()[1] == "Windows") {
+    if (Sys.info()[1] == "Windows" && allow_parallelization == TRUE) {
         stopCluster(cls)
     }
     # Extract the final graph
@@ -8786,7 +8830,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
 
 ####################### FROM GENETIC ALGORITHM ON GRAPH TO SPECTRA AND MS IMAGES
 # The function takes the result of the genetic algorithm optimization (the genetic model object) and the list of spectra used to generate the adjacency matrix for the function 'genetic_algorithm_graph', it extracts the final chromosome (generated after the optimization) and it mirrors it onto the list of spectra, so that the output is a list of spectra belonging to the clique and a list of spectra belonging to the independent set. In addition, a list of spectra for plotting purposes is returned. 
-from_GA_to_MS <- function(final_chromosome_GA, spectra, plot_figures = TRUE, plot_graphs = TRUE, spectra_format = "imzml") {
+from_GA_to_MS <- function(final_chromosome_GA, spectra, spectra_format = "imzml") {
     ##### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "parallel", "doParallel", "igraph", "GA"))
     ########## Isolate the final chromosome (after mutations and fitness optimization)
@@ -8853,7 +8897,7 @@ from_GA_to_MS <- function(final_chromosome_GA, spectra, plot_figures = TRUE, plo
 #################################################### GRAPH SEGMENTATION FUNCTION
 # The function returns (for the imzML MSI dataset provided as the variable spectra) the list of spectra in the clique, the list of spectra in the independent set and the MS images (with pixels related to spectra in the clique in red and pixels related to spectra in the independent set in green), the initial and the final graph.
 # It returns a NULL value if the segmentation is not possible due to incompatibilities between the features in the dataset and the ones provided by the model.
-graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalisation_algorithm = "TIC", normalization_mass_range = NULL), process_spectra_in_packages_of = 0, allow_parallelization = FALSE, peak_picking_algorithm = "SuperSmoother", SNR = 5, tof_mode = "reflectron", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, partition_spectra = FALSE, number_of_spectra_partitions = 3, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
+graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(800,3000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalisation_algorithm = "TIC", normalization_mass_range = NULL), process_spectra_in_packages_of = 0, allow_parallelization = FALSE, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, SNR = 5, tof_mode = "reflectron", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, partition_spectra = FALSE, number_of_spectra_partitions = 3, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
     # Install and load the required packages
     install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "parallel", "caret", "pls", "tcltk", "kernlab", "pROC", "e1071", "igraph", "GA"))
     ### Import the dataset (if filepath_imzml is not already a list of spectra)
@@ -8885,26 +8929,29 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
             ##### Do everything only of there are more than one spectra in the partition
             if (isMassSpectrumList(spectra_partition)) {
                 ### Use only the features from the model
-                peaklist_matrix <- generate_custom_intensity_matrix(spectra_partition, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
+                peaklist_matrix <- generate_custom_intensity_matrix(spectra_partition, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
                 # Compute the adjacency matrix
                 input_adjacency_matrix <- generate_adjacency_matrix(peaklist_matrix, correlation_method = correlation_method_for_adjacency_matrix, correlation_threshold = correlation_threshold_for_adjacency_matrix, pvalue_threshold = pvalue_threshold_for_adjacency_matrix)
                 # Run the genetic algorithm
                 GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, vertices_not_in_induced_subgraph = vertices_not_in_induced_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
                 # Record the plots
                 if (plot_graphs == TRUE) {
-                    graph_spectra_plot_list[[prt]] <- plot(GA_output$input_graph)
-                    final_graph_plot_list[[prt]] <- plot(GA_output$final_graph)
+                    plot(GA_output$input_graph)
+                    graph_spectra_plot_list[[prt]] <- recordPlot()
+                    plot(GA_output$final_graph)
+                    final_graph_plot_list[[prt]] <- recordPlot()
                 } else {
                     graph_spectra_plot_list[[prt]] <- NULL
                     final_graph_plot_list[[prt]] <- NULL
                 }
                 if (plot_figures == TRUE) {
-                    ga_model_plot_list[[prt]] <- plot(GA_output$GA_model)
+                    plot(GA_output$GA_model)
+                    ga_model_plot_list[[prt]] <- recordPlot()
                 } else {
                     ga_model_plot_list[[prt]] <- NULL
                 }
                 # From the optimised graph, extract the spectra for plotting, the adjacency matrix and the figures
-                MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra_partition, plot_figures = plot_figures, plot_graphs = plot_graphs)
+                MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra_partition)
                 # Record the plot
                 final_spectra_clique[[prt]] <- MS_from_GA$spectra_clique
                 final_spectra_independent[[prt]] <- MS_from_GA$spectra_independent
@@ -8943,7 +8990,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
         ga_model_plot <- NULL
         final_graph_plot <- NULL
         ### Use only the features from the model
-        peaklist_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
+        peaklist_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
         ### If a NULL value is returned, it means that the model is incompatible with the features in the dataset
         if (!is.null(peaklist_matrix)) {
             # Compute the adjacency matrix
@@ -8952,19 +8999,22 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
             GA_output <- genetic_algorithm_graph(input_adjacency_matrix, max_GA_generations = max_GA_generations, seed = seed, number_of_high_degree_vertices_for_subgraph = number_of_high_degree_vertices_for_subgraph, vertices_not_in_induced_subgraph = vertices_not_in_induced_subgraph, allow_parallelization = allow_parallelization, iterations_with_no_change = iterations_with_no_change)
             # Record the plots
             if (plot_graphs == TRUE) {
-                graph_spectra_plot <- plot(GA_output$input_graph)
-                final_graph_plot <- plot(GA_output$final_graph)
+                plot(GA_output$input_graph)
+                graph_spectra_plot <- recordPlot()
+                plot(GA_output$final_graph)
+                final_graph_plot <- recordPlot()
             } else {
                 graph_spectra_plot <- NULL
                 final_graph_plot <- NULL
             }
             if (plot_figures == TRUE) {
-                ga_model_plot <- plot(GA_output$GA_model)
+                plot(GA_output$GA_model)
+                ga_model_plot <- recordPlot()
             } else {
                 ga_model_plot <- NULL
             }
             # From the optimised graph, extract the spectra for plotting, the adjacency matrix and the figures
-            MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra, plot_figures = plot_figures, plot_graphs = plot_graphs)
+            MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra)
             # Extract the spectra for plotting
             spectra_all_for_plotting <- MS_from_GA$spectra_for_plotting
             ### Generate the MS images (slices)
@@ -8978,6 +9028,8 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
                 legend(x = "topleft", legend = "Graph segmentation", xjust = 0.5, yjust = 0.5)
                 # Record the plot
                 msi_segmentation <- recordPlot()
+            } else {
+                msi_segmentation <- NULL
             }
             ### Return
             return(list(spectra_for_plotting = spectra_all_for_plotting, spectra_clique = MS_from_GA$spectra_clique, spectra_independent = MS_from_GA$spectra_independent, msi_segmentation = msi_segmentation, graph_spectra_plot = graph_spectra_plot, final_graph_plot = final_graph_plot, ga_model_plot = ga_model_plot))
