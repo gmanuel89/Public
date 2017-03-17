@@ -1558,7 +1558,7 @@ return (spectrum_images)
 # This function imports the spectra in a memory efficient way: it reads spectra from one imzML file at a time, it can discard spectra according to their TIC, it runs the preprocessing of the spectra from the imzML file into packages of spectra, it can generate a set of representative average spectra (by grouping spectra randomly or according to a clustering algorithm). After this, it stores all the spectra from all the imzML files into a variable and from here it can align the spectra with the peaklist of the average spectrum of the dataset and it can crop all the spectra to a selected mass range.
 # It relies upon other functions.
 # The functions returns (the user can select what to compute) a list of elements: all the spectra, the representative spectra, the MS images after clustering.
-memory_efficient_import <- function (folder, tof_mode = "linear", tic_purification = FALSE, absolute_tic_threshold = 0, smoothing_strength = "medium", mass_range = NULL, spectra_preprocessing = TRUE, allow_parallelization = FALSE, transformation_algorithm = NULL, peak_picking_algorithm = "SuperSmoother", process_in_packages_of = length(spectra), generate_representative_spectra = FALSE, spectra_per_patient = 1, algorithm_for_representative_spectra = "hca", clustering_method_for_hca = "agglomerative", discarded_nodes = 1, skyline = FALSE, spectra_alignment = FALSE, spectra_alignment_method = "cubic", spectra_format = "imzml", seed = NULL, output_list = c("spectra","average","representative")) {
+memory_efficient_import <- function (folder, tof_mode = "linear", tic_purification = FALSE, absolute_tic_threshold = 0, smoothing_strength = "medium", mass_range = NULL, spectra_preprocessing = TRUE, allow_parallelization = FALSE, transformation_algorithm = NULL, peak_picking_algorithm = "SuperSmoother", process_in_packages_of = length(spectra), generate_representative_spectra = FALSE, spectra_per_patient = 1, algorithm_for_representative_spectra = "hca", clustering_method_for_hca = "agglomerative", discarded_nodes = 1, skyline = FALSE, spectral_alignment_method = NULL, spectra_format = "imzml", seed = NULL, output_list = c("spectra","average","representative")) {
 ##### Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
 ##### If it is not an imzML file...
@@ -1606,7 +1606,7 @@ for (ff in 1:length(folder_files)) {
     if ("spectra" %in% output_list) {
         if (spectra_preprocessing == TRUE) {
             if (length(spectra) > 0) {
-                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, smoothing_strength = smoothing_strength, process_in_packages_of = process_in_packages_of, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization, transformation_algorithm = transformation_algorithm, mass_range = mass_range)
+                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, smoothing_strength = smoothing_strength, process_in_packages_of = process_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization, transformation_algorithm = transformation_algorithm, mass_range = mass_range)
             }
         }
         spectra_dataset <- append(spectra_dataset, spectra)
@@ -1656,7 +1656,7 @@ for (ff in 1:length(folder_files)) {
     gc()
 }
 ############################################################# SPECTRA ALIGNMENT
-if (spectra_alignment == TRUE && "spectra" %in% output_list) {
+if (spectral_alignment == TRUE && "spectra" %in% output_list) {
     if (length(spectra_dataset) > 0 && isMassSpectrumList(spectra_dataset)) {
         # Average the spectra: the avg spectrum peaks will be used as reference
         spectra_avg_ref <- averageMassSpectra(spectra_dataset, method = "mean")
@@ -1664,10 +1664,10 @@ if (spectra_alignment == TRUE && "spectra" %in% output_list) {
         reference_for_alignment <- peaks_avg_ref@mass
         if (length(reference_for_alignment) > 0) {
             if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-                spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize = 20, noiseMethod = peak_picking_algorithm, SNR = 3, reference = peaks_avg_ref, tolerance=(tolerance_ppm/10^6), warpingMethod = spectra_alignment_method)
+                spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize = 20, noiseMethod = peak_picking_algorithm, SNR = 3, reference = peaks_avg_ref, tolerance=(tolerance_ppm/10^6), warpingMethod = spectral_alignment_method)
             }
             if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-                spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize = 5, noiseMethod = peak_picking_algorithm, SNR = 3, reference = peaks_avg_ref, tolerance=(tolerance_ppm/10^6), warpingMethod = spectra_alignment_method)
+                spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize = 5, noiseMethod = peak_picking_algorithm, SNR = 3, reference = peaks_avg_ref, tolerance=(tolerance_ppm/10^6), warpingMethod = spectral_alignment_method)
             }
         }
     }
@@ -2070,7 +2070,7 @@ return (spectra)
 # The function allows to select some additional parameters of the preprocessing.
 # This version of the function whould be faster because each element of the spectral list is subjected to all the preprocessing step.
 # If an algorithm is set to NULL, that preprocessing step will not be performed.
-preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), process_in_packages_of = 0, spectra_alignment_method = NULL, allow_parallelization = FALSE) {
+preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), process_in_packages_of = 0, spectral_alignment_method = NULL, allow_parallelization = FALSE) {
     ##### Load the required libraries
     install_and_load_required_packages(c("MALDIquant", "parallel"))
     ##### Rename the trim function
@@ -2240,7 +2240,7 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
         preprocessed_spectra <- spectra
     }
     ######################################### SPECTRAL ALIGNMENT
-    if (!is.null(spectra_alignment_method)) {
+    if (!is.null(spectral_alignment_method)) {
         if (isMassSpectrumList(preprocessed_spectra)) {
             if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
                 half_window_alignment <- 20
@@ -2249,7 +2249,7 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
                 half_window_alignment <- 5
                 tolerance_ppm <- 200
             }
-            preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 2, tolerance = (tolerance_ppm/10^6), warpingMethod = spectra_alignment_method)
+            preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 2, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_method)
         }
     }
     return(preprocessed_spectra)
@@ -3718,7 +3718,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 ### Generate the average spectrum for the bin
                 average_spectrum_bin <- averageMassSpectra(spectra_bin)
                 ### Preprocessing the AVG spectrum
-                average_spectrum_bin <- preprocess_spectra(average_spectrum_bin, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+                average_spectrum_bin <- preprocess_spectra(average_spectrum_bin, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 ### Peak picking on the AVG spectrum
                 sample_bin_matrix <- generate_custom_intensity_matrix(average_spectrum_bin, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
                 ### Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
@@ -3814,7 +3814,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 # Generate the average spectrum for these spectra under the node
                 average_spectrum_hca <- averageMassSpectra(spectra_hca)
                 ### Preprocessing the AVG spectrum
-                average_spectrum_hca <- preprocess_spectra(average_spectrum_hca, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+                average_spectrum_hca <- preprocess_spectra(average_spectrum_hca, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 ### Peak picking on the AVG spectrum
                 sample_hca_matrix <- generate_custom_intensity_matrix(average_spectrum_hca, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
                 ### Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
@@ -3896,8 +3896,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     spectra_clique_avg <- append(spectra_clique_avg, averageMassSpectra(spectra_clique[[l]]))
                 }
                 # Preprocess the average spectra
-                spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
-                spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+                spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
+                spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 # Peak picking on the AVG spectrum
                 sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
                 sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
@@ -4010,8 +4010,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 spectra_clique_avg <- averageMassSpectra(spectra_clique)
                 spectra_independent_avg <- averageMassSpectra(spectra_independent)
                 # Preprocess the average spectrum
-                spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
-                spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+                spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
+                spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 # Peak picking on the AVG spectrum
                 sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
                 sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = 5, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
@@ -4226,7 +4226,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel classification, a matrix with the ensemble classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel ensemble classification and the plot of the average spectrum with red bars to indicate the signals used for classification.
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
-spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment = FALSE, spectral_alignment_method = "cubic", tof_mode = "linear", spectra_preprocessing = TRUE, preprocess_spectra_in_packages_of = 0, allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, partition_spectra_graph = TRUE, number_of_spectra_partitions_graph = 4, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE) {
+spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment_method = NULL, tof_mode = "linear", spectra_preprocessing = TRUE, preprocess_spectra_in_packages_of = 0, allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, partition_spectra_graph = TRUE, number_of_spectra_partitions_graph = 4, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE) {
     ### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda", "caret", "nnet"))
     ### Defaults
@@ -4294,7 +4294,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
         sample_spectra <- replace_sample_name(sample_spectra, spectra_format = "imzml", allow_parallelization = allow_parallelization)
         ### Preprocess spectra
         if (spectra_preprocessing == TRUE) {
-            sample_spectra <- preprocess_spectra(sample_spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = preprocess_spectra_in_packages_of, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+            sample_spectra <- preprocess_spectra(sample_spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = preprocess_spectra_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
         }
         ### Average spectrum (protein profile)
         if ("profile" %in% classification_mode) {
@@ -4303,7 +4303,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
                 sample_spectra_avg <- averageMassSpectra(sample_spectra, method = "mean")
                 ## Preprocess average spectrum
                 if (spectra_preprocessing == TRUE) {
-                    sample_spectra_avg <- preprocess_spectra(sample_spectra_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = preprocess_spectra_in_packages_of, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+                    sample_spectra_avg <- preprocess_spectra(sample_spectra_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = preprocess_spectra_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 }
             } else {
                 sample_spectra_avg <- sample_spectra
@@ -7538,7 +7538,7 @@ generate_custom_intensity_matrix2 <- function(spectra, custom_feature_vector = N
     }
     ### Preprocessing
     if (spectra_preprocessing == TRUE) {
-        spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = process_in_packages_of, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+        spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = process_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
     }
     ### Peak picking and alignment
     peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = peak_picking_SNR, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
@@ -7737,7 +7737,7 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
     }
     ### Preprocessing
     if (spectra_preprocessing == TRUE) {
-        spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = process_in_packages_of, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+        spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = process_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
     }
     ### Peak picking and alignment (with the custom features)
     peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = peak_picking_SNR, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
@@ -8799,6 +8799,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 
+
 ####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
 
@@ -8838,7 +8839,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.17.3"
+R_script_version <- "2017.03.17.4"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -9437,11 +9438,11 @@ import_spectra_function <- function() {
             if (!is.null(mass_range)) {
                 spectra <- importBrukerFlex(filepath_import, massRange = mass_range)
                 # Preprocessing
-                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectra_alignment_method = spectral_alignment_algorithm)
+                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
             } else {
                 spectra <- importBrukerFlex(filepath_import)
                 # Preprocessing
-                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectra_alignment_method = spectral_alignment_algorithm)
+                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
             }
         }
         if (spectra_format == "imzml" | spectra_format == "imzML") {
@@ -9461,12 +9462,12 @@ import_spectra_function <- function() {
                         # Read and import the imzML file
                         spectra_imzml <- importImzMl(imzml_files[imzml], massRange = mass_range)
                         # Preprocessing
-                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectra_alignment_method = spectral_alignment_algorithm)
+                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
                         # Average the replicates (one AVG spectrum for each imzML file)
                         if (average_replicates == TRUE) {
                             spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
                             # Preprocessing AVG
-                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectra_alignment_method = spectral_alignment_algorithm)
+                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
                         }
                         # Append it to the final list of spectra
                         spectra <- append(spectra, spectra_imzml)
@@ -9479,12 +9480,12 @@ import_spectra_function <- function() {
                         # Read and import the imzML file
                         spectra_imzml <- importImzMl(imzml_files[imzml])
                         # Preprocessing
-                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectra_alignment_method = spectral_alignment_algorithm)
+                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
                         # Average the replicates (one AVG spectrum for each imzML file)
                         if (average_replicates == TRUE) {
                             spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
                             # Preprocessing AVG
-                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectra_alignment_method = spectral_alignment_algorithm)
+                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
                         }
                         # Append it to the final list of spectra
                         spectra <- append(spectra, spectra_imzml)
