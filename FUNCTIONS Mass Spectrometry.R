@@ -1,4 +1,4 @@
-###################### FUNCTIONS - MASS SPECTROMETRY 2017.03.16
+###################### FUNCTIONS - MASS SPECTROMETRY 2017.03.17
 
 # Update the packages
 try(update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE, checkBuilt = TRUE), silent = TRUE)
@@ -3785,7 +3785,7 @@ return (list(classification_hca_results_avg = classification_hca_results_avg, cl
 # The function takes a folder in which there are imzML files (one for each patient) or an imzML file or a list of MALDIquant spectra files, the R workspace containing the models with the name of the model objects in the workspace, and allows the user to specify something regarding the preprocessing of the spectra to be classified.
 # The features in the model must be aligned to the features in the dataset.
 # The function outputs a list containing: a matrix with the classification (patient's average spectrum), the model list and the average spectrum of the patients with red bars on the signals used by the models to classify it, a matrix with the ensemble classification (patient's average spectrum).
-spectral_classification_profile <- function(spectra_path, filepath_R, model_list_object = "model_list", spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(4000,15000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment = FALSE, spectra_alignment_method = "cubic", tof_mode = "linear", peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocess_spectra_in_packages_of = length(sample_spectra), allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal") {
+spectral_classification_profile <- function(spectra_path, filepath_R, model_list_object = "model_list", spectra_preprocessing = TRUE, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = c(4000,15000), data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment = FALSE, spectra_alignment_method = "cubic", tof_mode = "linear", peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocess_spectra_in_packages_of = 0, allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal") {
     ########## Load the required packages
     install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest","nnet"))
     # Rename the trim function
@@ -3816,7 +3816,7 @@ spectral_classification_profile <- function(spectra_path, filepath_R, model_list
     ######################################## Global OUTPUT Initialization
     final_result_matrix_all <- NULL
     classification_ensemble_matrix_all <- NULL
-    average_spectra_with_bars_list <- list()
+    average_spectrum_with_bars_list <- list()
     ######################################## SPECTRA
     ########## Process the sample to be classified
     ##### For each imzML file...
@@ -4509,7 +4509,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
         ########## SINGLE (AVG) SPECTRUM
         ### Inizialize output
         result_matrix <- NULL
-        average_spectra_with_bars <- NULL
+        average_spectrum_with_bars <- NULL
         ### Generate the intensity matrix with the features from the model
         final_sample_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 3, peaks_filtering = FALSE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
         ### Run only if there is compatibility between the spectral features and the model features (it is NULL if there is no compatibility)
@@ -4645,13 +4645,11 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
     ## Multiple imzML file path provided (folder)
     if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed = TRUE)) == 0) {
         filepath_test_imzml <- read_spectra_files(spectra_path, spectra_format = "imzml", full_path = TRUE)
-    }
-    ## Single imzML filepath
-    if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed = TRUE)) != 0) {
+    } else if (!is.list(spectra_path) && length(grep(".imzML", spectra_path, fixed = TRUE)) > 0) {
+        ## Single imzML filepath
         filepath_test_imzml <- spectra_path
-    }
-    ## Spectra list
-    if (is.list(spectra_path)) {
+    } else if (isMassSpectrumList(spectra_path) || isMassSpectrum(spectra_path)) {
+        ## Spectra list
         # Assign a string to the filepath for the future IF cycles
         filepath_test_imzml <- "List of spectra"
         sample_spectra <- spectra_path
@@ -4677,7 +4675,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
         final_result_matrix_profile_patient <- NULL
         average_spectrum_with_bars_patient <- list()
         ### Import the spectra
-        if (!isMassSpectrumList(spectra_path)) {
+        if (!isMassSpectrumList(spectra_path) || !isMassSpectrum(spectra_path)) {
             # Import the spectra (one imzML at a time)
             if (!is.null(mass_range)) {
                 sample_spectra <- importImzMl(filepath_test_imzml[p], massRange = mass_range)
@@ -4696,10 +4694,14 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
         ### Average spectrum (protein profile)
         if ("profile" %in% classification_mode) {
             ## Generate the average spectrum
-            sample_spectra_avg <- averageMassSpectra(sample_spectra, method = "mean")
-            ## Preprocess average spectrum
-            if (spectra_preprocessing == TRUE) {
-                sample_spectra_avg <- preprocess_spectra(sample_spectra_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = preprocess_spectra_in_packages_of, align_spectra = spectral_alignment, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+            if (isMassSpectrumList(sample_spectra)) {
+                sample_spectra_avg <- averageMassSpectra(sample_spectra, method = "mean")
+                ## Preprocess average spectrum
+                if (spectra_preprocessing == TRUE) {
+                    sample_spectra_avg <- preprocess_spectra(sample_spectra_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = preprocess_spectra_in_packages_of, align_spectra = spectral_alignment, spectra_alignment_method = spectra_alignment_method, allow_parallelization = allow_parallelization)
+                }
+            } else {
+                sample_spectra_avg <- sample_spectra
             }
         }
         ### LOAD THE R WORKSPACE WITH THE MODEL LIST
