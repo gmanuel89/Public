@@ -2281,9 +2281,7 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
     ##### Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     ##### Extract the parameters from the input list
-    crop_spectra <- preprocessing_parameters$crop_spectra
     mass_range <- preprocessing_parameters$mass_range
-    data_transformation <- preprocessing_parameters$data_transformation
     transformation_algorithm <- preprocessing_parameters$transformation_algorithm
     smoothing_algorithm <- preprocessing_parameters$smoothing_algorithm
     smoothing_strength <- preprocessing_parameters$smoothing_strength
@@ -2357,12 +2355,10 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
         ### Remove flat spectra
         # x <- removeEmptyMassObjects (x)
         ### Trimming
-            # Mass range specified
-            if (!is.null(mass_range)) {
-                x <- trim_spectra(x, range = mass_range)
-            } else {
-                x <- trim_spectra(x)
-            }
+        # Mass range specified
+        if (!is.null(mass_range)) {
+            x <- trim_spectra(x, range = mass_range)
+        }
         ### Transformation
         if (!is.null(transformation_algorithm)) {
             x <- transformIntensity(x, method = transformation_algorithm)
@@ -9236,6 +9232,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 
+
 ####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
 
@@ -9275,7 +9272,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.17.1"
+R_script_version <- "2017.03.17.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
