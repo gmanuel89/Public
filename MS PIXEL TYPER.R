@@ -2274,7 +2274,8 @@ preprocess_spectra2 <- function(spectra, tof_mode = "linear", preprocessing_para
 # The function runs the preprocessing on the selected spectra (smoothing, baseline subtraction and normalization). The function can be applied both to a spectra list or a single spectrum, allowing parallel computation.
 # The function allows to select some additional parameters of the preprocessing.
 # This version of the function whould be faster because each element of the spectral list is subjected to all the preprocessing step.
-preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(crop_spectra = FALSE, mass_range = NULL, data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), process_in_packages_of = length(spectra), align_spectra = FALSE, spectra_alignment_method = "cubic", allow_parallelization = FALSE) {
+# If an algorithm is set to NULL, that preprocessing step will not be performed.
+preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, data_transformation = FALSE, transformation_algorithm = "sqrt", smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), process_in_packages_of = length(spectra), spectra_alignment_method = NULL, allow_parallelization = FALSE) {
     ##### Load the required libraries
     install_and_load_required_packages(c("MALDIquant", "parallel"))
     ##### Rename the trim function
@@ -2352,20 +2353,18 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
         }
     }
     ##### Generate the preprocessing function to be applied to every element of the spectra_temp list (x = spectrum)
-    preprocessing_subfunction <- function(x, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range) {
+    preprocessing_subfunction <- function(x, mass_range, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range) {
         ### Remove flat spectra
         # x <- removeEmptyMassObjects (x)
         ### Trimming
-        if (crop_spectra == TRUE) {
             # Mass range specified
             if (!is.null(mass_range)) {
                 x <- trim_spectra(x, range = mass_range)
             } else {
                 x <- trim_spectra(x)
             }
-        }
         ### Transformation
-        if (data_transformation == TRUE) {
+        if (!is.null(transformation_algorithm)) {
             x <- transformIntensity(x, method = transformation_algorithm)
         }
         ### Smoothing
@@ -2383,14 +2382,16 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
             x <- removeBaseline(x, method = baseline_subtraction_algorithm, iterations = baseline_subtraction_iterations)
         }
         ### Normalization
-        if (normalization_algorithm == "TIC") {
-            if (!is.null(normalization_mass_range) && is.numeric(normalization_mass_range)) {
-                x <- calibrateIntensity(x, method = normalization_algorithm, range = normalization_mass_range)
+        if (!is.null(normalization_algorithm)) {
+            if (normalization_algorithm == "TIC") {
+                if (!is.null(normalization_mass_range) && is.numeric(normalization_mass_range)) {
+                    x <- calibrateIntensity(x, method = normalization_algorithm, range = normalization_mass_range)
+                } else {
+                    x <- calibrateIntensity(x, method = normalization_algorithm)
+                }
             } else {
                 x <- calibrateIntensity(x, method = normalization_algorithm)
             }
-        } else {
-            x <- calibrateIntensity(x, method = normalization_algorithm)
         }
         ### Return the preprocessed spectrum (x)
         return(x)
@@ -2398,7 +2399,7 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
     ######################################### Multiple spectra
     if (isMassSpectrumList(spectra)) {
         ##### Trimming (same mass range for all the dataset)
-        if (crop_spectra == TRUE && is.null(mass_range)) {
+        if (is.null(mass_range)) {
             spectra <- trim_spectra(spectra)
         }
         ##### Preprocess in packages
@@ -2425,30 +2426,30 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
                 cpu_thread_number <- detectCores(logical = TRUE)
                 cpu_thread_number <- cpu_thread_number / 2
                 if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                    spectra_temp <- mclapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), mc.cores = cpu_thread_number)
+                    spectra_temp <- mclapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, mass_range = mass_range, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), mc.cores = cpu_thread_number)
                 } else if (Sys.info()[1] == "Windows") {
                     cl <- makeCluster(cpu_thread_number)
                     clusterEvalQ(cl, {library(MALDIquant)})
                     clusterExport(cl = cl, varlist = c("crop_spectra", "mass_range", "data_transformation", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_iterations", "normalization_algorithm", "normalization_mass_range", "preprocessing_subfunction"), envir = environment())
-                    spectra_temp <- parLapply(cl, spectra_temp, fun = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
+                    spectra_temp <- parLapply(cl, spectra_temp, fun = function(spectra_temp) preprocessing_subfunction(spectra_temp, mass_range = mass_range, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
                     stopCluster(cl)
                 } else {
-                    spectra_temp <- lapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
+                    spectra_temp <- lapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, mass_range = mass_range, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
                 }
             } else {
-                spectra_temp <- lapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = data_transformation, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
+                spectra_temp <- lapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, mass_range = mass_range, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range))
             }
             # Add to the final preprocessed spectral dataset
             preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
         }
     } else if (isMassSpectrum(spectra)) {
     ########## Single spectrum
-        spectra <- preprocessing_subfunction(spectra, crop_spectra, mass_range, data_transformation, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range)
+        spectra <- preprocessing_subfunction(spectra, mass_range, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range)
         # Add to the final preprocessed spectral dataset
         preprocessed_spectra <- spectra
     }
     ######################################### SPECTRAL ALIGNMENT
-    if (align_spectra == TRUE) {
+    if (!is.null(spectra_alignment_method)) {
         if (isMassSpectrumList(preprocessed_spectra)) {
             if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
                 half_window_alignment <- 20
@@ -2457,7 +2458,7 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
                 half_window_alignment <- 5
                 tolerance_ppm <- 200
             }
-            preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 3, tolerance=(tolerance_ppm/10^6), warpingMethod = spectra_alignment_method)
+            preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 2, tolerance = (tolerance_ppm/10^6), warpingMethod = spectra_alignment_method)
         }
     }
     return(preprocessed_spectra)
@@ -9235,6 +9236,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 
+
 ####################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
 
 
@@ -9274,7 +9276,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.17.0"
+R_script_version <- "2017.03.17.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -9327,6 +9329,8 @@ spectral_alignment_algorithm <- "cubic"
 peaks_deisotoping <- FALSE
 RData_file_integrity <- FALSE
 classification_mode <- "pixel"
+decision_method_ensemble <- "majority"
+vote_weights_ensemble <- "equal"
 
 
 
@@ -9350,6 +9354,8 @@ spectral_alignment_algorithm_value <- "cubic"
 peaks_deisotoping_value <- "   NO   "
 RData_file_integrity_value <- "INTEGRITY TEST\nFAILED"
 classification_mode_value <- "pixel"
+decision_method_ensemble_value <- "majority"
+vote_weights_ensemble_value <- "equal"
 
 
 
@@ -9489,7 +9495,7 @@ preprocessing_window_function <- function() {
         if (transform_data == TRUE) {
             transform_data_value <- paste("YES", "(", transform_data_algorithm, ")")
         } else {
-            transform_data_value <- "    NO    "
+            transform_data_value <- "                      NO                           "
         }
         transform_data_value_label <- tklabel(preproc_window, text = transform_data_value, font = label_font)
         tkgrid(transform_data_value_label, row = 3, column = 2)
@@ -9524,7 +9530,7 @@ preprocessing_window_function <- function() {
         if (smoothing == TRUE) {
             smoothing_value <- paste("YES", "(", smoothing_algorithm, "," , smoothing_strength, ")")
         } else {
-            smoothing_value <- "          NO          "
+            smoothing_value <- "                           NO                             "
         }
         smoothing_value_label <- tklabel(preproc_window, text = smoothing_value, font = label_font)
         tkgrid(smoothing_value_label, row = 4, column = 2)
@@ -9564,7 +9570,7 @@ preprocessing_window_function <- function() {
         } else if (baseline_subtraction == TRUE && baseline_subtraction_algorithm == "SNIP") {
             baseline_subtraction_value <- paste("YES", "(", baseline_subtraction_algorithm, ", iterations:", baseline_subtraction_iterations, ")")
         } else {
-            baseline_subtraction_value <- "            NO             "
+            baseline_subtraction_value <- "                                    NO                                 "
         }
         baseline_subtraction_value_label <- tklabel(preproc_window, text = baseline_subtraction_value, font = label_font)
         tkgrid(baseline_subtraction_value_label, row = 5, column = 3)
@@ -9608,7 +9614,7 @@ preprocessing_window_function <- function() {
         } else if (normalization == TRUE && normalization_algorithm == "TIC") {
             normalization_value <- paste("YES", "(", normalization_algorithm, ", range:", normalization_mass_range_value, ")")
         } else {
-            normalization_value <- "            NO            "
+            normalization_value <- "                                 NO                             "
         }
         normalization_value_label <- tklabel(preproc_window, text = normalization_value, font = label_font)
         tkgrid(normalization_value_label, row = 6, column = 3)
@@ -9639,7 +9645,7 @@ preprocessing_window_function <- function() {
         if (spectral_alignment == TRUE) {
             spectral_alignment_value <- paste("YES", "(", spectral_alignment_algorithm, ")")
         } else {
-            spectral_alignment_value <- "           NO          "
+            spectral_alignment_value <- "                                   NO                            "
         }
         spectral_alignment_value_label <- tklabel(preproc_window, text = spectral_alignment_value, font = label_font)
         tkgrid(spectral_alignment_value_label, row = 8, column = 2)
@@ -10025,7 +10031,7 @@ run_patient_classification_function <- function() {
     ######## Run only if all the elements needed are there
     if (!is.null(filepath_import) && RData_file_integrity == TRUE) {
         ### Run the classification function
-        classification_of_patients <- spectral_classification(spectra_path = filepath_import, filepath_R = filepath_R, model_list_object = "model_list", classification_mode = classification_mode, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = peaks_deisotoping, preprocessing_parameters = list(crop_spectra = crop_spectra, mass_range = mass_range, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), spectral_alignment = spectral_alignment, spectral_alignment_method = spectral_alignment_algorithm, tof_mode = tof_mode, spectra_preprocessing = TRUE, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, decision_method_ensemble = decision_method_ensemble, vote_weights_ensemble = vote_weights_ensemble, pixel_grouping = pixel_grouping, moving_window_size = moving_window_size, number_of_hca_nodes = number_of_hca_nodes, partition_spectra_graph = F, number_of_spectra_partitions_graph = 3, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.99, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 30, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE)
+        classification_of_patients <- spectral_classification(spectra_path = filepath_import, filepath_R = filepath_R, model_list_object = "model_list", classification_mode = classification_mode, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = peaks_deisotoping, preprocessing_parameters = list(mass_range = mass_range, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), spectral_alignment_method = spectral_alignment_algorithm, tof_mode = tof_mode, spectra_preprocessing = TRUE, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, decision_method_ensemble = decision_method_ensemble, vote_weights_ensemble = vote_weights_ensemble, pixel_grouping = pixel_grouping, moving_window_size = moving_window_size, number_of_hca_nodes = number_of_hca_nodes, partition_spectra_graph = F, number_of_spectra_partitions_graph = 3, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.99, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 30, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE)
         ### Dump the files
         ### Messagebox
         tkmessageBox(title = "Done!", message = "The files have been dumped!", icon = "info")
@@ -10211,6 +10217,14 @@ browse_output_button <- tkbutton(window, text = "BROWSE\nOUTPUT FOLDER...", comm
 peak_picking_algorithm_entry <- tkbutton(window, text = "PEAK PICKING\nALGORITHM", command = peak_picking_algorithm_choice, font = button_font)
 # Peaks deisotoping
 peaks_deisotoping_entry <- tkbutton(window, text = "PEAK\nDEISOTOPING", command = peaks_deisotoping_choice, font = button_font)
+# Decision method ensemble
+decision_method_ensemble_entry <- tkbutton(window, text = "DECISION METHOD\nENSEMBLE", command = decision_method_ensemble_choice, font = button_font)
+# Vote weights ensemble
+vote_weights_ensemble_entry <- tkbutton(window, text = "VOTE WEIGHTS\nENSEMBLE", command = vote_weights_ensemble_choice, font = button_font)
+# Classification mode
+classification_mode_entry <- tkbutton(window, text = "CLASSIFICATION\nMODE", command = classification_mode_choice, font = button_font)
+# RData input
+select_RData_file_entry <- tkbutton(window, text = "SELECT RData\nWORKSPACE", command = select_RData_file_function, font = button_font)
 # File type export matrix
 file_type_export_matrix_entry <- tkbutton(window, text = "FILE TYPE\nEXPORT\nMATRIX", command = file_type_export_matrix_choice, font = button_font)
 # File type export images
@@ -10218,7 +10232,7 @@ file_type_export_images_entry <- tkbutton(window, text = "FILE TYPE\nEXPORT\nIMA
 # End session
 end_session_button <- tkbutton(window, text = "QUIT", command = end_session_function, font = button_font)
 # Run the Peaklist Export!!
-run_patient_classification_function_button <- tkbutton(window, text="RUN THE\nMS PIXEL TYPER", command = run_patient_classification_function, font = button_font)
+run_patient_classification_function_button <- tkbutton(window, text = "RUN THE\nMS PIXEL TYPER", command = run_patient_classification_function, font = button_font)
 # Multicore
 allow_parallelization_button <- tkbutton(window, text = "ALLOW\nPARALLEL\nCOMPUTING", command = allow_parallelization_choice, font = button_font)
 # Spectra preprocessing button
@@ -10232,6 +10246,10 @@ file_type_export_images_value_label <- tklabel(window, text = file_type_export_i
 peak_picking_algorithm_value_label <- tklabel(window, text = peak_picking_algorithm_value, font = label_font)
 peaks_deisotoping_value_label <- tklabel(window, text = peaks_deisotoping_value, font = label_font)
 allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font)
+vote_weights_ensemble_value_label <- tklabel(window, text = vote_weights_ensemble_value, font = label_font)
+classification_mode_value_label <- tklabel(window, text = classification_mode_value, font = label_font)
+RData_file_integrity_value_label <- tklabel(window, text = RData_file_integrity_value, font = label_font)
+decision_method_ensemble_value_label <- tklabel(window, text = decision_method_ensemble_value, font = label_font)
 check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font)
 
 #### Geometry manager
@@ -10241,7 +10259,7 @@ check_for_updates_value_label <- tklabel(window, text = check_for_updates_value,
 tkgrid(title_label, row = 1, column = 2)
 tkgrid(select_samples_button, row = 7, column = 2)
 tkgrid(browse_output_button, row = 7, column = 1)
-tkgrid(peaks_deisotoping_entry, row = 2, column = 2)
+tkgrid(peaks_deisotoping_entry, row = 2, column = 3)
 tkgrid(peaks_deisotoping_value_label, row = 2, column = 4)
 tkgrid(peak_picking_algorithm_entry, row = 2, column = 1)
 tkgrid(peak_picking_algorithm_value_label, row = 2, column = 2)
@@ -10249,6 +10267,14 @@ tkgrid(file_type_export_matrix_entry, row = 6, column = 1)
 tkgrid(file_type_export_matrix_value_label, row = 6, column = 2)
 tkgrid(file_type_export_images_entry, row = 6, column = 3)
 tkgrid(file_type_export_images_value_label, row = 6, column = 4)
+tkgrid(decision_method_ensemble_entry, row = 3, column = 1)
+tkgrid(decision_method_ensemble_value_label, row = 3, column = 2)
+tkgrid(vote_weights_ensemble_entry, row = 3, column = 3)
+tkgrid(vote_weights_ensemble_value_label, row = 3, column = 4)
+tkgrid(classification_mode_entry, row = 5, column = 1)
+tkgrid(classification_mode_value_label, row = 5, column = 2)
+tkgrid(select_RData_file_entry, row = 5, column = 3)
+tkgrid(RData_file_integrity_value_label, row = 5, column = 4)
 tkgrid(allow_parallelization_button, row = 4, column = 1)
 tkgrid(allow_parallelization_value_label, row = 4, column = 2)
 tkgrid(spectra_preprocessing_button, row = 4, column = 3)
