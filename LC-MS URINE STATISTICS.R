@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.02.4"
+R_script_version <- "2017.03.20.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -163,11 +163,17 @@ check_for_updates_function <- function() {
         online_version_YYYYMMDDVV <- unlist(strsplit(online_version_number, ".", fixed=TRUE))
         ### Compare with the local version
         local_version_YYYYMMDDVV = unlist(strsplit(R_script_version, ".", fixed = TRUE))
-        ### Check the versions
-        for (v in 1:length(local_version_YYYYMMDDVV)) {
+        ### Check the versions (up to the day value)
+        for (v in 1:(length(local_version_YYYYMMDDVV) - 1)) {
             if (as.numeric(local_version_YYYYMMDDVV[v]) < as.numeric(online_version_YYYYMMDDVV[v])) {
                 update_available <- TRUE
                 break
+            }
+        }
+        # If there are not updates at this point, check the latest version of the day
+        if (update_available == FALSE && (local_version_YYYYMMDDVV[length(local_version_YYYYMMDDVV) - 1] == online_version_YYYYMMDDVV[length(online_version_YYYYMMDDVV) - 1])) {
+            if (as.numeric(local_version_YYYYMMDDVV[length(local_version_YYYYMMDDVV)]) < as.numeric(online_version_YYYYMMDDVV[length(online_version_YYYYMMDDVV)])) {
+                update_available <- TRUE
             }
         }
         ### Return messages
@@ -616,6 +622,9 @@ remove_outliers_multi_level_effect_analysis_choice <- function() {
 
 ##### Run the statistics
 run_statistics_function <- function() {
+    ### Progress bar
+    program_progress_bar <- tkProgressBar(title = "Calculating...", label = "", min = 0, max = 1, initial = 0, width = 300)
+    setTkProgressBar(program_progress_bar, value = 0, title = NULL, label = "0 %")
     # Go to the working directory
     setwd(output_folder)
     if (input_file != "") {
@@ -670,6 +679,8 @@ run_statistics_function <- function() {
         # Go to the new working directory
         setwd(output_folder)
         
+        # Progress bar
+        setTkProgressBar(program_progress_bar, value = 0.05, title = NULL, label = "5 %")
         
         ################################################################################
         
@@ -910,7 +921,8 @@ run_statistics_function <- function() {
             setwd(output_folder)
         }
         
-        
+        # Progress bar
+        setTkProgressBar(program_progress_bar, value = 0.15, title = NULL, label = "15 %")
         
         
         ################################################################################
@@ -1068,7 +1080,8 @@ run_statistics_function <- function() {
             }
         }
         
-        
+        # Progress bar
+        setTkProgressBar(program_progress_bar, value = 0.30, title = NULL, label = "30 %")
         
         #################################################################################
         #################### 2-LEVEL EFFECT ANALYSIS OVER SIGNAL INTENSITY
@@ -1564,7 +1577,8 @@ run_statistics_function <- function() {
         
         
         
-        
+        # Progress bar
+        setTkProgressBar(program_progress_bar, value = 0.65, title = NULL, label = "65 %")
         
         
         
@@ -2101,6 +2115,9 @@ run_statistics_function <- function() {
             }
         }
         
+        # Progress bar
+        setTkProgressBar(program_progress_bar, value = 1.00, title = NULL, label = "100%")
+        close(program_progress_bar)
         
         ##### FINISH
         finish_message <- tkmessageBox(title = "Operation completed", message = "All the statistical operations have been performed and the files have been dumped", icon = "info")
@@ -2170,9 +2187,8 @@ if (system_os == "Windows") {
         # Retrieve the values
         screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
         screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
-    }
+    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
     # Windows 10
-    if (length(grep("10", os_release, fixed = TRUE)) > 0) {
         # Get system info
         screen_info <- system("wmic path Win32_VideoController get VideoModeDescription", intern = TRUE)[2]
         # Get the resolution
@@ -2209,9 +2225,8 @@ if (system_os == "Windows") {
         scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
         title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
         other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
-    }
+    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
     # Windows 10
-    if (length(grep("10", os_release, fixed = TRUE)) > 0) {
         # Determine the font size according to the resolution
         total_number_of_pixels <- screen_width * screen_height
         # Determine the scaling factor (according to a complex formula)
@@ -2248,11 +2263,17 @@ if (system_os == "Windows") {
         ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = title_font_size, weight = "bold")
         ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "normal")
         ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "bold")
+        liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
+        liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
+        liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
+        bitstream_charter_title_bold = tkfont.create(family = "Bitstream Charter", size = title_font_size, weight = "bold")
+        bitstream_charter_other_normal = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "normal")
+        bitstream_charter_other_bold = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "bold")
         # Use them in the GUI
-        title_font = ubuntu_title_bold
-        label_font = ubuntu_other_normal
-        entry_font = ubuntu_other_normal
-        button_font = ubuntu_other_bold
+        title_font = bitstream_charter_title_bold
+        label_font = bitstream_charter_other_normal
+        entry_font = bitstream_charter_other_normal
+        button_font = bitstream_charter_other_bold
     } else if (length(grep("Fedora", os_version, ignore.case = TRUE)) > 0) {
         # Fedora
         # Define the fonts
