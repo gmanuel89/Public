@@ -8842,7 +8842,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.20.0"
+R_script_version <- "2017.03.20.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -9465,18 +9465,19 @@ select_RData_file_function <- function() {
     } else {
         tkmessageBox(message = paste("The model list will be read from:\n\n", filepath_R))
         # Define the progressbar
-        RData_progress_bar <- tkProgressBar(title = "R progress bar", label = "", min = 0, max = 1, initial = 0, width = 300)
+        RData_progress_bar <- tkProgressBar(title = "RData integrity verification", label = "", min = 0, max = 1, initial = 0, width = 300)
         # Retrieve the content of the RData workspace
+        setTkProgressBar(RData_progress_bar, value = 0, title = NULL, label = "0 %")
         RData_file_integrity <- FALSE
         try(RData_variables <- R_workspace_data_retriever(filepath_R)$variable_list)
-        setTkProgressBar(RData_progress_bar, value = 0.50, title = NULL, label = NULL)
+        setTkProgressBar(RData_progress_bar, value = 0.50, title = NULL, label = "50 %")
         # Check for integrity of the RData file
         try({
             if ("model_list" %in% RData_variables) {
                 RData_file_integrity <- TRUE
             }
         })
-        setTkProgressBar(RData_progress_bar, value = 1, title = NULL, label = NULL)
+        setTkProgressBar(RData_progress_bar, value = 1, title = NULL, label = "100 %")
         close(RData_progress_bar)
     }
     ### Displaying label
@@ -9615,12 +9616,19 @@ allow_parallelization_choice <- function() {
 run_patient_classification_function <- function() {
     ######## Run only if all the elements needed are there
     if (!is.null(filepath_import) && RData_file_integrity == TRUE) {
+        # Progress bar
+        program_progress_bar <- tkProgressBar(title = "Calculating...", label = "", min = 0, max = 1, initial = 0, width = 300)
+        setTkProgressBar(program_progress_bar, value = 0, title = NULL, label = "0 %")
+        setTkProgressBar(program_progress_bar, value = 0.25, title = NULL, label = "25 %")
         ########## Run the classification function
         classification_of_patients <- spectral_classification(spectra_path = filepath_import, filepath_R = filepath_R, model_list_object = "model_list", classification_mode = classification_mode, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = peaks_deisotoping, preprocessing_parameters = list(mass_range = mass_range, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), spectral_alignment_method = spectral_alignment_algorithm, tof_mode = tof_mode, spectra_preprocessing = TRUE, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, decision_method_ensemble = decision_method_ensemble, vote_weights_ensemble = vote_weights_ensemble, pixel_grouping = pixel_grouping, moving_window_size = moving_window_size, number_of_hca_nodes = number_of_hca_nodes, partition_spectra_graph = F, number_of_spectra_partitions_graph = 3, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.99, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 30, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE)
+        setTkProgressBar(program_progress_bar, value = 0.25, title = NULL, label = "75 %")
         # Dump the files
         ms_pixel_typer_data_dumper(classification_output = classification_of_patients, working_directory = output_folder, file_type_export_images = file_type_export_images, file_type_export_matrix = file_type_export_matrix)
         # Escape the function
         .GlobalEnv$classification_of_patients <- classification_of_patients
+        setTkProgressBar(program_progress_bar, value = 1.00, title = NULL, label = "100 %")
+        close(program_progress_bar)
         ### Messagebox
         tkmessageBox(title = "Done!", message = "The classification has been performed and the files have been dumped!", icon = "info")
     } else if (is.null(filepath_import) || RData_file_integrity == FALSE) {
@@ -9976,11 +9984,17 @@ if (system_os == "Windows") {
         ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = title_font_size, weight = "bold")
         ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "normal")
         ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "bold")
+        liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
+        liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
+        liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
+        bitstream_charter_title_bold = tkfont.create(family = "Bitstream Charter", size = title_font_size, weight = "bold")
+        bitstream_charter_other_normal = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "normal")
+        bitstream_charter_other_bold = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "bold")
         # Use them in the GUI
-        title_font = ubuntu_title_bold
-        label_font = ubuntu_other_normal
-        entry_font = ubuntu_other_normal
-        button_font = ubuntu_other_bold
+        title_font = bitstream_charter_title_bold
+        label_font = bitstream_charter_other_normal
+        entry_font = bitstream_charter_other_normal
+        button_font = bitstream_charter_other_bold
     } else if (length(grep("Fedora", os_version, ignore.case = TRUE)) > 0) {
         # Fedora
         # Define the fonts
