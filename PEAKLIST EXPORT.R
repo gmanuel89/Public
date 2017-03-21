@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.17 ####################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.21 ####################
 
 # Update the packages
 try(update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask = FALSE, checkBuilt = TRUE), silent = TRUE)
@@ -612,7 +612,7 @@ for (lib in 1:length(filepath)) {
     spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, smoothing_strength = smoothing_strength_preprocessing, process_in_packages_of = process_in_packages_of)
     ### Peak Picking and alignment
     peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = SNR)
-    peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, peaks_filtering = TRUE, frequency_threshold_percent = 25)
+    peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, filtering_frequency_threshold_percent = 5)
     # Generate the intensity matrix
     intensity_matrix <- intensityMatrix(peaks, spectra)
     #### Create the partial result matrices
@@ -941,7 +941,7 @@ if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
     peaks_avg <- peak_picking(avg_spectrum, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = SNR)
     # Merge for the alignment
     global_peaks <- append(peaks_avg, peaks)
-    global_peaks <- align_and_filter_peaks(global_peaks, tof_mode = tof_mode, peaks_filtering = TRUE, frequency_threshold_percent = 25)
+    global_peaks <- align_and_filter_peaks(global_peaks, tof_mode = tof_mode, filtering_frequency_threshold_percent = 5)
     peaks_avg <- global_peaks[[1]]
     peaks <- global_peaks [2:length(global_peaks)]
     # Compute the intensity matrix
@@ -1057,7 +1057,7 @@ return (list (vector = v, outliers_position = outliers_position))
 ######################################### PEAK STATISTICS (on processed Spectra)
 # This function computes the peak statistics onto a selected spectra dataset (or to the provided peaks), both when the spectra belong to no (or one) class and more classes.
 # It returns a NULL value if the peak statistics cannot be performed.
-peak_statistics <- function (spectra, peaks = NULL, SNR = 3, peak_picking_algorithm = "SuperSmoother", class_list = NULL, class_in_file_name = TRUE, tof_mode = "linear", spectra_format = "imzml", exclude_spectra_without_peak = FALSE, alignment_iterations = 5, peaks_filtering = TRUE, frequency_threshold_percent = 25, remove_outliers = TRUE, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element_wise") {
+peak_statistics <- function (spectra, peaks = NULL, SNR = 3, peak_picking_algorithm = "SuperSmoother", class_list = NULL, class_in_file_name = TRUE, tof_mode = "linear", spectra_format = "imzml", exclude_spectra_without_peak = FALSE, alignment_iterations = 5, filtering_frequency_threshold_percent = 25, remove_outliers = TRUE, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element_wise") {
     ########## Load the required libraries
     install_and_load_required_packages(c("MALDIquant", "stats"))
     ########## Rename the trim function
@@ -1078,7 +1078,7 @@ peak_statistics <- function (spectra, peaks = NULL, SNR = 3, peak_picking_algori
     if (is.null(peaks)) {
         peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = SNR)
     }
-    peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, alignment_iterations = alignment_iterations, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, reference_peaklist = NULL, spectra = spectra)
+    peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, alignment_iterations = alignment_iterations, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, reference_peaklist = NULL, spectra = spectra)
     # Generate the matrix (and convert it into a data frame)
     if (exclude_spectra_without_peak == FALSE) {
         signal_matrix <- intensityMatrix(peaks, spectra)
@@ -1542,138 +1542,6 @@ for (a in 1:length(signals_of_interest)) {
     spectrum_images <- append(spectrum_images, avg_spectrum_zoom)
 }
 return (spectrum_images)
-}
-
-
-
-
-
-################################################################################
-
-
-
-
-
-##################################################### MEMORY EFFICIENT IMPORTING
-# This function imports the spectra in a memory efficient way: it reads spectra from one imzML file at a time, it can discard spectra according to their TIC, it runs the preprocessing of the spectra from the imzML file into packages of spectra, it can generate a set of representative average spectra (by grouping spectra randomly or according to a clustering algorithm). After this, it stores all the spectra from all the imzML files into a variable and from here it can align the spectra with the peaklist of the average spectrum of the dataset and it can crop all the spectra to a selected mass range.
-# It relies upon other functions.
-# The functions returns (the user can select what to compute) a list of elements: all the spectra, the representative spectra, the MS images after clustering.
-memory_efficient_import <- function (folder, tof_mode = "linear", tic_purification = FALSE, absolute_tic_threshold = 0, smoothing_strength = "medium", mass_range = NULL, spectra_preprocessing = TRUE, allow_parallelization = FALSE, transformation_algorithm = NULL, peak_picking_algorithm = "SuperSmoother", process_in_packages_of = length(spectra), generate_representative_spectra = FALSE, spectra_per_patient = 1, algorithm_for_representative_spectra = "hca", clustering_method_for_hca = "agglomerative", discarded_nodes = 1, skyline = FALSE, spectral_alignment_method = NULL, spectra_format = "imzml", seed = NULL, output_list = c("spectra","average","representative")) {
-##### Load the required libraries
-install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign"))
-##### If it is not an imzML file...
-if (length(grep(".imzML",folder, fixed = TRUE)) == 0) {
-    ##### Read the spectra files in the folder and in the subfolders
-    folder_files <- read_spectra_files(folder, spectra_format = spectra_format, full_path = TRUE)
-} else {
-    folder_files <- folder
-}
-##### Tolerance - TOF-mode
-if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-    tolerance_ppm <- 2000
-} else if (tof_mode == "reflectron" || tof_mode == "reflector" || tof_mode == "R") {
-    tolerance_ppm <- 200
-}
-##### Output initialization
-spectra_dataset <- list ()
-spectra_dataset_grouped <- list()
-spectra_dataset_average <- list()
-spectra_dataset_skyline <- list()
-spectra_dataset_representative <- list()
-########## For each imzML file (patient)...
-for (ff in 1:length(folder_files)) {
-    ##### Load the spectra
-    if (spectra_format == "imzml" || spectra_format == "imzML") {
-        # Crop the spectra while importing
-        if (!is.null(mass_range)) {
-            spectra <- importImzMl(folder_files[ff], massRange = mass_range)
-        } else {
-            spectra <- importImzMl(folder_files[ff])
-        }
-    }
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
-        if (!is.null(mass_range)) {
-            spectra <- importBrukerFlex(folder_files[ff], massRange = mass_range)
-        } else {
-            spectra <- importBrukerFlex(folder_files[ff])
-        }
-    }
-    ##### TIC purification
-    if (tic_purification == TRUE) {
-        spectra <- spectra_tic_purification(spectra, tof_mode = tof_mode, absolute_tic_threshold = absolute_tic_threshold)
-    }
-    ##### Preprocessing (only if there is still some spectra left and only if the spectral dataset has to be returned) and add this purified spectra list to a global list (if there is still something after the TIC purification)
-    if ("spectra" %in% output_list) {
-        if (spectra_preprocessing == TRUE) {
-            if (length(spectra) > 0) {
-                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, smoothing_strength = smoothing_strength, process_in_packages_of = process_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization, transformation_algorithm = transformation_algorithm, mass_range = mass_range)
-            }
-        }
-        spectra_dataset <- append(spectra_dataset, spectra)
-    }
-    ##### Average the spectra (preprocessing not needed)
-    if (generate_representative_spectra == TRUE && spectra_per_patient == 1 && "average" %in% output_list) {
-        # At least two spectra for the averaging (the averaging will fail if there is only one spectrum, so use it if there is only one; after TIC purification no spectra can be left!) Check if there is any spectra and if there are one or many spectra.
-        if (tof_mode == "linear") {
-            if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
-                spectra_avg <- averageMassSpectra(spectra, method = "mean")
-                spectra_avg <- smoothIntensity(spectra_avg, method = "SavitzkyGolay", halfWindowSize = 10)
-                spectra_avg <- removeBaseline(spectra_avg, method = "TopHat")
-                spectra_avg <- calibrateIntensity(spectra_avg, method = "TIC")
-            }
-        }
-        if (tof_mode == "reflector" || tof_mode == "reflectron") {
-            if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
-                spectra_avg <- averageMassSpectra(spectra, method = "mean")
-                spectra_avg <- smoothIntensity(spectra_avg, method = "SavitzkyGolay", halfWindowSize = 2.5)
-                spectra_avg <- removeBaseline(spectra_avg, method = "TopHat")
-                spectra_avg <- calibrateIntensity(spectra_avg, method = "TIC")
-            }
-        }
-        spectra_dataset_average <- append(spectra_dataset_average, spectra_avg)
-    }
-    ##### Skyline spectrum (preprocessing not needed)
-    if (generate_representative_spectra == TRUE && skyline == TRUE && "skyline" %in% output_list) {
-        # At least two spectra for the skyline (the process will fail if there is only one spectrum, so use it if there is only one; after TIC purification no spectra can be left!)
-        if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
-            spectra_skyline <- generate_skyline_spectrum(spectra)
-            spectra_skyline <- removeBaseline(spectra_skyline, method = "TopHat")
-            spectra_skyline <- calibrateIntensity(spectra_skyline, method = "TIC")
-        }
-        if (length(spectra_syline) > 0) {
-            spectra_dataset_syline <- append(spectra_dataset_skyline, spectra_skyline)
-        }
-    }
-    ##### Generate representative spectra (after TIC purification no spectra can be left!)
-    if (generate_representative_spectra == TRUE && "representative" %in% output_list) {
-        if (length(spectra) > 0 && isMassSpectrumList(spectra)) {
-            spectra_dataset_representative[[i]] <- group_spectra(spectra, spectra_per_patient = spectra_per_patient, spectra_format = spectra_format, tof_mode = tof_mode, seed = ifelse(is.null(seed), 0, seed), algorithm = algorithm_for_representative_spectra, clustering_method = clustering_method_for_hca, discarded_nodes = discarded_nodes)
-            spectra_dataset_grouped <- append(spectra_dataset_grouped,spectra_dataset_representative[[i]]$spectra)
-        }
-    }
-    ### Free the memory
-    rm(spectra)
-    gc()
-}
-############################################################# SPECTRA ALIGNMENT
-if (spectral_alignment == TRUE && "spectra" %in% output_list) {
-    if (length(spectra_dataset) > 0 && isMassSpectrumList(spectra_dataset)) {
-        # Average the spectra: the avg spectrum peaks will be used as reference
-        spectra_avg_ref <- averageMassSpectra(spectra_dataset, method = "mean")
-        peaks_avg_ref <- peak_picking(spectra_avg_ref, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = 3)
-        reference_for_alignment <- peaks_avg_ref@mass
-        if (length(reference_for_alignment) > 0) {
-            if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-                spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize = 20, noiseMethod = peak_picking_algorithm, SNR = 3, reference = peaks_avg_ref, tolerance=(tolerance_ppm/10^6), warpingMethod = spectral_alignment_method)
-            }
-            if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-                spectra_dataset <- alignSpectra(spectra_dataset, halfWindowSize = 5, noiseMethod = peak_picking_algorithm, SNR = 3, reference = peaks_avg_ref, tolerance=(tolerance_ppm/10^6), warpingMethod = spectral_alignment_method)
-            }
-        }
-    }
-}
-########## Return the values
-return (list(spectra = spectra_dataset, spectra_dataset_grouped = spectra_dataset_grouped, spectra_average = spectra_dataset_average, spectra_skyline = spectra_dataset_skyline, spectra_dataset_representative = spectra_dataset_representative))
 }
 
 
@@ -2423,7 +2291,7 @@ if (spectra_per_patient > 1) {
                 spectra_per_patient <- spectra_per_patient + discarded_nodes
                 # Detect and align peaks
                 peaks <- peak_picking(patient_spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = SNR)
-                peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, peaks_filtering = TRUE, frequency_threshold_percent = 25)
+                peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, filtering_frequency_threshold_percent = 5)
                 # Generate the peaklist matrix
                 peaklist <- intensityMatrix(peaks, patient_spectra)
                 # Compute the distance matrix
@@ -2527,7 +2395,7 @@ if (spectra_per_patient > 1) {
                 spectra_per_patient <- spectra_per_patient + discarded_nodes
                 # Detect and align peaks
                 peaks <- peak_picking(patient_spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = SNR)
-                peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, peaks_filtering = TRUE, frequency_threshold_percent = 25)
+                peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, filtering_frequency_threshold_percent = 5)
                 # Generate the peaklist matrix
                 peaklist <- intensityMatrix(peaks, patient_spectra)
                 # Compute the k-Means clustering
@@ -2732,7 +2600,7 @@ peaks_average <- peak_picking(average_spectrum, peak_picking_algorithm = peak_pi
 peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = SNR)
 # Alignment: merge the two lists and align them all
 peaks_all <- append(peaks, peaks_average)
-peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, peaks_filtering = TRUE, frequency_threshold_percent = 25, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1)
+peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, filtering_frequency_threshold_percent = 25, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1)
 # Empty the lists
 peaks_average <- list()
 peaks <- list()
@@ -3063,7 +2931,7 @@ deisotope_peaks <- function(peaks, pattern_model_correlation = 0.95, isotopic_to
 
 ################################################################# PEAK ALIGNMENT
 # This function takes a list of peaks (MALDIquant) and computes the peak alignment, along with the false positive removal and the removal of low-intensity peaks.
-align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoother", tof_mode = "linear", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", reference_peaklist = NULL, spectra = NULL, alignment_iterations = 5, allow_parallelization = FALSE) {
+align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoother", tof_mode = "linear", filtering_frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", reference_peaklist = NULL, spectra = NULL, alignment_iterations = 5, allow_parallelization = FALSE) {
     ########## Determine the tolerance in PPM
     if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
         tolerance_ppm <- 2000
@@ -3095,7 +2963,7 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
             }
         }
         ##### False positive removal
-        if (peaks_filtering == TRUE) {
+        if (!is.null(frequency_threshold_percent) && filtering_frequency_threshold_percent > 0) {
             peaks_aligned <- filterPeaks(peaks_aligned, minFrequency = (frequency_threshold_percent/100))
         }
         ##### Low-intensity peaks removal
@@ -3237,7 +3105,7 @@ if (most_intense_peaks == TRUE) {
     peaks_database <- most_intense_signals(spectra, signals_to_take = signals_to_take)
 } else {
     peaks_database <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = SNR)
-    #peaks_database <- align_and_filter_peaks(peaks_database, tof_mode = tof_mode, peaks_filtering = FALSE, low_intensity_peaks_removal = FALSE, reference_peaklist = reference_peaklist_for_alignment)
+    #peaks_database <- align_and_filter_peaks(peaks_database, tof_mode = tof_mode, low_intensity_peaks_removal = FALSE, reference_peaklist = reference_peaklist_for_alignment)
 }
 ####
 library_list <- list(spectra = spectra, peaks = peaks_database)
@@ -3418,7 +3286,7 @@ for (p in 1:length(patient_vector)) {
     # Put the database and the spectra together
     global_spectra <- append(spectra_database, patient_spectra_clustered_average)
     global_peaks <- peak_picking(global_spectra, SNR = SNR, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode)
-    global_peaks <- align_and_filter_peaks(global_peaks, tof_mode = tof_mode, peaks_filtering = TRUE, frequency_threshold_percent = 25)
+    global_peaks <- align_and_filter_peaks(global_peaks, tof_mode = tof_mode, filtering_frequency_threshold_percent = 5)
     # Compute the intensity matrix
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
     intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks = global_peaks, class_list = class_list, spectra_format = "imzml", sample_output = TRUE, class_output = FALSE)
@@ -3485,7 +3353,7 @@ for (p in 1:length(patient_vector)) {
     # Put the database and the spectra together
     global_spectra <- append(spectra_database, patient_spectra)
     global_peaks <- peak_picking(global_spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = SNR)
-        global_peaks <- align_and_filter_peaks(global_peaks, tof_mode = tof_mode, peaks_filtering = TRUE, frequency_threshold_percent = 25)
+        global_peaks <- align_and_filter_peaks(global_peaks, tof_mode = tof_mode, filtering_frequency_threshold_percent = 5)
     # Compute the intensity matrix
     intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
     intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks = global_peaks, class_list = class_list, spectra_format = "imzml", sample_output = TRUE, class_output = FALSE)
@@ -3549,7 +3417,7 @@ for (p in 1:length(patient_vector)) {
         # Put the database and the spectra together
         global_spectra <- append(spectra_database, patient_spectra)
     global_peaks <- peak_picking(global_spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = SNR)
-    global_peaks <- align_and_filter_peaks(global_peaks, tof_mode = tof_mode, peaks_filtering = TRUE, frequency_threshold_percent = 25)
+    global_peaks <- align_and_filter_peaks(global_peaks, tof_mode = tof_mode, filtering_frequency_threshold_percent = 5)
         # Compute the intensity matrix
         intensity_matrix <- intensityMatrix(global_peaks, global_spectra)
         intensity_matrix <- matrix_add_class_and_sample(intensity_matrix, peaks = global_peaks, class_list = class_list, spectra_format = "imzml", sample_output = TRUE, class_output = FALSE)
@@ -3620,7 +3488,7 @@ return (list(classification_hca_results_avg = classification_hca_results_avg, cl
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
 # The pixel grouping cannot be 'graph', otherwise, when embedded in the pixel by pixel classification function, the graph segmentation is performed for each model before making the predictons.
-single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", spectra_preprocessing = FALSE, preprocess_spectra_in_packages_of = 0, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "Savitzky-Golay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalisation_algorithm = "TIC", normalisation_mass_range = NULL), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 100, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, partition_spectra = FALSE, number_of_spectra_partitions = 4, partitioning_method = "space", plot_figures = TRUE, plot_graphs = TRUE) {
+single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", preprocess_spectra_in_packages_of = 0, preprocessing_parameters = NULL, spectral_alignment_method = NULL, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, filtering_frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 100, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, number_of_spectra_partitions = 1, partitioning_method = "space", plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE) {
     # Class list (from the custom model entry)
     class_list <- model_x$class_list
     # Outcome list (from the custom model entry)
@@ -3638,9 +3506,9 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
         ########## SINGLE PIXEL CLASSIFICATION
         if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(spectra)) {
             ##### Rearrange the spectra according to the space coordinates (for reproducibility purposes)
-            spectra <- rearrange_spectral_dataset(spectra, rearranging_method = "space")
+            #spectra <- rearrange_spectral_dataset(spectra, rearranging_method = "space")
             ### Generate the intensity matrix with the features from the model
-            final_sample_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+            final_sample_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, spectral_alignment_method = spectral_alignment_method, peak_picking_SNR = peak_picking_SNR, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
             ### Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
             if (!is.null(final_sample_matrix)) {
                 # Put the X at the beginning of the peak names
@@ -3678,12 +3546,14 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 # Generate the MS image
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                # Define the legend
-                legend_text <- outcome_and_class$legend_text
-                legend_fill <- outcome_and_class$legend_fill
-                legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
-                legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
-                legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                if (isTRUE(plot_legends)) {
+                    # Define the legend
+                    legend_text <- outcome_and_class$legend_text
+                    legend_fill <- outcome_and_class$legend_fill
+                    legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                    legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
+                    legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                }
                 # Store the plot into the list of images (for model)
                 classification_msi_model <- recordPlot()
             } else {
@@ -3720,7 +3590,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 ### Preprocessing the AVG spectrum
                 average_spectrum_bin <- preprocess_spectra(average_spectrum_bin, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 ### Peak picking on the AVG spectrum
-                sample_bin_matrix <- generate_custom_intensity_matrix(average_spectrum_bin, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                sample_bin_matrix <- generate_custom_intensity_matrix(average_spectrum_bin, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, spectral_alignment_method = spectral_alignment_method, peak_picking_SNR = peak_picking_SNR, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
                 ### Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
                 if (!is.null(sample_bin_matrix)) {
                     ### Put the X at the beginning of the peak names
@@ -3772,12 +3642,14 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 # Generate the MS images
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                # Define the legend
-                legend_text <- outcome_and_class$legend_text
-                legend_fill <- outcome_and_class$legend_fill
-                legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
-                legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
-                legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                if (isTRUE(plot_legends)) {
+                    # Define the legend
+                    legend_text <- outcome_and_class$legend_text
+                    legend_fill <- outcome_and_class$legend_fill
+                    legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                    legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
+                    legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                }
                 # Store the plot into the list of images (for model)
                 classification_msi_model <- recordPlot()
             } else {
@@ -3786,7 +3658,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             }
         } else if (pixel_grouping == "hca") {
             ##### Rearrange the spectra according to the space coordinates (for reproducibility purposes)
-            spectra <- rearrange_spectral_dataset(spectra, rearranging_method = "space")
+            #spectra <- rearrange_spectral_dataset(spectra, rearranging_method = "space")
             ########## HCA
             ### Initialize the model result matrix
             result_matrix_model <- matrix("class", nrow = length(spectra), ncol = 1)
@@ -3795,7 +3667,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
             ### Detect and align peaks
             peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = peak_picking_SNR, allow_parallelization = allow_parallelization)
-            peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent)
+            peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, filtering_frequency_threshold_percent = frequency_threshold_percent)
             ### Generate the peaklist matrix
             peaklist <- intensityMatrix(peaks, spectra)
             ### Compute the distance matrix
@@ -3816,7 +3688,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 ### Preprocessing the AVG spectrum
                 average_spectrum_hca <- preprocess_spectra(average_spectrum_hca, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 ### Peak picking on the AVG spectrum
-                sample_hca_matrix <- generate_custom_intensity_matrix(average_spectrum_hca, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                sample_hca_matrix <- generate_custom_intensity_matrix(average_spectrum_hca, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, spectral_alignment_method = spectral_alignment_method, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
                 ### Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
                 if (!is.null(sample_hca_matrix)) {
                     ### Put the X at the beginning of the peak names
@@ -3852,12 +3724,14 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 # Generate the MS images
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                # Define the legend
-                legend_text <- outcome_and_class$legend_text
-                legend_fill <- outcome_and_class$legend_fill
-                legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
-                legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
-                legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                if (isTRUE(plot_legends)) {
+                    # Define the legend
+                    legend_text <- outcome_and_class$legend_text
+                    legend_fill <- outcome_and_class$legend_fill
+                    legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                    legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
+                    legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                }
                 # Store the plot into the list of images (for SVM)
                 classification_msi_model <- recordPlot()
             } else {
@@ -3872,7 +3746,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             }
         } else if (pixel_grouping == "graph") {
             ##### Rearrange the spectra according to the space coordinates (for reproducibility purposes)
-            spectra <- rearrange_spectral_dataset(spectra, rearranging_method = "space")
+            #spectra <- rearrange_spectral_dataset(spectra, rearranging_method = "space")
             # Initialize output
             spectra_for_plotting <- list()
             ### Initialize the model result matrix
@@ -3881,9 +3755,9 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             sample_name <- spectra[[1]]@metaData$file[1]
             rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
             ########## GRAPH SEGMENTATION
-            graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, , deisotope_peaklist = deisotope_peaklist, SNR = peak_picking_SNR, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, custom_feature_vector = features_model, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = "independent", max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, partition_spectra = partition_spectra, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed)
+            graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, preprocessing_parameters = NULL, process_spectra_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, spectral_alignment_method = spectral_alignment_method, deisotope_peaklist = deisotope_peaklist, SNR = peak_picking_SNR, tof_mode = tof_mode, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, custom_feature_vector = features_model, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = "independent", max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed, plot_legends = plot_legends)
             ### Extract the spectra from the clique and from the independent set (mind that they are two lists if the spectra are taken all at the same time or they are two lists of lists if the spectra are partitioned)
-            if (partition_spectra == TRUE && number_of_spectra_partitions > 1) {
+            if (number_of_spectra_partitions > 1) {
                 spectra_clique <- graph_segmentation$spectra_clique
                 spectra_independent <- graph_segmentation$spectra_independent
                 # Generate the average of the clique and the independent set
@@ -3899,8 +3773,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 # Peak picking on the AVG spectrum
-                sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
-                sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, spectral_alignment_method = spectral_alignment_method, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, spectral_alignment_method = spectral_alignment_method, peak_picking_SNR = peak_picking_SNR, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
                 ## Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
                 if (!is.null(sample_clique_matrix)) {
                     ### Put the X at the beginning of the peak names
@@ -3971,12 +3845,14 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     # Generate the MS images
                     slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                     plotMsiSlice(slices, legend = FALSE, scale = F)
-                    # Define the legend
-                    legend_text <- outcome_and_class$legend_text
-                    legend_fill <- outcome_and_class$legend_fill
-                    legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
-                    legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
-                    legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                    if (isTRUE(plot_legends)) {
+                        # Define the legend
+                        legend_text <- outcome_and_class$legend_text
+                        legend_fill <- outcome_and_class$legend_fill
+                        legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                        legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                        legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                    }
                     # Store the plot into the list of images (for SVM)
                     classification_msi_model <- recordPlot()
                     # Generate the result matrix from the rearranged spectra (so that it is reproducible, because the spectra of the clique mught not be always the same) according to the intensity value
@@ -4002,7 +3878,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     result_matrix_model <- NULL
                     classification_msi_model <- NULL
                 }
-            } else if (partition_spectra == FALSE || number_of_spectra_partitions <= 1) {
+            } else if (number_of_spectra_partitions <= 1) {
                 ######### NO PARTITION SPECTRA
                 spectra_clique <- graph_segmentation$spectra_clique
                 spectra_independent <- graph_segmentation$spectra_independent
@@ -4013,8 +3889,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 # Peak picking on the AVG spectrum
-                sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
-                sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = 5, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, spectral_alignment_method = spectral_alignment_method, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, spectral_alignment_method = spectral_alignment_method, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, filtering_frequency_threshold_percent = 5, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
                 ## Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
                 if (!is.null(sample_clique_matrix)) {
                     ### Put the X at the beginning of the peak names
@@ -4075,12 +3951,14 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     # Generate the MS images
                     slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                     plotMsiSlice(slices, legend = FALSE, scale = F)
-                    # Define the legend
-                    legend_text <- outcome_and_class$legend_text
-                    legend_fill <- outcome_and_class$legend_fill
-                    legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
-                    legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
-                    legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                    if (isTRUE(plot_legends)) {
+                        # Define the legend
+                        legend_text <- outcome_and_class$legend_text
+                        legend_fill <- outcome_and_class$legend_fill
+                        legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                        legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                        legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                    }
                     # Store the plot into the list of images
                     classification_msi_model <- recordPlot()
                     # Generate the result matrix from the rearranged spectra (so that it is reproducible, because the spectra of the clique mught not be always the same) according to the intensity value
@@ -4116,7 +3994,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
         result_matrix <- NULL
         average_spectrum_with_bars <- NULL
         ### Generate the intensity matrix with the features from the model
-        final_sample_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = features_model, tof_mode = tof_mode, spectra_preprocessing = FALSE, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 3, peaks_filtering = FALSE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+        final_sample_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, spectral_alignment_method = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = 3, filtering_frequency_threshold_percent = NULL, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 0.1, intensity_threshold_method = "element-wise", process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
         ### Run only if there is compatibility between the spectral features and the model features (it is NULL if there is no compatibility)
         if (!is.null(final_sample_matrix)) {
             # Put the X at the beginning of the peak names
@@ -4187,8 +4065,10 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             }
             if (plot_figures == TRUE) {
                 plot(spectra, xlab = "m/z", ylab = "Intensity (a.i.)")
-                legend(x = "topright", legend = spectra@metaData$file[[1]], xjust = 0.5, yjust = 0.5)
-                legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                if (isTRUE(plot_legends)) {
+                    legend(x = "topright", legend = spectra@metaData$file[[1]], xjust = 0.5, yjust = 0.5)
+                    legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                }
                 # Draw the bars
                 for (s in 1:length(coordinates_of_bars$x)) {
                     # Vertical bars (x,y x,y)
@@ -4226,7 +4106,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel classification, a matrix with the ensemble classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel ensemble classification and the plot of the average spectrum with red bars to indicate the signals used for classification.
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
-spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment_method = NULL, tof_mode = "linear", spectra_preprocessing = TRUE, preprocess_spectra_in_packages_of = 0, allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, partition_spectra_graph = TRUE, number_of_spectra_partitions_graph = 4, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE) {
+spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment_method = NULL, tof_mode = "linear", preprocess_spectra_in_packages_of = 0, allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE) {
     ### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda", "caret", "nnet"))
     ### Defaults
@@ -4289,11 +4169,13 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
             }
         }
         ### Rearrange the spectra according to the space coordinates (for reproducibility purposes)
-        sample_spectra <- rearrange_spectral_dataset(sample_spectra, rearranging_method = "space")
+        #sample_spectra <- rearrange_spectral_dataset(sample_spectra, rearranging_method = "space")
         ### Replace the sample name (path) with the actual sample name
         sample_spectra <- replace_sample_name(sample_spectra, spectra_format = "imzml", allow_parallelization = allow_parallelization)
+        ### Retrieve the sample name
+        sample_name <- sample_spectra[[1]]@metaData$file[1]
         ### Preprocess spectra
-        if (spectra_preprocessing == TRUE) {
+        if (!is.null(preprocessing_parameters) && is.list(preprocessing_parameters) && length(preprocessing_parameters) > 0) {
             sample_spectra <- preprocess_spectra(sample_spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = preprocess_spectra_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
         }
         ### Average spectrum (protein profile)
@@ -4302,7 +4184,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
             if (isMassSpectrumList(sample_spectra)) {
                 sample_spectra_avg <- averageMassSpectra(sample_spectra, method = "mean")
                 ## Preprocess average spectrum
-                if (spectra_preprocessing == TRUE) {
+                if (!is.null(preprocessing_parameters) && is.list(preprocessing_parameters) && length(preprocessing_parameters) > 0) {
                     sample_spectra_avg <- preprocess_spectra(sample_spectra_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = preprocess_spectra_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
                 }
             } else {
@@ -4323,7 +4205,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
             ### Pixel by pixel
             if ("pixel" %in% classification_mode) {
                 # Perform the classification
-                model_classification <- single_model_classification_of_spectra(spectra = sample_spectra, model_x = model_list[[md]], model_name = list_of_models[md], spectra_preprocessing = FALSE, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = 3, peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", tof_mode = tof_mode, allow_parallelization = allow_parallelization, pixel_grouping = pixel_grouping, number_of_hca_nodes = number_of_hca_nodes, moving_window_size = moving_window_size, final_result_matrix = final_result_matrix_msi_patient, seed = seed, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change_GA, partition_spectra = partition_spectra_graph, number_of_spectra_partitions = number_of_spectra_partitions_graph, partitioning_method = partitioning_method_graph, plot_figures = plot_figures, plot_graphs = plot_graphs)
+                model_classification <- single_model_classification_of_spectra(spectra = sample_spectra, model_x = model_list[[md]], model_name = list_of_models[md], preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = 3, filtering_frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", tof_mode = tof_mode, allow_parallelization = allow_parallelization, pixel_grouping = pixel_grouping, number_of_hca_nodes = number_of_hca_nodes, moving_window_size = moving_window_size, final_result_matrix = final_result_matrix_msi_patient, seed = seed, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change_GA, number_of_spectra_partitions = number_of_spectra_partitions_graph, partitioning_method = partitioning_method_graph, plot_figures = plot_figures, plot_graphs = plot_graphs, plot_legends = plot_legends)
                 # MSI classification
                 if (plot_figures == TRUE) {
                     classification_ms_images_model <- model_classification$classification_msi_model
@@ -4333,11 +4215,11 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
                 # Add the model result matrix to the final matrix (the classification function automatically attach the result to a result matrix if provided)
                 final_result_matrix_msi_patient <- model_classification$final_result_matrix
                 # Append the classification image list to the final list
-                classification_ms_images_patient[[md]] <- classification_ms_images_model
+                classification_ms_images_patient[[(list_of_models[md])]] <- classification_ms_images_model
             }
             if ("profile" %in% classification_mode) {
                 # Perform the classification
-                model_classification_profile <- single_model_classification_of_spectra(spectra = sample_spectra_avg, model_x = model_list[[md]], model_name = list_of_models[md], spectra_preprocessing = FALSE, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = 3, peaks_filtering = FALSE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", tof_mode = tof_mode, allow_parallelization = allow_parallelization, pixel_grouping = pixel_grouping, number_of_hca_nodes = number_of_hca_nodes, moving_window_size = moving_window_size, final_result_matrix = final_result_matrix_profile_patient, seed = seed, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change_GA, partition_spectra = partition_spectra_graph, number_of_spectra_partitions = number_of_spectra_partitions_graph, partitioning_method = partitioning_method_graph, plot_figures = plot_figures, plot_graphs = plot_graphs)
+                model_classification_profile <- single_model_classification_of_spectra(spectra = sample_spectra_avg, model_x = model_list[[md]], model_name = list_of_models[md], preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = 3, filtering_frequency_threshold_percent = NULL, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", tof_mode = tof_mode, allow_parallelization = allow_parallelization, pixel_grouping = pixel_grouping, number_of_hca_nodes = number_of_hca_nodes, moving_window_size = moving_window_size, final_result_matrix = final_result_matrix_profile_patient, seed = seed, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change_GA, number_of_spectra_partitions = number_of_spectra_partitions_graph, partitioning_method = partitioning_method_graph, plot_figures = plot_figures, plot_graphs = plot_graphs, plot_legends = plot_legends)
                 # Plot AVG spectrum
                 if (plot_figures == TRUE) {
                     average_spectrum_profile_with_bars_model <- model_classification_profile$average_spectrum_with_bars
@@ -4347,21 +4229,21 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
                 # Add the model result matrix to the final matrix (the classification function automatically attach the result to a result matrix if provided)
                 final_result_matrix_profile_patient <- model_classification_profile$final_result_matrix
                 # Append the classification image list to the final list 
-                average_spectrum_with_bars_patient[[md]] <- average_spectrum_profile_with_bars_model
+                average_spectrum_with_bars_patient[[(list_of_models[md])]] <- average_spectrum_profile_with_bars_model
             }
         }
         ### Add to the global final patient list
         if ("pixel" %in% classification_mode) {
             ##### Store the matrix with the classification from all the models in the final list of matrices
-            final_result_matrix_msi_list[[p]] <- final_result_matrix_msi_patient
+            final_result_matrix_msi_list[[sample_name]] <- final_result_matrix_msi_patient
             ##### Store all the MS images in the element of the final list of MS images
-            classification_ms_images_list[[p]] <- classification_ms_images_patient
+            classification_ms_images_list[[sample_name]] <- classification_ms_images_patient
         }
         if ("profile" %in% classification_mode) {
             ##### Store the matrix with the classification
-            final_result_matrix_profile_list[[p]] <- final_result_matrix_profile_patient
+            final_result_matrix_profile_list[[sample_name]] <- final_result_matrix_profile_patient
             ##### Store the plots with the AVG spectrum with bars
-            average_spectrum_with_bars_profile_list[[p]] <- average_spectrum_with_bars_patient
+            average_spectrum_with_bars_profile_list[[sample_name]] <- average_spectrum_with_bars_patient
         }
         ######################################## ENSEMBLE VOTE
         ### The ensemble classification can be possible only if: there is the classifiation matrix, there are at least 3 models and if the classes/outcomes are the same for each model
@@ -4385,7 +4267,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
                 ### Classification matrix
                 classification_ensemble_matrix_msi <- ensemble_vote_classification(classification_matrix = final_result_matrix_msi_patient, class_list = model_list[[1]]$class_list, decision_method = decision_method_ensemble, vote_weights = vote_weights_ensemble)
                 # Store the ensemble classification matrix in the final output list
-                classification_ensemble_matrix_msi_all[[p]] <- classification_ensemble_matrix_msi
+                classification_ensemble_matrix_msi_all[[sample_name]] <- classification_ensemble_matrix_msi
                 ### Molecular image of the classification
                 # Generate the "predicted classes" vector from the ensemble classification matrix
                 predicted_classes <- as.character(classification_ensemble_matrix_msi)
@@ -4401,16 +4283,18 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
                 # Define the legend
-                legend_text <- outcome_and_class$legend_text
-                legend_fill <- outcome_and_class$legend_fill
-                legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
-                legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
-                legend(x = "topleft", legend = "Ensemble classifier", xjust = 0.5, yjust = 0.5)
+                if (isTRUE(plot_legends)) {
+                    legend_text <- outcome_and_class$legend_text
+                    legend_fill <- outcome_and_class$legend_fill
+                    legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                    legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                    legend(x = "topleft", legend = "Ensemble classifier", xjust = 0.5, yjust = 0.5)
+                }
                 # Store the plot into the list of images
-                classification_ensemble_ms_image_list[[p]] <- recordPlot()
+                classification_ensemble_ms_image_list[[sample_name]] <- recordPlot()
             } else {
-                classification_ensemble_matrix_msi_all[[p]] <- NULL
-                classification_ensemble_ms_image_list[[p]] <- NULL
+                classification_ensemble_matrix_msi_all[[sample_name]] <- NULL
+                classification_ensemble_ms_image_list[[sample_name]] <- NULL
             }
         }
         if ("profile" %in% classification_mode) {
@@ -6400,7 +6284,7 @@ return (list(original_peaklist = peaklist, peaklist_rounded = peaklist2))
 #################### SPECTRAL TYPER SCORE ACCORDING TO THE HIERARCHICAL DISTANCE
 # This function computes the Spectral Typer score by comparing the test spectra with the library spectra, determining the similarity (through the euclidean distance) and assigning a category according to the distance.
 # Each sample gets compared with all the entries in the database, simultaneously.
-spectral_typer_score_hierarchical_distance <- function (spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = NULL, peaks_filtering = TRUE, peaks_filtering_percentage_threshold = 25, low_intensity_peaks_removal = FALSE, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tolerance_ppm = 2000, spectra_path_output = TRUE, score_only = TRUE, spectra_format = "brukerflex", normalise_distances = TRUE, normalization_method = "sum") {
+spectral_typer_score_hierarchical_distance <- function (spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = NULL, peaks_filtering_percentage_threshold = 5, low_intensity_peaks_removal = FALSE, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tolerance_ppm = 2000, spectra_path_output = TRUE, score_only = TRUE, spectra_format = "brukerflex", normalise_distances = TRUE, normalization_method = "sum") {
 # Load the required libraries
 install_and_load_required_packages(c("MALDIquant", "stats", "ggplot2", "ggdendro"))
 # Rename the trim function
@@ -6421,7 +6305,7 @@ if (isMassPeaksList(peaks_database)) {
 peaks_all <- append(peaks_database, peaks_test)
 spectra_all <- append(spectra_database, spectra_test)
 # Align
-peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = peaks_filtering_percentage_threshold, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = low_intensity_percentage_threshold, intensity_threshold_method = low_intensity_threshold_method)
+peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, filtering_frequency_threshold_percent = peaks_filtering_percentage_threshold, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = low_intensity_percentage_threshold, intensity_threshold_method = low_intensity_threshold_method)
 # Restore the lists
 peaks_database <- peaks_all [1:database_size]
 peaks_test <- peaks_all [(database_size+1):length(peaks_all)]
@@ -6549,7 +6433,7 @@ return (list(result_matrix = result_matrix, hca_dendrogram = hca_dendrogram))
 # The function calculates the score for the Spectral Typer program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity symmetry via the correlation matrix.
 # Each sample gets compared with each entry in the database, separately.
 # Parallel implemented.
-spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = NULL, peaks_filtering = TRUE, peaks_filtering_percentage_threshold = 25, low_intensity_peaks_removal = FALSE, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tolerance_ppm = 2000, intensity_correction_coefficient = 1, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = FALSE, allow_parallelization = FALSE) {
+spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = NULL, peaks_filtering_percentage_threshold = 5, low_intensity_peaks_removal = FALSE, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tolerance_ppm = 2000, intensity_correction_coefficient = 1, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = FALSE, allow_parallelization = FALSE) {
 install_and_load_required_packages(c("MALDIquant", "corrplot", "weights", "stats", "parallel"))
 # Rename the trim function
 trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
@@ -6649,7 +6533,7 @@ comparison_sample_db_subfunction_correlation <- function(x) {
         peaks_all <- append(peaks_database_temp, peaks_sample)
         spectra_all <- append(spectra_database_temp, spectrum_sample)
         # Align the peaks
-        peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = peaks_filtering_percentage_threshold, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = low_intensity_percentage_threshold, intensity_threshold_method = low_intensity_threshold_method)
+        peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, filtering_frequency_threshold_percent = peaks_filtering_percentage_threshold, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = low_intensity_percentage_threshold, intensity_threshold_method = low_intensity_threshold_method)
         # Restore the lists
         peaks_database_temp <- peaks_all[[1]]
         peaks_sample <- peaks_all[[2]]
@@ -6763,7 +6647,7 @@ if (allow_parallelization == TRUE) {
         # Make the cluster use the custom functions and the package functions along with their parameters
         clusterEvalQ(cls, {library(MALDIquant)})
         # Pass the variables to the cluster for running the function
-        clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue"), envir = environment())
+        clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue"), envir = environment())
         output_list <- parLapply(cls, global_list, fun = function(global_list) comparison_sample_db_subfunction_correlation(global_list))
         stopCluster(cls)
     }
@@ -6888,7 +6772,7 @@ return (output)
 # The function calculates the score for the Spectral Typer program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity comparison.
 # Each sample gets compared with each entry in the database, separately.
 # Parallel implemented.
-spectral_typer_score_signal_intensity <- function(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = NULL, comparison = c("intensity percentage", "standard deviation"), peaks_filtering = TRUE, peaks_filtering_percentage_threshold = 25, low_intensity_peaks_removal = FALSE, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tolerance_ppm = 2000, intensity_tolerance_percent_threshold = 50, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = TRUE, number_of_st_dev = 1, allow_parallelization = FALSE) {
+spectral_typer_score_signal_intensity <- function(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = NULL, comparison = c("intensity percentage", "standard deviation"), peaks_filtering_percentage_threshold = 5, low_intensity_peaks_removal = FALSE, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tolerance_ppm = 2000, intensity_tolerance_percent_threshold = 50, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = TRUE, number_of_st_dev = 1, allow_parallelization = FALSE) {
 # Load the required libraries
 install_and_load_required_packages("MALDIquant","parallel")
 # Rename the trim function
@@ -6985,7 +6869,7 @@ comparison_sample_db_subfunction_intensity <- function(x) {
         peaks_all <- append(peaks_database_temp, peaks_sample)
         spectra_all <- append(spectra_database_temp, spectrum_sample)
         # Align the peaks
-        peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = peaks_filtering_percentage_threshold, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = low_intensity_percentage_threshold, intensity_threshold_method = low_intensity_threshold_method)
+        peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, filtering_frequency_threshold_percent = peaks_filtering_percentage_threshold, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = low_intensity_percentage_threshold, intensity_threshold_method = low_intensity_threshold_method)
         # Restore the lists
         peaks_database_temp <- peaks_all[[1]]
         peaks_sample <- peaks_all[[2]]
@@ -7076,7 +6960,7 @@ if (allow_parallelization == TRUE) {
         cls <- makeCluster(cpu_thread_number)
         # Make the cluster use the custom functions and the package functions along with their parameters
         clusterEvalQ(cls, {library(MALDIquant)})
-        clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_intensity", "database_size", "tof_mode", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue", "intensity_tolerance_percent_threshold", "comparison"), envir = environment())
+        clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_intensity", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_pvalue", "intensity_tolerance_percent_threshold", "comparison"), envir = environment())
         output_list <- parLapply(cls, global_list, fun = function(global_list) comparison_sample_db_subfunction_intensity(global_list))
         stopCluster(cls)
     }
@@ -7179,7 +7063,7 @@ return(output)
 # The function calculates the score for the Spectral Typer program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity symmetry via the similarity index computation.
 # Each sample gets compared with each entry in the database, separately.
 # Parallel implemented.
-spectral_typer_score_similarity_index <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = NULL, peaks_filtering = TRUE, peaks_filtering_percentage_threshold = 25, low_intensity_peaks_removal = FALSE, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tolerance_ppm = 2000, intensity_correction_coefficient = 1, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = FALSE, allow_parallelization = FALSE) {
+spectral_typer_score_similarity_index <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = NULL, peaks_filtering_percentage_threshold = 5, low_intensity_peaks_removal = FALSE, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tolerance_ppm = 2000, intensity_correction_coefficient = 1, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = FALSE, allow_parallelization = FALSE) {
 install_and_load_required_packages(c("MALDIquant", "stats", "parallel"))
 # Rename the trim function
 trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
@@ -7275,7 +7159,7 @@ comparison_sample_db_subfunction_similarity_index <- function(x) {
         peaks_all <- append(peaks_database_temp, peaks_sample)
         spectra_all <- append(spectra_database_temp, spectrum_sample)
         # Align the peaks
-        peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = peaks_filtering_percentage_threshold, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = low_intensity_percentage_threshold, intensity_threshold_method = low_intensity_threshold_method)
+        peaks_all <- align_and_filter_peaks(peaks_all, tof_mode = tof_mode, filtering_frequency_threshold_percent = peaks_filtering_percentage_threshold, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = low_intensity_percentage_threshold, intensity_threshold_method = low_intensity_threshold_method)
         # Restore the lists
         peaks_database_temp <- peaks_all[[1]]
         peaks_sample <- peaks_all[[2]]
@@ -7355,7 +7239,7 @@ if (allow_parallelization == TRUE) {
         cls <- makeCluster(cpu_thread_number)
         # Make the cluster use the custom functions and the package functions along with their parameters
         clusterEvalQ(cls, {library(MALDIquant)})
-        clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method"), envir = environment())
+        clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_peaks_removal", "low_intensity_percentage_threshold", "low_intensity_threshold_method"), envir = environment())
         output_list <- parLapply(cls, global_list, fun = function(global_list) comparison_sample_db_subfunction_similarity_index(global_list))
         stopCluster(cls)
     }
@@ -7460,7 +7344,7 @@ return (output)
 
 #################################################### ADJACENCY MATRIX GENERATION
 # The function generates an adjacency matrix from a peak list matrix, in order to generate a graph. The matrix is computed first by generating a correlation matrix and then replacing the correlation coefficients with 0 or 1 according to a threshold value.
-generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "pearson", correlation_threshold = 0.8, pvalue_threshold = 0.05) {
+generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "pearson", correlation_threshold = 0.90, pvalue_threshold = 0.05) {
 ##### Install the required packages
 install_and_load_required_packages("stats")
 ##### Transpose the peaklist matrix to compute the correlation between observations and not features
@@ -7521,210 +7405,11 @@ return(adjacency_matrix)
 
 
 
-############################### GENERATE A CUSTOM INTENSITY MATRIX (SLOWER)
-# The function takes a list of spectra and a vector of custom features to be included in the generation of the final peaklist intensity matrix. The functions takes the spectra, preprocesses the spectra according to the specified parameters, performs the peak picking and outputs the intensity matrix only for the peaks specified as input (not all of those custom peaks if they are outside of the spectral mass range).
-# If the range provided is too large, the function will return a NULL value, since some custom features cannot be found.
-# This function is suited for aligning the spectral features (of an unknown dataset) with the model features.
-generate_custom_intensity_matrix2 <- function(spectra, custom_feature_vector = NULL, tof_mode = "linear", spectra_preprocessing = TRUE, preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), peak_picking_algorithm = "SuperSmoother", peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 10, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", process_in_packages_of = 0, allow_parallelization = FALSE, deisotope_peaklist = FALSE) {
-    ### Install the required packages
-    install_and_load_required_packages("MALDIquant")
-    # Rename the trim function
-    trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
-    ### Define the tolerance
-    if (tof_mode == "linear" || tof_mode == "L") {
-        tolerance_ppm <- 2000
-    } else if (tof_mode == "reflectron" || tof_mode == "reflector" || tof_mode == "R") {
-        tolerance_ppm <- 200
-    }
-    ### Preprocessing
-    if (spectra_preprocessing == TRUE) {
-        spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = process_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
-    }
-    ### Peak picking and alignment
-    peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = peak_picking_SNR, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
-    peaks <- align_and_filter_peaks(peaks, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, reference_peaklist = as.numeric(custom_feature_vector), spectra = spectra, alignment_iterations = 5, allow_parallelization = allow_parallelization)
-    ### Peaklist matrix
-    # If there are more spectra...
-    if (isMassSpectrumList(spectra) && isMassPeaksList(peaks)) {
-        peaklist_matrix <- intensityMatrix(peaks, spectra)
-    } else if (isMassSpectrum(spectra) && isMassPeaks(peaks)) {
-        # If there is only one spectrum...
-        peaklist_matrix <- as.matrix(rbind(peaks@intensity))
-        colnames(peaklist_matrix) <- peaks@mass
-    }
-    ### Run the alignment only if the vector of custom features is not null
-    if (!is.null(custom_feature_vector)) {
-        # Check if there are X at the beginning of the feature numbers before converting into numbers
-        if (unlist(strsplit(as.character(custom_feature_vector[1]),""))[1] == "X") {
-            # Remove the X
-            for (f in 1:length(custom_feature_vector)) {
-                name_splitted <- unlist(strsplit(custom_feature_vector[f],""))
-                feature_def <- name_splitted [2]
-                for (i in 3:length(name_splitted)) {
-                    feature_def <- paste(feature_def, name_splitted[i], sep = "")
-                }
-                custom_feature_vector[f] <- feature_def
-            }
-        }
-        # Convert the custom feature vector in numeric
-        custom_feature_vector <- sort(as.numeric(custom_feature_vector))
-        # Retrieve the maximum and minimum data points in the spectra
-        spectra_peaks <- numeric()
-        if (isMassSpectrumList(spectra)) {
-            for (sp in 1:length(spectra)) {
-                spectra_peaks <- append(spectra_peaks, c(spectra[[sp]]@mass[1], spectra[[sp]]@mass[length(spectra[[sp]]@mass)]))
-            }
-        } else {
-            spectra_peaks <- append(spectra_peaks, c(spectra@mass[1], spectra@mass[length(spectra[[sp]]@mass)]))
-        }
-        spectra_peaks <- sort(as.numeric(spectra_peaks))
-        ### Check the compatibility between the spectra and the provided mass list
-        if (spectra_peaks[1] <= custom_feature_vector[1] && spectra_peaks[length(spectra_peaks)] >= custom_feature_vector[length(custom_feature_vector)]) {
-            feature_compatibility <- TRUE
-        } else {
-            feature_compatibility <- FALSE
-        }
-        ### If there is feature compatibility...
-        if (feature_compatibility == TRUE) {
-            # Generate a temporary vector for the custom peaks
-            custom_feature_vector_final <- vector()
-            # Generate the final list of ovrlapping features
-            for (f in 1:length(custom_feature_vector)) {
-                # If there are peaks...
-                if (length(spectra_peaks) > 0) {
-                    if (custom_feature_vector[f] >= spectra_peaks[1] && custom_feature_vector[f] <= spectra_peaks[length(spectra_peaks)]) {
-                        custom_feature_vector_final <- append(custom_feature_vector_final, custom_feature_vector[f])
-                    }
-                } else if (length(spectra_peaks) == 0) {
-                    # If there are peaks...
-                    custom_feature_vector_final <- append(custom_feature_vector_final, character())
-                }
-            }
-            # Isolate the dataset features (sorted)
-            spectral_dataset_features <- sort(as.numeric(colnames(peaklist_matrix)))
-            # Sort the custom features
-            custom_feature_vector_final <- sort(as.numeric(custom_feature_vector_final))
-            # Fix the original custom feature vector
-            custom_feature_vector <- as.character(custom_feature_vector_final)
-            ### Determine the columns to keep and the column to add
-            features_to_keep <- numeric()
-            features_to_add <- numeric()
-            adjusted_features_to_keep <- numeric()
-            # For each feature in the custom feature vector
-            for (csft in custom_feature_vector) {
-                # Set the default presence of the signal in the sample to FALSE
-                presence <- FALSE
-                # Scroll the sample features
-                for (ft in colnames(peaklist_matrix)) {
-                    # If there is a match
-                    if (abs((as.numeric(csft)-as.numeric(ft))*10^6/as.numeric(csft)) <= tolerance_ppm) {
-                        # Add it to the features to keep
-                        features_to_keep <- append(features_to_keep, ft)
-                        # Align the feature in the sample with the one in the custom feature vector
-                        ft <- csft
-                        # Add it to another list (it will be used to adjust the column names in the final sample peaklist)
-                        adjusted_features_to_keep <- append(adjusted_features_to_keep, ft)
-                        # Set the presence of the signal in the sample to TRUE
-                        presence <- TRUE
-                        # Avoid consecutive duplicates (once it is found there is no point in keep going)
-                        break
-                    }
-                }
-                # If after all the signal in the custom feature vector is not found in the sample
-                if (presence == FALSE) {
-                    # Add this to the features to be added
-                    features_to_add <- append(features_to_add, csft)
-                }
-            }
-            ### Generate the final sample matrix (with the right column names)
-            if (length(features_to_keep) > 0) {
-                final_peaklist_matrix <- as.matrix(rbind(peaklist_matrix [,features_to_keep]))
-                colnames(final_peaklist_matrix) <- adjusted_features_to_keep
-            } else {
-                final_peaklist_matrix <- NULL
-            }
-            ### Add the missing features
-            ## Multiple spectra
-            if (isMassSpectrumList(spectra)) {
-                # If there are features to add...
-                if (length(features_to_add > 0)) {
-                    # Generate a fake spectrum and a fake peaklist with the features to add
-                    fake_spectrum <- createMassSpectrum(mass = spectra[[1]]@mass, intensity = spectra[[1]]@intensity, metaData = list(name = "Fake spectrum"))
-                    fake_peaks <- createMassPeaks(mass = as.numeric(features_to_add), intensity = rep(1, length(features_to_add)), snr = rep(3, length(features_to_add)), metaData = list(name = "Fake peaklist"))
-                    # Detect the peaks in the spectra
-                    peaks <- detectPeaks(spectra, method = "SuperSmoother", SNR = 3)
-                    # Append the fake spectrum and the fake peaklist to he original lists
-                    spectra_all <- append(spectra, fake_spectrum)
-                    peaks_all <- append(peaks, fake_peaks)
-                    # Generate the intensity matrix
-                    intensity_matrix_all <- intensityMatrix(peaks_all, spectra_all)
-                    # Remove the last row (corresponding to the fake spectrum)
-                    intensity_matrix_all <- intensity_matrix_all[1:(nrow(intensity_matrix_all)-1),]
-                    # Keep only the columns that are corresponding to the desired features
-                    final_intensity_matrix <- intensity_matrix_all[,features_to_add]
-                    # If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
-                    if (is.null(final_peaklist_matrix)) {
-                        final_peaklist_matrix <- final_peaklist_matrix
-                    } else {
-                        # If the final matrix exists, append the feature column to the matrix
-                        final_peaklist_matrix <- cbind(final_peaklist_matrix, final_intensity_matrix)
-                    }
-                }
-            } else if (isMassSpectrum(spectra)) {
-                # If there are features to add...
-                if (length(features_to_add > 0)) {
-                    # Scroll the features to add (in the model but not in the sample)
-                    for (f in 1:length(features_to_add)) {
-                        # Initialize the output
-                        x_intensity <- NA
-                        # Scroll the mass list of each spectrum
-                        for (m in 1:length(spectra@mass)) {
-                            # If there is a match
-                            if (abs(spectra@mass[m]-as.numeric(features_to_add[f]))*10^6/as.numeric(features_to_add[f]) <= tolerance_ppm) {
-                                # Store the corresponding intensity and generate the matrix column
-                                x_intensity <- as.matrix(cbind(spectra@intensity[m]))
-                                colnames(x_intensity) <- features_to_add[f]
-                                # If the final matrix does not exist yet and it is null, the final matrix becomes the feature column
-                                if (is.null(final_peaklist_matrix)) {
-                                    final_peaklist_matrix <- cbind(x_intensity)
-                                } else {
-                                    # If the final matrix exists, append the feature column to the matrix
-                                    final_peaklist_matrix <- cbind(final_peaklist_matrix, x_intensity)
-                                }
-                                # Do not keep searching
-                                break
-                            }
-                        }
-                    }
-                }
-            }
-            ### Return the final matrix with the custom features
-            return(final_peaklist_matrix)
-        } else {
-            ### Return a NULL value if features are not compatible
-            return(NULL)
-        }
-    } else {
-        ### Return the simple peaklist matrix if no custom vector is provided
-        return(peaklist_matrix)
-    }
-}
-
-
-
-
-
-################################################################################
-
-
-
-
-
 ############################### GENERATE A CUSTOM INTENSITY MATRIX (FASTER)
 # The function takes a list of spectra and a vector of custom features to be included in the generation of the final peaklist intensity matrix. The functions takes the spectra, preprocesses the spectra according to the specified parameters, performs the peak picking and outputs the intensity matrix only for the peaks specified as input (not all of those custom peaks if they are outside of the spectral mass range).
 # If the range provided is too large, the function will return a NULL value, since some custom features cannot be found.
 # This function is suited for aligning the spectral features (of an unknown dataset) with the model features.
-generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NULL, tof_mode = "linear", spectra_preprocessing = TRUE, preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), peak_picking_algorithm = "SuperSmoother", peak_picking_SNR = 5, peaks_filtering = TRUE, frequency_threshold_percent = 10, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", process_in_packages_of = 0, allow_parallelization = FALSE, deisotope_peaklist = FALSE) {
+generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NULL, tof_mode = "linear", preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment_method = NULL, peak_picking_algorithm = "SuperSmoother", peak_picking_SNR = 5, filtering_frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", process_in_packages_of = 0, allow_parallelization = FALSE, deisotope_peaklist = FALSE) {
     ### Install the required packages
     install_and_load_required_packages("MALDIquant")
     # Rename the trim function
@@ -7736,7 +7421,7 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
         tolerance_ppm <- 200
     }
     ### Preprocessing
-    if (spectra_preprocessing == TRUE) {
+    if (!is.null(preprocessing_parameters) && is.list(preprocessing_parameters) && length(preprocessing_parameters) > 0) {
         spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, process_in_packages_of = process_in_packages_of, spectral_alignment_method = spectral_alignment_method, allow_parallelization = allow_parallelization)
     }
     ### Peak picking and alignment (with the custom features)
@@ -7847,7 +7532,7 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
         }
     } else {
         ### Return the simple peaklist matrix if no custom vector is provided
-        peaks <- align_and_filter_peaks(peaks, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, reference_peaklist = NULL, spectra = spectra, alignment_iterations = 5, allow_parallelization = allow_parallelization)
+        peaks <- align_and_filter_peaks(peaks, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, reference_peaklist = NULL, spectra = spectra, alignment_iterations = 5, allow_parallelization = allow_parallelization)
         final_peaklist_matrix <- intensityMatrix(peaks, spectra)
         return(final_peaklist_matrix)
     }
@@ -8091,7 +7776,7 @@ partition_spectral_dataset <- function(spectra, partitioning_method = c("space",
             #################### HCA
             ### Detect and align peaks
             peaks <- peak_picking(spectra, peak_picking_algorithm = ifelse(tof_mode == "reflectron" || tof_mode == "reflector", "SuperSmoother", "MAD"), tof_mode = tof_mode, SNR = ifelse(tof_mode == "reflectron" || tof_mode == "reflector", 5, 3), allow_parallelization = FALSE)
-            peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, peaks_filtering = TRUE, frequency_threshold_percent = 10)
+            peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, filtering_frequency_threshold_percent = 5)
             ### Generate the peaklist matrix
             peaklist <- intensityMatrix(peaks, spectra)
             ### Compute the distance matrix
@@ -8604,7 +8289,7 @@ from_GA_to_MS <- function(final_chromosome_GA, spectra, spectra_format = "imzml"
 #################################################### GRAPH SEGMENTATION FUNCTION
 # The function returns (for the imzML MSI dataset provided as the variable spectra) the list of spectra in the clique, the list of spectra in the independent set and the MS images (with pixels related to spectra in the clique in red and pixels related to spectra in the independent set in green), the initial and the final graph.
 # It returns a NULL value if the segmentation is not possible due to incompatibilities between the features in the dataset and the ones provided by the model.
-graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE, preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalisation_algorithm = "TIC", normalization_mass_range = NULL), process_spectra_in_packages_of = 0, allow_parallelization = FALSE, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, SNR = 5, tof_mode = "reflectron", peaks_filtering = TRUE, frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, partition_spectra = FALSE, number_of_spectra_partitions = 3, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
+graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL), spectral_alignment_method = NULL, process_spectra_in_packages_of = 0, allow_parallelization = FALSE, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, SNR = 5, tof_mode = "reflectron", filtering_frequency_threshold_percent = 5, low_intensity_peaks_removal = FALSE, intensity_threshold_percent = 1, intensity_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE, number_of_spectra_partitions = 1, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
     # Install and load the required packages
     install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "parallel", "caret", "pls", "tcltk", "kernlab", "pROC", "e1071", "igraph", "GA"))
     ### Import the dataset (if filepath_imzml is not already a list of spectra)
@@ -8618,9 +8303,9 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
         spectra <- filepath_imzml
     }
     ### Rearrange spectra for reproducibility
-    spectra <- rearrange_spectral_dataset(spectra = spectra, rearranging_method = "space", seed = seed)
+    #spectra <- rearrange_spectral_dataset(spectra = spectra, rearranging_method = "space", seed = seed)
     #################### Partition the spectra
-    if (partition_spectra == TRUE && number_of_spectra_partitions > 1) {
+    if (number_of_spectra_partitions > 1) {
         # Initialize the output
         final_spectra_clique <- list()
         final_spectra_independent <- list()
@@ -8636,7 +8321,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
             ##### Do everything only of there are more than one spectra in the partition
             if (isMassSpectrumList(spectra_partition)) {
                 ### Use only the features from the model
-                peaklist_matrix <- generate_custom_intensity_matrix(spectra_partition, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
+                peaklist_matrix <- generate_custom_intensity_matrix(spectra_partition, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
                 # Compute the adjacency matrix
                 input_adjacency_matrix <- generate_adjacency_matrix(peaklist_matrix, correlation_method = correlation_method_for_adjacency_matrix, correlation_threshold = correlation_threshold_for_adjacency_matrix, pvalue_threshold = pvalue_threshold_for_adjacency_matrix)
                 # Run the genetic algorithm
@@ -8680,16 +8365,18 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
         ### Plot the MS image
         if (plot_figures == TRUE) {
             plotMsiSlice(slices, legend = FALSE, scale = F)
-            ### Add the legend
-            legend(x = "bottomright", legend = c("clique","independent set"), fill = c("red","green"), xjust = 0.5, yjust = 0.5)
-            legend(x = "topright", legend = spectra_all_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
-            legend(x = "topleft", legend = "Graph segmentation", xjust = 0.5, yjust = 0.5)
+            if (isTRUE(plot_legends)) {
+                ### Add the legend
+                legend(x = "bottomright", legend = c("clique","independent set"), fill = c("red","green"), xjust = 0.5, yjust = 0.5)
+                legend(x = "topright", legend = spectra_all_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                legend(x = "topleft", legend = "Graph segmentation", xjust = 0.5, yjust = 0.5)
+            }
             # Record the plot
             msi_segmentation <- recordPlot()
         }
         ########## Return
         return(list(spectra_for_plotting = spectra_all_for_plotting, spectra_clique = final_spectra_clique, spectra_independent = final_spectra_independent, msi_segmentation = msi_segmentation, initial_graph_spectra_plot_list = graph_spectra_plot_list, final_graph_plot_list = final_graph_plot_list, ga_model_plot = ga_model_plot_list))
-    } else if (partition_spectra == FALSE || number_of_spectra_partitions <= 1) {
+    } else if (number_of_spectra_partitions <= 1) {
         #################### NO Partitioning of the spectra
         ### Initialize the outputs
         graph_spectra_plot <- NULL
@@ -8697,7 +8384,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
         ga_model_plot <- NULL
         final_graph_plot <- NULL
         ### Use only the features from the model
-        peaklist_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, spectra_preprocessing = spectra_preprocessing, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, peaks_filtering = peaks_filtering, frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
+        peaklist_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, spectral_alignment_method = spectral_alignment_method, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, filtering_frequency_threshold_percent = frequency_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_threshold_percent, intensity_threshold_method = intensity_threshold_method, process_in_packages_of = process_spectra_in_packages_of, allow_parallelization = allow_parallelization)
         ### If a NULL value is returned, it means that the model is incompatible with the features in the dataset
         if (!is.null(peaklist_matrix)) {
             # Compute the adjacency matrix
@@ -8721,7 +8408,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
                 ga_model_plot <- NULL
             }
             # From the optimised graph, extract the spectra for plotting, the adjacency matrix and the figures
-            MS_from_GA <- from_GA_to_MS(GA_output$final_chromosome, spectra = spectra)
+            MS_from_GA <- from_GA_to_MS(final_chromosome_GA = GA_output$final_chromosome, spectra = spectra)
             # Extract the spectra for plotting
             spectra_all_for_plotting <- MS_from_GA$spectra_for_plotting
             ### Generate the MS images (slices)
@@ -8729,10 +8416,12 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
             ### Plot the MS image
             if (plot_figures == TRUE) {
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                ### Add the legend
-                legend(x = "bottomright", legend = c("clique","independent set"), fill = c("red","green"), xjust = 0.5, yjust = 0.5)
-                legend(x = "topright", legend = spectra_all_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
-                legend(x = "topleft", legend = "Graph segmentation", xjust = 0.5, yjust = 0.5)
+                if (isTRUE(plot_legends)) {
+                    ### Add the legend
+                    legend(x = "bottomright", legend = c("clique","independent set"), fill = c("red","green"), xjust = 0.5, yjust = 0.5)
+                    legend(x = "topright", legend = spectra_all_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                    legend(x = "topleft", legend = "Graph segmentation", xjust = 0.5, yjust = 0.5)
+                }
                 # Record the plot
                 msi_segmentation <- recordPlot()
             } else {
@@ -8745,6 +8434,7 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
         }
     }
 }
+
 
 
 
@@ -8839,13 +8529,13 @@ graph_MSI_segmentation <- function(filepath_imzml, spectra_preprocessing = TRUE,
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.17.4"
+R_script_version <- "2017.03.21.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
 script_file_name <- "PEAKLIST EXPORT.R"
 # Change log
-change_log <- "1. Bugfix"
+change_log <- "1. Bugfix\n2. Progress bar"
 
 
 
@@ -8865,7 +8555,6 @@ filepath_import <- NULL
 tof_mode <- "linear"
 output_folder <- getwd()
 spectra_format <- "imzml"
-peaks_filtering <- TRUE
 low_intensity_peaks_removal <- FALSE
 intensity_threshold_method <- "element-wise"
 peak_picking_mode <- "all"
@@ -8900,7 +8589,6 @@ tof_mode_value <- "linear"
 filepath_import_value <- NULL
 output_folder_value <- output_folder
 spectra_format_value <- "imzML"
-peaks_filtering_value <- "YES"
 low_intensity_peaks_removal_value <- "NO"
 peak_picking_mode_value <- "all"
 peak_picking_algorithm_value <- "Super Smoother"
@@ -8965,11 +8653,17 @@ check_for_updates_function <- function() {
         online_version_YYYYMMDDVV <- unlist(strsplit(online_version_number, ".", fixed=TRUE))
         ### Compare with the local version
         local_version_YYYYMMDDVV = unlist(strsplit(R_script_version, ".", fixed = TRUE))
-        ### Check the versions
-        for (v in 1:length(local_version_YYYYMMDDVV)) {
+        ### Check the versions (up to the day value)
+        for (v in 1:(length(local_version_YYYYMMDDVV) - 1)) {
             if (as.numeric(local_version_YYYYMMDDVV[v]) < as.numeric(online_version_YYYYMMDDVV[v])) {
                 update_available <- TRUE
                 break
+            }
+        }
+        # If there are not updates at this point, check the latest version of the day
+        if (update_available == FALSE && (local_version_YYYYMMDDVV[length(local_version_YYYYMMDDVV) - 1] == online_version_YYYYMMDDVV[length(online_version_YYYYMMDDVV) - 1])) {
+            if (as.numeric(local_version_YYYYMMDDVV[length(local_version_YYYYMMDDVV)]) < as.numeric(online_version_YYYYMMDDVV[length(online_version_YYYYMMDDVV)])) {
+                update_available <- TRUE
             }
         }
         ### Return messages
@@ -9425,147 +9119,6 @@ end_session_function <- function () {
     q(save="no")
 }
 
-##### Import the spectra
-import_spectra_function <- function() {
-    ##### Run only if the spectra path has been set!
-    if (!is.null(filepath_import)) {
-        # Load the required libraries
-        install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
-        ###### Get the values
-        # Generate the list of spectra (library and test)
-        if (spectra_format == "brukerflex" || spectra_format == "xmass") {
-            ### Load the spectra
-            if (!is.null(mass_range)) {
-                spectra <- importBrukerFlex(filepath_import, massRange = mass_range)
-                # Preprocessing
-                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
-            } else {
-                spectra <- importBrukerFlex(filepath_import)
-                # Preprocessing
-                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
-            }
-        }
-        if (spectra_format == "imzml" | spectra_format == "imzML") {
-            # List all the imzML files (if the path is not already an imzML file)
-            if (length(grep(".imzML", filepath_import, fixed = TRUE)) <= 0) {
-                imzml_files <- read_spectra_files(filepath_import, spectra_format="imzml", full_path = TRUE)
-            } else {
-                imzml_files <- filepath_import
-            }
-            # Generate the spectra list
-            spectra <- list()
-            ### Load the spectra
-            if (!is.null(mass_range)) {
-                # Read and import one imzML file at a time
-                if (length(imzml_files) > 0) {
-                    for (imzml in 1:length(imzml_files)) {
-                        # Read and import the imzML file
-                        spectra_imzml <- importImzMl(imzml_files[imzml], massRange = mass_range)
-                        # Preprocessing
-                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
-                        # Average the replicates (one AVG spectrum for each imzML file)
-                        if (average_replicates == TRUE) {
-                            spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
-                            # Preprocessing AVG
-                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
-                        }
-                        # Append it to the final list of spectra
-                        spectra <- append(spectra, spectra_imzml)
-                    }
-                }
-            } else {
-                # Read and import one imzML file at a time
-                if (length(imzml_files) > 0) {
-                    for (imzml in 1:length(imzml_files)) {
-                        # Read and import the imzML file
-                        spectra_imzml <- importImzMl(imzml_files[imzml])
-                        # Preprocessing
-                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
-                        # Average the replicates (one AVG spectrum for each imzML file)
-                        if (average_replicates == TRUE) {
-                            spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
-                            # Preprocessing AVG
-                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
-                        }
-                        # Append it to the final list of spectra
-                        spectra <- append(spectra, spectra_imzml)
-                    }
-                }
-            }
-        }
-        # Exit the function and put the variable into the R workspace
-        .GlobalEnv$spectra <- spectra
-        ### Messagebox
-        tkmessageBox(title = "Import successful", message = "The spectra have been successfully imported and preprocessed", icon = "info")
-    } else {
-        ### Messagebox
-        tkmessageBox(title = "Import not possible", message = "No spectra files or folder have been selected!", icon = "warning")
-    }
-}
-
-##### Peak picking function
-peak_picking_function <- function() {
-    ############ Do not run if the spectra have not been imported
-    if (!is.null(spectra)) {
-        ###### Get the values
-        ## Signals to take in most intense peaks
-        signals_to_take <- tclvalue(signals_to_take)
-        signals_to_take <- as.integer(signals_to_take)
-        signals_to_take_value <- as.character(signals_to_take)
-        ## SNR
-        SNR <- tclvalue(SNR)
-        SNR <- as.numeric(SNR)
-        SNR_value <- as.character(SNR)
-        if (peak_picking_mode == "most intense") {
-            peaks <- most_intense_signals(spectra, signals_to_take = signals_to_take, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
-        } else if (peak_picking_mode == "all") {
-            peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, SNR = SNR, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
-        }
-        ## Peaks filtering threshold
-        peaks_filtering_threshold_percent <- tclvalue(peaks_filtering_threshold_percent)
-        peaks_filtering_threshold_percent <- as.numeric(peaks_filtering_threshold_percent)
-        peaks_filtering_threshold_percent_value <- as.character(peaks_filtering_threshold_percent)
-        ## Low intensity threshold
-        intensity_percentage_threshold <- tclvalue(intensity_percentage_threshold)
-        intensity_percentage_threshold <- as.numeric(intensity_percentage_threshold)
-        intensity_percentage_threshold_value <- as.character(intensity_percentage_threshold)
-        ##### Peak alignment
-        peaks <- align_and_filter_peaks(peaks, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, peaks_filtering = peaks_filtering, frequency_threshold_percent = peaks_filtering_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_percentage_threshold, intensity_threshold_method = intensity_threshold_method, reference_peaklist = NULL, spectra = spectra, alignment_iterations = 5, allow_parallelization = allow_parallelization)
-        # Exit the function and put the variable into the R workspace
-        .GlobalEnv$peaks <- peaks
-        .GlobalEnv$signals_to_take_value <- signals_to_take_value
-        .GlobalEnv$SNR_value <- SNR_value
-        ### Messagebox
-        tkmessageBox(title = "Peak picking successful", message = "The peak picking process has been successfully performed", icon = "info")
-    } else if (is.null(spectra)) {
-        ### Messagebox
-        tkmessageBox(title = "Spectra not imported", message = "The spectra have not been imported yet.\nImport them before performing the peak picking", icon = "warning")
-    }
-}
-
-##### Output the average number of signals with the SD
-signals_avg_and_sd_function <- function() {
-    ############ Do not run if the peaks have not been picked
-    if (!is.null(peaks)) {
-        # Generate the vector recording the number of signals
-        number_of_signals_vector <- numeric()
-        for (p in 1:length(peaks)) {
-            number_of_signals_vector <- append(number_of_signals_vector, length(peaks[[p]]@mass))
-        }
-        # Compute the mean and the standard deviation
-        mean_signal_number <- mean(number_of_signals_vector, na.rm = TRUE)
-        sd_signal_number <- sd(number_of_signals_vector, na.rm = TRUE)
-        cv_signal_number <- (sd_signal_number / mean_signal_number) *100
-        ### Messagebox
-        # Message
-        message_avg_sd <- paste("The mean number of signals in the spectral dataset is:", mean_signal_number, ",\n\nthe standard deviation is:", sd_signal_number, ",\n\nthe coefficient of variation is:", cv_signal_number, "%")
-        tkmessageBox(title = "Mean and SD of the number of signals", message = message_avg_sd, icon = "info")
-    } else if (is.null(peaks)) {
-        ### Messagebox
-        tkmessageBox(title = "Something is wrong", message = "Some elements are needed to perform this operation: make sure that the peak picking process has been performed", icon = "warning")
-    }
-}
-
 ##### Peak picking mode
 peak_picking_mode_choice <- function() {
     # Catch the value from the menu
@@ -9606,30 +9159,6 @@ peak_picking_algorithm_choice <- function() {
     # Escape the function
     .GlobalEnv$peak_picking_algorithm <- peak_picking_algorithm
     .GlobalEnv$peak_picking_algorithm_value <- peak_picking_algorithm_value
-}
-
-##### Peaks filtering
-peaks_filtering_choice <- function() {
-    # Catch the value from the menu
-    peaks_filtering <- select.list(c("YES","NO"), title="Choose")
-    # Default
-    if (peaks_filtering == "YES" || peaks_filtering == "") {
-        peaks_filtering <- TRUE
-    }
-    if (peaks_filtering == "NO") {
-        peaks_filtering <- FALSE
-    }
-    # Set the value of the displaying label
-    if (peaks_filtering == TRUE) {
-        peaks_filtering_value <- "YES"
-    } else {
-        peaks_filtering_value <- "  NO  "
-    }
-    peaks_filtering_value_label <- tklabel(window, text = peaks_filtering_value, font = label_font)
-    tkgrid(peaks_filtering_value_label, row = 5, column = 2)
-    # Escape the function
-    .GlobalEnv$peaks_filtering <- peaks_filtering
-    .GlobalEnv$peaks_filtering_value <- peaks_filtering_value
 }
 
 ##### Peaks deisotoping
@@ -9771,12 +9300,178 @@ spectra_format_choice <- function() {
     tkgrid(spectra_format_value_label, row = 2, column = 2)
 }
 
+##### Import the spectra
+import_spectra_function <- function() {
+    ##### Run only if the spectra path has been set!
+    if (!is.null(filepath_import)) {
+        # Progress bar
+        import_progress_bar <- tkProgressBar(title = "Importing and preprocessing spectra...", label = "", min = 0, max = 1, initial = 0, width = 300)
+        setTkProgressBar(import_progress_bar, value = 0, title = NULL, label = "0 %")
+        # Load the required libraries
+        install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
+        ###### Get the values
+        # Generate the list of spectra (library and test)
+        if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+            ### Load the spectra
+            if (!is.null(mass_range)) {
+                setTkProgressBar(import_progress_bar, value = 0.25, title = NULL, label = "25 %")
+                spectra <- importBrukerFlex(filepath_import, massRange = mass_range)
+                # Preprocessing
+                setTkProgressBar(import_progress_bar, value = 0.50, title = NULL, label = "50 %")
+                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
+                setTkProgressBar(import_progress_bar, value = 1, title = NULL, label = "100 %")
+            } else {
+                setTkProgressBar(import_progress_bar, value = 0.25, title = NULL, label = "25 %")
+                spectra <- importBrukerFlex(filepath_import)
+                # Preprocessing
+                setTkProgressBar(import_progress_bar, value = 0.50, title = NULL, label = "50 %")
+                spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
+                setTkProgressBar(import_progress_bar, value = 1, title = NULL, label = "100 %")
+            }
+        }
+        if (spectra_format == "imzml" | spectra_format == "imzML") {
+            # List all the imzML files (if the path is not already an imzML file)
+            if (length(grep(".imzML", filepath_import, fixed = TRUE)) <= 0) {
+                imzml_files <- read_spectra_files(filepath_import, spectra_format="imzml", full_path = TRUE)
+            } else {
+                imzml_files <- filepath_import
+            }
+            # Generate the spectra list
+            spectra <- list()
+            ### Load the spectra
+            if (!is.null(mass_range)) {
+                # Read and import one imzML file at a time
+                if (length(imzml_files) > 0) {
+                    setTkProgressBar(import_progress_bar, value = 0.50, title = NULL, label = "50 %")
+                    for (imzml in 1:length(imzml_files)) {
+                        # Read and import the imzML file
+                        spectra_imzml <- importImzMl(imzml_files[imzml], massRange = mass_range)
+                        # Preprocessing
+                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
+                        # Average the replicates (one AVG spectrum for each imzML file)
+                        if (average_replicates == TRUE) {
+                            spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
+                            # Preprocessing AVG
+                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
+                        }
+                        # Append it to the final list of spectra
+                        spectra <- append(spectra, spectra_imzml)
+                    }
+                    setTkProgressBar(import_progress_bar, value = 1, title = NULL, label = "100 %")
+                }
+            } else {
+                # Read and import one imzML file at a time
+                if (length(imzml_files) > 0) {
+                    setTkProgressBar(import_progress_bar, value = 0.50, title = NULL, label = "50 %")
+                    for (imzml in 1:length(imzml_files)) {
+                        # Read and import the imzML file
+                        spectra_imzml <- importImzMl(imzml_files[imzml])
+                        # Preprocessing
+                        spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
+                        # Average the replicates (one AVG spectrum for each imzML file)
+                        if (average_replicates == TRUE) {
+                            spectra_imzml <- averageMassSpectra(spectra_imzml, method="mean")
+                            # Preprocessing AVG
+                            spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, allow_parallelization = allow_parallelization, spectral_alignment_method = spectral_alignment_algorithm)
+                        }
+                        # Append it to the final list of spectra
+                        spectra <- append(spectra, spectra_imzml)
+                    }
+                    setTkProgressBar(import_progress_bar, value = 1, title = NULL, label = "100 %")
+                }
+            }
+        }
+        close(import_progress_bar)
+        # Exit the function and put the variable into the R workspace
+        .GlobalEnv$spectra <- spectra
+        ### Messagebox
+        tkmessageBox(title = "Import successful", message = "The spectra have been successfully imported and preprocessed", icon = "info")
+    } else {
+        ### Messagebox
+        tkmessageBox(title = "Import not possible", message = "No spectra files or folder have been selected!", icon = "warning")
+    }
+}
+
+##### Peak picking function
+peak_picking_function <- function() {
+    ############ Do not run if the spectra have not been imported
+    if (!is.null(spectra)) {
+        # Progress bar
+        peak_picking_progress_bar <- tkProgressBar(title = "Peak picking...", label = "", min = 0, max = 1, initial = 0, width = 300)
+        setTkProgressBar(peak_picking_progress_bar, value = 0, title = NULL, label = "0 %")
+        ###### Get the values
+        ## Signals to take in most intense peaks
+        signals_to_take <- tclvalue(signals_to_take)
+        signals_to_take <- as.integer(signals_to_take)
+        signals_to_take_value <- as.character(signals_to_take)
+        ## SNR
+        SNR <- tclvalue(SNR)
+        SNR <- as.numeric(SNR)
+        SNR_value <- as.character(SNR)
+        setTkProgressBar(peak_picking_progress_bar, value = 0.25, title = NULL, label = "25 %")
+        if (peak_picking_mode == "most intense") {
+            peaks <- most_intense_signals(spectra, signals_to_take = signals_to_take, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
+        } else if (peak_picking_mode == "all") {
+            peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, SNR = SNR, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
+        }
+        ## Peaks filtering threshold
+        peaks_filtering_threshold_percent <- tclvalue(peaks_filtering_threshold_percent)
+        peaks_filtering_threshold_percent <- as.numeric(peaks_filtering_threshold_percent)
+        peaks_filtering_threshold_percent_value <- as.character(peaks_filtering_threshold_percent)
+        ## Low intensity threshold
+        intensity_percentage_threshold <- tclvalue(intensity_percentage_threshold)
+        intensity_percentage_threshold <- as.numeric(intensity_percentage_threshold)
+        intensity_percentage_threshold_value <- as.character(intensity_percentage_threshold)
+        ##### Peak alignment
+        setTkProgressBar(peak_picking_progress_bar, value = 0.50, title = NULL, label = "50 %")
+        peaks <- align_and_filter_peaks(peaks, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, filtering_frequency_threshold_percent = peaks_filtering_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, intensity_threshold_percent = intensity_percentage_threshold, intensity_threshold_method = intensity_threshold_method, reference_peaklist = NULL, spectra = spectra, alignment_iterations = 5, allow_parallelization = allow_parallelization)
+        setTkProgressBar(peak_picking_progress_bar, value = 1, title = NULL, label = "100 %")
+        close(peak_picking_progress_bar)
+        # Exit the function and put the variable into the R workspace
+        .GlobalEnv$peaks <- peaks
+        .GlobalEnv$signals_to_take_value <- signals_to_take_value
+        .GlobalEnv$SNR_value <- SNR_value
+        ### Messagebox
+        tkmessageBox(title = "Peak picking successful", message = "The peak picking process has been successfully performed", icon = "info")
+    } else if (is.null(spectra)) {
+        ### Messagebox
+        tkmessageBox(title = "Spectra not imported", message = "The spectra have not been imported yet.\nImport them before performing the peak picking", icon = "warning")
+    }
+}
+
+##### Output the average number of signals with the SD
+signals_avg_and_sd_function <- function() {
+    ############ Do not run if the peaks have not been picked
+    if (!is.null(peaks)) {
+        # Generate the vector recording the number of signals
+        number_of_signals_vector <- numeric()
+        for (p in 1:length(peaks)) {
+            number_of_signals_vector <- append(number_of_signals_vector, length(peaks[[p]]@mass))
+        }
+        # Compute the mean and the standard deviation
+        mean_signal_number <- mean(number_of_signals_vector, na.rm = TRUE)
+        sd_signal_number <- sd(number_of_signals_vector, na.rm = TRUE)
+        cv_signal_number <- (sd_signal_number / mean_signal_number) *100
+        ### Messagebox
+        # Message
+        message_avg_sd <- paste("The mean number of signals in the spectral dataset is:", mean_signal_number, ",\n\nthe standard deviation is:", sd_signal_number, ",\n\nthe coefficient of variation is:", cv_signal_number, "%")
+        tkmessageBox(title = "Mean and SD of the number of signals", message = message_avg_sd, icon = "info")
+    } else if (is.null(peaks)) {
+        ### Messagebox
+        tkmessageBox(title = "Something is wrong", message = "Some elements are needed to perform this operation: make sure that the peak picking process has been performed", icon = "warning")
+    }
+}
+
 ##### Run the Peaklist Export function
 run_peaklist_export_function <- function() {
     ######## Run only if all the elements needed are there
     if (!is.null(spectra) && !is.null(peaks)) {
+        # Progress bar
+        program_progress_bar <- tkProgressBar(title = "Computing...", label = "", min = 0, max = 1, initial = 0, width = 300)
+        setTkProgressBar(program_progress_bar, value = 0, title = NULL, label = "0 %")
         ### List the directories in the filepath_import folder
         folder_list <- list.dirs(filepath_import, full.names = FALSE, recursive = FALSE)
+        setTkProgressBar(program_progress_bar, value = 0.25, title = NULL, label = "25 %")
         # If there are only imzML files
         if (length(folder_list) == 0) {
             # Each imzML file is a class
@@ -9787,10 +9482,13 @@ run_peaklist_export_function <- function() {
         } else if ((length(folder_list) == 1 && folder_list != "") || (length(folder_list) >= 1)) {
             class_list <- folder_list
         }
+        setTkProgressBar(program_progress_bar, value = 0.50, title = NULL, label = "50 %")
         # Generate the signal matrix
         peaklist <- intensityMatrix(peaks, spectra)
+        setTkProgressBar(program_progress_bar, value = 0.75, title = NULL, label = "75 %")
         # Add the sample and the class to the matrix
         peaklist <- matrix_add_class_and_sample(peaklist, peaks = peaks, class_list = class_list, spectra_format = spectra_format, sample_output = TRUE, class_output = TRUE, row_labels = NULL)
+        setTkProgressBar(program_progress_bar, value = 0.90, title = NULL, label = "90 %")
         # Save the files (CSV)
         if (file_type_export == "csv") {
             filename <- set_file_name()
@@ -9806,6 +9504,8 @@ run_peaklist_export_function <- function() {
             writeWorksheetToFile(file = filename, data = peaklist, sheet = "Peaklist", clearSheets = TRUE, header = TRUE)
             #write.xlsx(x = peaklist, file = filename, sheetName="Peaklist", row.names = FALSE)
         }
+        setTkProgressBar(program_progress_bar, value = 1, title = NULL, label = "100 %")
+        close(program_progress_bar)
         ### Messagebox
         tkmessageBox(title = "Done!", message = "The peaklist file has been dumped!", icon = "info")
     } else if (is.null(spectra) || is.null(peaks)) {
@@ -10002,8 +9702,6 @@ tkinsert(signals_to_take_entry, "end", "25")
 SNR_label <- tklabel(window, text="Signal-to-noise\nratio", font = label_font)
 SNR_entry <- tkentry(window, width = 10, textvariable = SNR, font = entry_font)
 tkinsert(SNR_entry, "end", "5")
-# Peaks filtering
-peaks_filtering_entry <- tkbutton(window, text="PEAK\nFILTERING", command = peaks_filtering_choice, font = button_font)
 # Peaks filtering threshold
 peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold\nfrequency percentage", font = label_font)
 peaks_filtering_threshold_percent_entry <- tkentry(window, width = 10, textvariable = peaks_filtering_threshold_percent, font = entry_font)
@@ -10028,29 +9726,28 @@ average_replicates_button <- tkbutton(window, text="AVERAGE\nREPLICATES", comman
 #end_session_label <- tklabel(window, text="Quit", font = label_font)
 end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
 # Import the spectra
-import_spectra_button <- tkbutton(window, text="IMPORT AND\nPREPROCESS\nSPECTRA", command = import_spectra_function, font = button_font)
+import_spectra_button <- tkbutton(window, text="IMPORT AND\nPREPROCESS\nSPECTRA...", command = import_spectra_function, font = button_font)
 # Peak picking
-peak_picking_button <- tkbutton(window, text="PEAK\nPICKING", command = peak_picking_function, font = button_font)
+peak_picking_button <- tkbutton(window, text="PEAK\nPICKING...", command = peak_picking_function, font = button_font)
 # Run the Peaklist Export!!
-peaklist_export_button <- tkbutton(window, text="EXPORT\nPEAKLIST", command = run_peaklist_export_function, font = button_font)
+peaklist_export_button <- tkbutton(window, text="EXPORT\nPEAKLIST...", command = run_peaklist_export_function, font = button_font)
 # Average number of signals and standard deviation
-signals_avg_and_sd_button <- tkbutton(window, text="MEAN +/- SD of\nnumber of signals", command = signals_avg_and_sd_function, font = button_font)
+signals_avg_and_sd_button <- tkbutton(window, text="MEAN +/- SD of\nnumber of signals...", command = signals_avg_and_sd_function, font = button_font)
 # Multicore
 allow_parallelization_button <- tkbutton(window, text="ALLOW\nPARALLEL\nCOMPUTING", command = allow_parallelization_choice, font = button_font)
 # Spectra preprocessing button
-spectra_preprocessing_button <- tkbutton(window, text="SPECTRA\nPREPROCESSING\nPARAMETERS", command = preprocessing_window_function, font = button_font)
+spectra_preprocessing_button <- tkbutton(window, text="SPECTRA\nPREPROCESSING\nPARAMETERS...", command = preprocessing_window_function, font = button_font)
 # Set the file name
 set_file_name_label <- tklabel(window, text="<--- Set the file name", font = label_font)
 set_file_name_entry <- tkentry(window, textvariable = file_name, font = entry_font)
 tkinsert(set_file_name_entry, "end", "Peaklist")
 # Updates
-download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE", command = download_updates_function, font = button_font)
+download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE...", command = download_updates_function, font = button_font)
 
 #### Displaying labels
 file_type_export_value_label <- tklabel(window, text = file_type_export, font = label_font)
 peak_picking_mode_value_label <- tklabel(window, text = peak_picking_mode_value, font = label_font)
 peak_picking_algorithm_value_label <- tklabel(window, text = peak_picking_algorithm_value, font = label_font)
-peaks_filtering_value_label <- tklabel(window, text = peaks_filtering_value, font = label_font)
 peaks_deisotoping_value_label <- tklabel(window, text = peaks_deisotoping_value, font = label_font)
 low_intensity_peaks_removal_value_label <- tklabel(window, text = low_intensity_peaks_removal_value, font = label_font)
 intensity_threshold_method_value_label <- tklabel(window, text = intensity_threshold_method_value, font = label_font)
@@ -10074,8 +9771,6 @@ tkgrid(signals_to_take_label, row = 3, column = 3)
 tkgrid(signals_to_take_entry, row = 3, column = 4)
 tkgrid(SNR_label, row = 2, column = 5)
 tkgrid(SNR_entry, row = 2, column = 6)
-tkgrid(peaks_filtering_entry, row = 5, column = 1)
-tkgrid(peaks_filtering_value_label, row = 5, column = 2)
 tkgrid(peaks_filtering_threshold_percent_label, row = 5, column = 3)
 tkgrid(peaks_filtering_threshold_percent_entry, row = 5, column = 4)
 tkgrid(peaks_deisotoping_entry, row = 5, column = 5)
