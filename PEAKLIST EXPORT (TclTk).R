@@ -5958,11 +5958,11 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.22.0"
+R_script_version <- "2017.03.22.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
-script_file_name <- "PEAKLIST EXPORT.R"
+script_file_name <- paste("PEAKLIST EXPORT (", R_script_version, ").R", sep = "")
 # Change log
 change_log <- "1. Bugfix\n2. Progress bar\n3. Fixed check for updates"
 
@@ -6673,32 +6673,8 @@ average_replicates_choice <- function() {
     .GlobalEnv$average_replicates_value <- average_replicates_value
 }
 
-##### Low intensity peaks removal
-low_intensity_peaks_removal_choice <- function() {
-    # Catch the value from the menu
-    low_intensity_peaks_removal <- select.list(c("YES","NO"), title="Choose")
-    # Default
-    if (low_intensity_peaks_removal == "" || low_intensity_peaks_removal == "NO") {
-        low_intensity_peaks_removal <- FALSE
-    }
-    if (low_intensity_peaks_removal == "YES") {
-        low_intensity_peaks_removal <- TRUE
-    }
-    # Set the value of the displaying label
-    if (low_intensity_peaks_removal == TRUE) {
-        low_intensity_peaks_removal_value <- "YES"
-    } else {
-        low_intensity_peaks_removal_value <- "  NO  "
-    }
-    low_intensity_peaks_removal_value_label <- tklabel(window, text = low_intensity_peaks_removal_value, font = label_font)
-    tkgrid(low_intensity_peaks_removal_value_label, row = 4, column = 2)
-    # Escape the function
-    .GlobalEnv$low_intensity_peaks_removal <- low_intensity_peaks_removal
-    .GlobalEnv$low_intensity_peaks_removal_value <- low_intensity_peaks_removal_value
-}
-
 ##### Low intensity peaks removal Method
-intensity_threshold_method_choice <- function() {
+low_intensity_peak_removal_threshold_method_choice <- function() {
     # Catch the value from the menu
     low_intensity_peak_removal_threshold_method <- select.list(c("whole","element-wise"), title="Choose")
     # Default
@@ -6706,15 +6682,15 @@ intensity_threshold_method_choice <- function() {
         low_intensity_peak_removal_threshold_method <- "element-wise"
     }
     # Set the value of the displaying label
-    intensity_threshold_method_value <- low_intensity_peak_removal_threshold_method
-    if (intensity_threshold_method_value == "whole") {
-        intensity_threshold_method_value <- "       whole       "
+    low_intensity_peak_removal_threshold_method_value <- low_intensity_peak_removal_threshold_method
+    if (low_intensity_peak_removal_threshold_method_value == "whole") {
+        low_intensity_peak_removal_threshold_method <- "              whole               "
     }
-    intensity_threshold_method_value_label <- tklabel(window, text = intensity_threshold_method_value, font = label_font)
-    tkgrid(intensity_threshold_method_value_label, row = 4, column = 6)
+    low_intensity_peak_removal_threshold_method_value_label <- tklabel(window, text = low_intensity_peak_removal_threshold_method_value, font = label_font)
+    tkgrid(low_intensity_peak_removal_threshold_method_value_label, row = 4, column = 6)
     # Escape the function
     .GlobalEnv$low_intensity_peak_removal_threshold_method <- low_intensity_peak_removal_threshold_method
-    .GlobalEnv$intensity_threshold_method_value <- intensity_threshold_method_value
+    .GlobalEnv$low_intensity_peak_removal_threshold_method_value <- low_intensity_peak_removal_threshold_method_value
 }
 
 ##### File format
@@ -7157,7 +7133,7 @@ low_intensity_peak_removal_threshold_percent_label <- tklabel(window, text="LOW-
 low_intensity_peak_removal_threshold_percent_entry <- tkentry(window, width = 10, textvariable = low_intensity_peak_removal_threshold_percent, font = entry_font)
 tkinsert(low_intensity_peak_removal_threshold_percent_entry, "end", "0")
 # Intensiry percentage theshold method
-intensity_threshold_method_entry <- tkbutton(window, text="INTENSITY\nTHRESHOLD\nMETHOD", command = intensity_threshold_method_choice, font = button_font)
+low_intensity_peak_removal_threshold_method_entry <- tkbutton(window, text="INTENSITY\nTHRESHOLD\nMETHOD", command = low_intensity_peak_removal_threshold_method_choice, font = button_font)
 # File format
 spectra_format_entry <- tkbutton(window, text="SPECTRA\nFORMAT", command = spectra_format_choice, font = button_font)
 # File type export
@@ -7191,8 +7167,7 @@ file_type_export_value_label <- tklabel(window, text = file_type_export, font = 
 peak_picking_mode_value_label <- tklabel(window, text = peak_picking_mode_value, font = label_font)
 peak_picking_algorithm_value_label <- tklabel(window, text = peak_picking_algorithm_value, font = label_font)
 peaks_deisotoping_value_label <- tklabel(window, text = peaks_deisotoping_value, font = label_font)
-low_intensity_peaks_removal_value_label <- tklabel(window, text = low_intensity_peaks_removal_value, font = label_font)
-intensity_threshold_method_value_label <- tklabel(window, text = intensity_threshold_method_value, font = label_font)
+low_intensity_peak_removal_threshold_method_value_label <- tklabel(window, text = low_intensity_peak_removal_threshold_method_value, font = label_font)
 spectra_format_value_label <- tklabel(window, text = spectra_format_value, font = label_font)
 allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font)
 average_replicates_value_label <- tklabel(window, text = average_replicates_value, font = label_font)
@@ -7219,8 +7194,8 @@ tkgrid(peaks_deisotoping_entry, row = 5, column = 5)
 tkgrid(peaks_deisotoping_value_label, row = 5, column = 6)
 tkgrid(low_intensity_peak_removal_threshold_percent_label, row = 4, column = 3)
 tkgrid(low_intensity_peak_removal_threshold_percent_entry, row = 4, column = 4)
-tkgrid(intensity_threshold_method_entry, row = 4, column = 5)
-tkgrid(intensity_threshold_method_value_label, row = 4, column = 6)
+tkgrid(low_intensity_peak_removal_threshold_method_entry, row = 4, column = 5)
+tkgrid(low_intensity_peak_removal_threshold_method_value_label, row = 4, column = 6)
 tkgrid(peak_picking_algorithm_entry, row = 2, column = 3)
 tkgrid(peak_picking_algorithm_value_label, row = 2, column = 4)
 tkgrid(spectra_format_entry, row = 2, column = 1)
@@ -7239,6 +7214,8 @@ tkgrid(signals_avg_and_sd_button, row = 8, column = 5)
 tkgrid(end_session_button, row = 8, column = 6)
 tkgrid(download_updates_button, row = 1, column = 5)
 tkgrid(check_for_updates_value_label, row = 1, column = 6)
+
+
 
 
 
