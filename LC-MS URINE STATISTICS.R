@@ -5,50 +5,137 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.21.0"
+R_script_version <- "2017.03.24.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
-script_file_name <- "LC-MS URINE STATISTICS.R"
+script_file_name <- paste("LC-MS URINE STATISTICS (", R_script_version, ").R", sep = "")
 # Change log
-change_log <- "1. Table to see the up-down proteins\n2. Possibility to decide whether to generate the correlation plots\n3. Bugfix\n4. Fix the graphics labels\n5. Progress bar"
+change_log <- "1. It should be faster when no internet connection is present"
 
 
 
 
 
-#################### INSTALL AND LOAD THE REQUIRED PACKAGES
-##### Install the required packages if not already installed
-# FUNCTION
+
+########## FUNCTIONS
+# Check internet connection
+check_internet_connection <- function(website_to_ping = "www.google.it") {
+    if (Sys.info()[1] == "Linux") {
+        # -c: number of packets sent/received (attempts) ; -W timeout in seconds
+        there_is_internet <- !as.logical(system(command = paste("ping -c 1 -W 2", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+    } else if (Sys.info()[1] == "Windows") {
+        # -n: number of packets sent/received (attempts) ; -w timeout in milliseconds
+        there_is_internet <- !as.logical(system(command = paste("ping -n 1 -w 2000", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+    } else {
+        there_is_internet <- !as.logical(system(command = paste("ping", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+    }
+    return(there_is_internet)
+}
+
+# Install and load required packages
 install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
-    # Update all the packages
-    try(update.packages(repos = repository, ask = FALSE), silent = TRUE)
-    # Retrieve the installed packages
+    ### Check internet connection
+    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
+    ########## Update all the packages (if there is internet connection)
+    if (there_is_internet == TRUE) {
+        ##### If a repository is specified
+        if (repository != "" || !is.null(repository)) {
+            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
+                # Try to build the package from source
+                update_successful <- FALSE
+                try({
+                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
+                    update_successful <- TRUE
+                }, silent = TRUE)
+                # Otherwise use the binary files
+                if (update_successful == FALSE) {
+                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+                }
+            } else if (Sys.info()[1] == "Linux") {
+                update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
+            }
+        } else {
+            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
+                # Try to build the package from source
+                update_successful <- FALSE
+                try({
+                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
+                    update_successful <- TRUE
+                }, silent = TRUE)
+                # Otherwise use the binary files
+                if (update_successful == FALSE) {
+                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+                }
+            } else if (Sys.info()[1] == "Linux") {
+                update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
+            }
+        }
+        print("Packages updated")
+    } else {
+        print("Packages cannot be updated due to internet connection problems")
+    }
+    ##### Retrieve the installed packages
     installed_packages <- installed.packages()[,1]
-    # Determine the missing packages
+    ##### Determine the missing packages
     missing_packages <- character()
     for (p in 1:length(required_packages)) {
         if ((required_packages[p] %in% installed_packages) == FALSE) {
             missing_packages <- append(missing_packages, required_packages[p])
         }
     }
-    # If a repository is specified
-    if (repository != "" || !is.null(repository)) {
-        if (length(missing_packages) > 0) {
-            install.packages(missing_packages, repos = repository)
+    ##### If there are packages to install...
+    if (length(missing_packages) > 0) {
+        ### If there is internet...
+        if (there_is_internet == TRUE) {
+            ### If a repository is specified
+            if (repository != "" || !is.null(repository)) {
+                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
+                    # Try to build the package from source
+                    installed_successful <- FALSE
+                    try({
+                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
+                        installed_successful <- TRUE
+                    }, silent = TRUE)
+                    # Otherwise use the binary files
+                    if (installed_successful == FALSE) {
+                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
+                    }
+                } else if (Sys.info()[1] == "Linux") {
+                    install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
+                }
+            } else {
+                ### If NO repository is specified
+                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
+                    # Try to build the package from source
+                    installed_successful <- FALSE
+                    try({
+                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
+                        installed_successful <- TRUE
+                    }, silent = TRUE)
+                    # Otherwise use the binary files
+                    if (installed_successful == FALSE) {
+                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
+                    }
+                } else if (Sys.info()[1] == "Linux") {
+                    install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
+                }
+            }
+            print("All the required packages have been installed")
+        } else {
+            ### If there is NO internet...
+            print("Some packages cannot be installed due to internet connection problems")
         }
     } else {
-        if (length(missing_packages) > 0) {
-            install.packages(missing_packages)
-        }
+        print("All the packages are up-to-date")
     }
-    # Load the packages
+    ##### Load the packages
     for (i in 1:length(required_packages)) {
         library(required_packages[i], character.only = TRUE)
     }
 }
 
-# RUN THE FUNCTION
+########## INSTALL AND LOAD THE REQUIRED PACKAGES
 install_and_load_required_packages(c("rattle", "phia", "MASS", "ggplot2", "lawstat", "coin", "multcomp", "agricolae", "tcltk", "Hmisc")) # "Rcmdr", "RcmdrPlugin.coin"
 # The package lawstat is used for levene test for non parametric anova
 
@@ -129,78 +216,83 @@ check_for_updates_function <- function() {
     update_available <- FALSE
     ### Initialize the change log
     online_change_log <- "Bug fixes"
-    try({
-        ### Read the file from the web (first 10 lines)
-        online_file <- readLines(con = github_R_url)
-        ### Retrieve the version number
-        for (l in online_file) {
-            if (length(grep("R_script_version", l, fixed = TRUE)) > 0) {
-                # Isolate the "variable" value
-                online_version_number <- unlist(strsplit(l, "R_script_version <- ", fixed = TRUE))[2]
-                # Remove the quotes
-                online_version_number <- unlist(strsplit(online_version_number, "\""))[2]
-                break
-            }
-        }
-        ### Retrieve the change log
-        for (l in online_file) {
-            if (length(grep("change_log", l, fixed = TRUE)) > 0) {
-                # Isolate the "variable" value
-                online_change_log <- unlist(strsplit(l, "change_log <- ", fixed = TRUE))[2]
-                # Remove the quotes
-                online_change_log_split <- unlist(strsplit(online_change_log, "\""))[2]
-                # Split at the \n
-                online_change_log_split <- unlist(strsplit(online_change_log_split, "\\\\n"))
-                # Put it back to the character
-                online_change_log <- ""
-                for (o in online_change_log_split) {
-                    online_change_log <- paste(online_change_log, o, sep = "\n")
+    # Check if there is internet connection by pinging a website
+    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
+    # Check for updates only in case of working internet connection
+    if (there_is_internet == TRUE) {
+        try({
+            ### Read the file from the web (first 10 lines)
+            online_file <- readLines(con = github_R_url)
+            ### Retrieve the version number
+            for (l in online_file) {
+                if (length(grep("R_script_version", l, fixed = TRUE)) > 0) {
+                    # Isolate the "variable" value
+                    online_version_number <- unlist(strsplit(l, "R_script_version <- ", fixed = TRUE))[2]
+                    # Remove the quotes
+                    online_version_number <- unlist(strsplit(online_version_number, "\""))[2]
+                    break
                 }
-                break
             }
-        }
-        ### Split the version number in YYYY.MM.DD
-        online_version_YYYYMMDDVV <- unlist(strsplit(online_version_number, ".", fixed = TRUE))
-        ### Compare with the local version
-        local_version_YYYYMMDDVV = unlist(strsplit(R_script_version, ".", fixed = TRUE))
-        ### Check the versions (from the Year to the Day)
-        # Check the year
-        if (as.numeric(local_version_YYYYMMDDVV[1]) < as.numeric(online_version_YYYYMMDDVV[1])) {
-            update_available <- TRUE
-        }
-        # If the year is the same (update is FALSE), check the month
-        if (update_available == FALSE) {
-            if ((as.numeric(local_version_YYYYMMDDVV[1]) == as.numeric(online_version_YYYYMMDDVV[1])) && (as.numeric(local_version_YYYYMMDDVV[2]) < as.numeric(online_version_YYYYMMDDVV[2]))) {
+            ### Retrieve the change log
+            for (l in online_file) {
+                if (length(grep("change_log", l, fixed = TRUE)) > 0) {
+                    # Isolate the "variable" value
+                    online_change_log <- unlist(strsplit(l, "change_log <- ", fixed = TRUE))[2]
+                    # Remove the quotes
+                    online_change_log_split <- unlist(strsplit(online_change_log, "\""))[2]
+                    # Split at the \n
+                    online_change_log_split <- unlist(strsplit(online_change_log_split, "\\\\n"))
+                    # Put it back to the character
+                    online_change_log <- ""
+                    for (o in online_change_log_split) {
+                        online_change_log <- paste(online_change_log, o, sep = "\n")
+                    }
+                    break
+                }
+            }
+            ### Split the version number in YYYY.MM.DD
+            online_version_YYYYMMDDVV <- unlist(strsplit(online_version_number, ".", fixed = TRUE))
+            ### Compare with the local version
+            local_version_YYYYMMDDVV = unlist(strsplit(R_script_version, ".", fixed = TRUE))
+            ### Check the versions (from the Year to the Day)
+            # Check the year
+            if (as.numeric(local_version_YYYYMMDDVV[1]) < as.numeric(online_version_YYYYMMDDVV[1])) {
                 update_available <- TRUE
             }
-        }
-        # If the month and the year are the same (update is FALSE), check the day
-        if (update_available == FALSE) {
-            if ((as.numeric(local_version_YYYYMMDDVV[1]) == as.numeric(online_version_YYYYMMDDVV[1])) && (as.numeric(local_version_YYYYMMDDVV[2]) == as.numeric(online_version_YYYYMMDDVV[2])) && (as.numeric(local_version_YYYYMMDDVV[3]) < as.numeric(online_version_YYYYMMDDVV[3]))) {
-                update_available <- TRUE
+            # If the year is the same (update is FALSE), check the month
+            if (update_available == FALSE) {
+                if ((as.numeric(local_version_YYYYMMDDVV[1]) == as.numeric(online_version_YYYYMMDDVV[1])) && (as.numeric(local_version_YYYYMMDDVV[2]) < as.numeric(online_version_YYYYMMDDVV[2]))) {
+                    update_available <- TRUE
+                }
             }
-        }
-        # If the day and the month and the year are the same (update is FALSE), check the daily version
-        if (update_available == FALSE) {
-            if ((as.numeric(local_version_YYYYMMDDVV[1]) == as.numeric(online_version_YYYYMMDDVV[1])) && (as.numeric(local_version_YYYYMMDDVV[2]) == as.numeric(online_version_YYYYMMDDVV[2])) && (as.numeric(local_version_YYYYMMDDVV[3]) == as.numeric(online_version_YYYYMMDDVV[3])) && (as.numeric(local_version_YYYYMMDDVV[4]) < as.numeric(online_version_YYYYMMDDVV[4]))) {
-                update_available <- TRUE
+            # If the month and the year are the same (update is FALSE), check the day
+            if (update_available == FALSE) {
+                if ((as.numeric(local_version_YYYYMMDDVV[1]) == as.numeric(online_version_YYYYMMDDVV[1])) && (as.numeric(local_version_YYYYMMDDVV[2]) == as.numeric(online_version_YYYYMMDDVV[2])) && (as.numeric(local_version_YYYYMMDDVV[3]) < as.numeric(online_version_YYYYMMDDVV[3]))) {
+                    update_available <- TRUE
+                }
             }
-        }
-        ### Return messages
-        if (is.null(online_version_number)) {
-            # The version number could not be ckecked due to internet problems
-            # Update the label
-            check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked: connection problems", sep = "")
-        } else {
-            if (update_available == TRUE) {
+            # If the day and the month and the year are the same (update is FALSE), check the daily version
+            if (update_available == FALSE) {
+                if ((as.numeric(local_version_YYYYMMDDVV[1]) == as.numeric(online_version_YYYYMMDDVV[1])) && (as.numeric(local_version_YYYYMMDDVV[2]) == as.numeric(online_version_YYYYMMDDVV[2])) && (as.numeric(local_version_YYYYMMDDVV[3]) == as.numeric(online_version_YYYYMMDDVV[3])) && (as.numeric(local_version_YYYYMMDDVV[4]) < as.numeric(online_version_YYYYMMDDVV[4]))) {
+                    update_available <- TRUE
+                }
+            }
+            ### Return messages
+            if (is.null(online_version_number)) {
+                # The version number could not be ckecked due to internet problems
                 # Update the label
-                check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
+                check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked: connection problems", sep = "")
             } else {
-                # Update the label
-                check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
+                if (update_available == TRUE) {
+                    # Update the label
+                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
+                } else {
+                    # Update the label
+                    check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
+                }
             }
-        }
-    }, silent = TRUE)
+        }, silent = TRUE)
+    }
     ### Something went wrong: library not installed, retrieving failed, errors in parsing the version number
     if (is.null(online_version_number)) {
         # Update the label
@@ -326,7 +418,7 @@ file_import_function <- function() {
                 # Replace the Age with the Age_BINNED
                 input_data$Age <- cbind(Age_BINNED)
             }
-            }, silent = TRUE)
+        }, silent = TRUE)
         ##### Separate the mass spectrometric data from the demographic data
         # All features
         feature_vector <- colnames(input_data)
@@ -688,13 +780,13 @@ run_statistics_function <- function() {
         }
         # Go to the new working directory
         setwd(output_folder)
-
+        
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.05, title = NULL, label = "5 %")
-
+        
         ################################################################################
-
-
+        
+        
         # Retrieve the values from the entries
         pvalue_expression <- tclvalue(pvalue_expression)
         pvalue_expression <- as.numeric(pvalue_expression)
@@ -711,29 +803,22 @@ run_statistics_function <- function() {
         minimum_number_of_patients <- tclvalue(minimum_number_of_patients)
         minimum_number_of_patients <- as.integer(minimum_number_of_patients)
         minimum_number_of_patients_value <- as.character(minimum_number_of_patients)
-
-
-
-
+        
+        
+        
+        
         ########## Exception handling
         #if (isTRUE(two_level_effect_analysis)) {
         #    ifelse(isTRUE(sampling), print("The Two-Level Effect analysis is performed with sampling for RM"), print("WARNING!!! The Two-Level Effect analysis is performed without sampling!"))
         #}
-
+        
         ################################# FUNCTIONS
-
-
+        
+        
         ########## General Statistic Function: definition ###############################
-        ### skip this !!!!!!!!!!!!!!!!!!
-        signif <- function(object, pvalue_tests) {
-            if (object$p.value <= pvalue_tests) {
-                object$p.value
-            } else {
-                NULL
-            }
-        }
+        
         ################################ P-value extractor functions
-
+        
         assumption_p <- function(objt) {
             ifelse(is.object(objt), return(objt$p.value), return(NA))
         }
@@ -743,8 +828,8 @@ run_statistics_function <- function() {
         assumption_permutation <- function(objt) {
             ifelse(is.object(objt), return(pvalue(objt)[1]), return(NA))
         }
-
-
+        
+        
         #################  Post hoc tests
         write_posthoc_file <- function(file_name, data, file_format = "xlsx"){
             # Store the original filename
@@ -789,9 +874,9 @@ run_statistics_function <- function() {
                 write.csv(output_matrix, file = file_name)
             }
         }
-
+        
         ###################################################
-
+        
         sammy <- function(pn, minpos, maxpos){
             sam <- NULL
             while (length(sam) < pn){
@@ -801,8 +886,8 @@ run_statistics_function <- function() {
             }
             return(sam)
         }
-
-
+        
+        
         ##### Split the dependent variable according to the factor variable
         group_dependent_variable <- function(dependent_variable, factor_variable) {
             # Extract the levels of the factor variable
@@ -819,11 +904,11 @@ run_statistics_function <- function() {
             # Return
             return(dependent_variable_split)
         }
-
-
-
-
-
+        
+        
+        
+        
+        
         ###################################################
         # Function to export the data files
         write_file <- function(file_name, data, file_format = "xlsx"){
@@ -854,7 +939,7 @@ run_statistics_function <- function() {
                 write.csv(data, file = file_name)
             }
         }
-
+        
         SamplingForRM <- function(Per_Base , Per_Adv){
             ##### sampling indexes from group 0
             p <- Per_Base
@@ -883,18 +968,18 @@ run_statistics_function <- function() {
             print(n2)
             return (list(N1=n1,N2=n2))
         }
-
+        
         ################################################################################
-
-
-
-
-
-
-
-
-
-
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         ################ Data from input_data #######################
         if (isTRUE(data_record)) {
             print("########## Data Management ##########")
@@ -907,7 +992,7 @@ run_statistics_function <- function() {
                 list_of_dataframes[[1]] <- input_data[,!(names(input_data) %in% non_signals)]
                 list_of_filenames <- "Whole data"
             } else if (length(class_list) == 2) {
-            # If there are only two classes...
+                # If there are only two classes...
                 # Generate a dataframe with those two classes, otherwise dump one dataframe per each class
                 list_of_dataframes[[1]] <- input_data[,!(names(input_data) %in% non_signals)]
                 list_of_filenames <- paste("Class", class_list[1], "vs", class_list[2])
@@ -930,11 +1015,11 @@ run_statistics_function <- function() {
             # Go back to the original output folder
             setwd(output_folder)
         }
-
+        
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.15, title = NULL, label = "15 %")
-
-
+        
+        
         ################################################################################
         #################### CORRELATION ANALYSIS (Done only with patients affected by RCC, because controls do not have pT, grade, dimension, etc...)
         if (isTRUE(correlation_analysis)) {
@@ -990,8 +1075,6 @@ run_statistics_function <- function() {
                     ### For each non-signal...
                     for (f in 1:length(non_signals_for_correlation_analysis)) {
                         ns <- non_signals_for_correlation_analysis[f]
-                        # Generate the sublist...
-                        correlation_sublist <- list()
                         # Isolate the column corresponding to the non-signal...
                         non_signal_column_original <- data_frame_correlation[, ns]
                         ##### Scroll the masses...
@@ -1089,10 +1172,10 @@ run_statistics_function <- function() {
                 }
             }
         }
-
+        
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.30, title = NULL, label = "30 %")
-
+        
         #################################################################################
         #################### 2-LEVEL EFFECT ANALYSIS OVER SIGNAL INTENSITY
         if (isTRUE(two_level_effect_analysis)) {
@@ -1174,14 +1257,14 @@ run_statistics_function <- function() {
                 }
                 ##### Sampling
                 if (isTRUE(sampling)){
-
+                    
                     base_sampling_df <- temp_data_frame[temp_data_frame[, non_signal_variable] == 0, ]
                     adv_sampling_df <- temp_data_frame[temp_data_frame[, non_signal_variable] == 1, ]
-
+                    
                     Samlist <- SamplingForRM(TestPer_Base,TestPer_Adv)
                     n1 <- Samlist$N1
                     n2 <- Samlist$N2
-
+                    
                     TFD <- rbind(BaseTFD[n1,],AdvTFD[n2,])
                     DIAGTFD <- rbind(BaseTFD[-n1,],AdvTFD[-n2,])
                 }
@@ -1236,4 +1319,1180 @@ run_statistics_function <- function() {
                     for (x in 1:length(mass_x_split)) {
                         mass_x_split[[x]] <- mass_x_split[[x]][!is.na(mass_x_split[[x]])]
                     }
-                    ## If the response variable has only one level, it0s pointless to fodo ther 
+                    ## If the response variable has only one level, it0s pointless to fodo ther statistics
+                    if (length(mass_x_split) > 1) {
+                        # Define the groups (response variable = 0, response variable = 1)
+                        group_0 <- mass_x_split[[1]]
+                        group_1 <- mass_x_split[[2]]
+                        # Define the names and the number of patients
+                        name_group_0 <- sprintf("%s%s", m, l)
+                        name_group_1 <- sprintf("%s%s", m, "_OTHERS")
+                        number_of_patients_list[[m]] <- c(length(group_0),length(group_1))
+                    } else if (length(mass_x_split) == 1) {
+                        # Define the groups (response variable = 0, response variable = 1)
+                        group_0 <- mass_x_split[[1]]
+                        group_1 <- numeric()
+                        # Define the names and the number of patients
+                        name_group_0 <- sprintf("%s%s", m, l)
+                        name_group_1 <- sprintf("%s%s", m, "_OTHERS")
+                        number_of_patients_list[[m]] <- c(length(group_0),length(group_1))
+                    }
+                    ### If the number of patients in the two lists is more than the minimum number of patients allowed and all the elements of the two groups are not the same...
+                    if (length(group_0) >= minimum_number_of_patients && length(group_1) >= minimum_number_of_patients && !all(group_0 == group_0[1]) && !all(group_1 == group_1[1])) {
+                        # Checking for normal distributed data in the two groups (class 0 and class 1)
+                        if (length(group_0) >= 3 && length(group_0) <= 5000) {
+                            shapiro_list_0[[name_group_0]] <- shapiro.test(as.numeric(group_0))
+                        } else {
+                            shapiro_list_0[[name_group_0]] <- NA
+                        }
+                        if (length(group_1) >= 3 && length(group_1) <= 5000) {
+                            shapiro_list_1[[name_group_1]] <- shapiro.test(as.numeric(group_1))
+                        } else {
+                            shapiro_list_1[[name_group_1]] <- NA
+                        }
+                        # Checking variances (Normal data)
+                        variance_test_list[[m]] <- var.test(as.numeric(group_0), as.numeric(group_1))
+                        # Checking variances (Non-Normal data)
+                        Leven_test_list[[m]] <- levene.test(y = as.numeric(mass_x), group = response_variable, location = "mean", kruskal.test = T)
+                        # Normal Data, Equal Variances --> Equal Variance t-test
+                        EqTTest_list[[m]] <- t.test(as.numeric(group_0), as.numeric(group_1))
+                        # Normal Data, Unequal Variances --> Unequal Variance t-test:
+                        UneqTTest_list[[m]] <- t.test(as.numeric(group_0), as.numeric(group_1), var.equal = FALSE)
+                        # Non-normal Data, Equal Variances --> Mann-Whitney U-test (Wilcoxon)
+                        MWUTest_list[[m]] <- wilcox.test(as.numeric(group_0), as.numeric(group_1), paired = FALSE)
+                        # Non-normal Data, Unequal Variances --> Kolmogorov-Smirnov test
+                        KSTest_list[[m]] <- ks.test(as.numeric(group_0), as.numeric(group_1))
+                    } else {
+                        ### Otherwise all the results are NA...
+                        shapiro_list_0[[name_group_0]] <- NA
+                        shapiro_list_1[[name_group_1]] <- NA
+                        variance_test_list[[m]] <- NA
+                        Leven_test_list[[m]] <- NA
+                        EqTTest_list[[m]] <- NA
+                        UneqTTest_list[[m]] <- NA
+                        MWUTest_list[[m]] <- NA
+                        KSTest_list[[m]] <- NA
+                    }
+                }
+                # Extract the pvalue list from the test lists...
+                list_of_shapiro_list_0 <- lapply(shapiro_list_0, assumption_p)
+                list_of_shapiro_list_1 <- lapply(shapiro_list_1, assumption_p)
+                list_of_variance_test_list <- lapply(variance_test_list, assumption_p)
+                list_of_Leven_test_list <- lapply(Leven_test_list, assumption_p)
+                list_of_EqTTest_list <- lapply(EqTTest_list, assumption_p)
+                list_of_UneqTTest_list <- lapply(UneqTTest_list, assumption_p)
+                list_of_MWUTest_list <- lapply(MWUTest_list, assumption_p)
+                list_of_KSTest_list <- lapply(KSTest_list, assumption_p)
+                # Vectorize the lists...
+                vector_of_shapiro_list_0 <- unlist(list_of_shapiro_list_0)
+                vector_of_shapiro_list_1 <- unlist(list_of_shapiro_list_1)
+                vector_of_variance_test_list <- unlist(list_of_variance_test_list)
+                vector_of_Leven_test_list <- unlist(list_of_Leven_test_list)
+                vector_of_EqTTest_list <- unlist(list_of_EqTTest_list)
+                vector_of_UneqTTest_list <- unlist(list_of_UneqTTest_list)
+                vector_of_MWUTest_list <- unlist(list_of_MWUTest_list)
+                vector_of_KSTest_list <- unlist(list_of_KSTest_list)
+                # Message (if the elements in the lists are NA it means that there weren't enough patients per class)
+                #if (is.na(vector_of_shapiro_list_0[1])) {
+                #    tkmessageBox(title = "Insufficient number of patients in one class", message = "There is an insufficient number of patients in at least one class: the statistics cannot be performed!", icon = "warning")
+                #}
+                # Matrix of patient numbers...
+                patient_number_matrix <- matrix(ncol = 2)
+                patient_number_matrix <- do.call(rbind, number_of_patients_list)
+                patient_number_matrix <- cbind(rownames(patient_number_matrix),patient_number_matrix)
+                colnames(patient_number_matrix) <- c("Mass","Group 0","Group 1")
+                # Outlier matrix
+                outlier_matrix <- do.call(rbind, outlier_list)
+                # pvalue  matrix
+                pvalue_matrix <- data.matrix(cbind(vector_of_shapiro_list_0, vector_of_shapiro_list_1, vector_of_variance_test_list, vector_of_Leven_test_list, vector_of_EqTTest_list, vector_of_UneqTTest_list, vector_of_MWUTest_list, vector_of_KSTest_list))
+                rownames(pvalue_matrix) <- names(signals_data)
+                ### Extract the data according to the conditions
+                # Extract the normal and non-normal data
+                normal_data <- as.data.frame(subset(pvalue_matrix, vector_of_shapiro_list_0 > pvalue_tests & vector_of_shapiro_list_1 > pvalue_tests))
+                non_normal_data <- as.data.frame(subset(pvalue_matrix, vector_of_shapiro_list_0 <= pvalue_tests | vector_of_shapiro_list_1 <= pvalue_tests))
+                # Extract the normal homoschedastic data
+                normal_homoschedastic_data <- as.data.frame(subset(normal_data, vector_of_variance_test_list > pvalue_tests))
+                # Extract the normal heteroschedastic data
+                normal_heteroschedastic_data <- as.data.frame(subset(normal_data, vector_of_variance_test_list <= pvalue_tests))
+                # Extract the non-normal homoschedastic data
+                non_normal_homoschedastic_data <-    as.data.frame(subset(non_normal_data, vector_of_Leven_test_list > pvalue_tests))
+                # Extract the non-normal heteroschedastic data
+                non_normal_heteroschedastic_data <- as.data.frame(subset(non_normal_data, vector_of_Leven_test_list <= pvalue_tests))
+                # Differentially expressed signals: normal homoschedastic data
+                diff_normal_homoschedastic_data <- as.data.frame(subset(normal_homoschedastic_data, vector_of_EqTTest_list <= pvalue_expression))
+                method_diff_norm_homo <- rep("Equal Variance t-test", nrow(diff_normal_homoschedastic_data))
+                matrix_diff_norm_homo <- as.data.frame(subset(diff_normal_homoschedastic_data, select = vector_of_EqTTest_list))
+                matrix_diff_norm_homo <- cbind(rownames(matrix_diff_norm_homo), matrix_diff_norm_homo, method_diff_norm_homo)
+                colnames(matrix_diff_norm_homo) <- c("Signal","pvalue","Test")
+                # Differentially expressed signals: normal heteroschedastic data
+                diff_normal_heteroschedastic_data <- as.data.frame(subset(normal_heteroschedastic_data, vector_of_UneqTTest_list <= pvalue_expression))
+                method_diff_norm_hetero <- rep("Unequal Variance t-test", nrow(diff_normal_heteroschedastic_data))
+                matrix_diff_norm_hetero <- as.data.frame(subset(diff_normal_heteroschedastic_data, select = vector_of_UneqTTest_list))
+                matrix_diff_norm_hetero <- cbind(rownames(matrix_diff_norm_hetero), matrix_diff_norm_hetero, method_diff_norm_hetero)
+                colnames(matrix_diff_norm_hetero) <- c("Signal","pvalue","Test")
+                # Differentially expressed signals: non_normal homoschedastic data
+                diff_non_normal_homoschedastic_data <- as.data.frame(subset(non_normal_homoschedastic_data, vector_of_MWUTest_list <= pvalue_expression))
+                method_diff_non_norm_homo <- rep("Wilcoxon",nrow(diff_non_normal_homoschedastic_data))
+                matrix_diff_non_norm_homo <- as.data.frame(subset(diff_non_normal_homoschedastic_data, select = vector_of_MWUTest_list))
+                matrix_diff_non_norm_homo <- cbind(rownames(matrix_diff_non_norm_homo), matrix_diff_non_norm_homo, method_diff_non_norm_homo)
+                colnames(matrix_diff_non_norm_homo) <- c("Signal","pvalue","Test")
+                # Differentially expressed signals: non_normal heteroschedastic data
+                diff_non_normal_heteroschedastic_data <- as.data.frame(subset(non_normal_heteroschedastic_data, vector_of_KSTest_list <= pvalue_expression))
+                method_diff_non_norm_hetero <- rep("Kolmogorov-Smirnov test", nrow(diff_non_normal_heteroschedastic_data))
+                matrix_diff_non_norm_hetero <- as.data.frame(subset(diff_non_normal_heteroschedastic_data, select = vector_of_KSTest_list))
+                matrix_diff_non_norm_hetero <- cbind(rownames(matrix_diff_non_norm_hetero),matrix_diff_non_norm_hetero, method_diff_non_norm_hetero)
+                colnames(matrix_diff_non_norm_hetero) <- c("Signal","pvalue","Test")
+                ## Selected signals for inference
+                selected_signals_for_inference <- c(rownames(diff_normal_homoschedastic_data), rownames(diff_normal_heteroschedastic_data), rownames(diff_non_normal_homoschedastic_data), rownames(diff_non_normal_heteroschedastic_data))
+                # Print the message...
+                if (length(selected_signals_for_inference) > 0) {
+                    print("Differentially expressed signals for inference")
+                    print(selected_signals_for_inference)
+                } else {
+                    print(paste("There are no differentially expressed signals between", names(l), l, "and OTHERS or there is an insuffucient number of patients in at least one class or there is only one class!"))
+                }
+                # Generate a matrix with the signals for inference and the method used to identify them...
+                inference_signals_method_matrix <- rbind(matrix_diff_norm_homo, matrix_diff_norm_hetero, matrix_diff_non_norm_homo, matrix_diff_non_norm_hetero)
+                # Select the signals to be used for inference and the non-signal variable
+                selected_signals_for_inference_intensity_df <- subset(temp_data_frame, select = c(non_signal_variable, selected_signals_for_inference))
+                if (remove_outliers_two_level_effect_analysis == TRUE) {
+                    selected_signals_for_inference_intensity_df_no_outliers <- subset(temp_data_frame_no_outliers, select = c(non_signal_variable, selected_signals_for_inference))
+                } else {
+                    selected_signals_for_inference_intensity_df_no_outliers <- NULL
+                }
+                ### data for testing: for diagnostic analysis
+                if (isTRUE(sampling)) TEST <- DIAGTFD[c("No",BaseEffName,non_signal_variable,SelectedSignsForEffect)]
+                ############################### Dump the files
+                # For each signals of inference...
+                ### OUTLIERS
+                # Create the folder where to dump the plot files
+                plots_two_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots")
+                dir.create(plots_two_level_effect_analysis_subfolder)
+                # Create the folder where to dump the table files and go to it...
+                tables_two_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Tables")
+                dir.create(tables_two_level_effect_analysis_subfolder)
+                ##### UP-DOWN Table
+                up_down_matrix <- matrix(0, nrow = length(selected_signals_for_inference), ncol = length(levels(as.factor(temp_data_frame[, non_signal_variable]))))
+                rownames(up_down_matrix) <- selected_signals_for_inference
+                colnames(up_down_matrix) <- levels(as.factor(temp_data_frame[, non_signal_variable]))
+                for (s in selected_signals_for_inference) {
+                    # Extract the intensity
+                    signal_intensity <- selected_signals_for_inference_intensity_df[[s]]
+                    # Extract the non-signal variable as an ordered factor
+                    non_signal_as_ordered_factor <- ordered(temp_data_frame[, non_signal_variable])
+                    # Remove possible NA values
+                    non_signal_as_ordered_factor <- non_signal_as_ordered_factor[!is.na(signal_intensity)]
+                    signal_intensity <- signal_intensity[!is.na(signal_intensity)]
+                    # Number the observations
+                    IDs <- c(1:length(signal_intensity))
+                    # Generate a matrix with the ID, the intensities of the selected signal for inference and the non-signal variable
+                    signal_dataframe <- data.frame(IDs, signal_intensity, non_signal_as_ordered_factor)
+                    ##### Jitter plot
+                    plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " jitterplot")
+                    file_name <- sprintf("%s%s", plot_name, image_format)
+                    jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = plot_name, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                    setwd(plots_two_level_effect_analysis_subfolder)
+                    ggsave(jitter_plot, file = file_name, width = 4, height = 4)
+                    ##### Box plot
+                    plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot")
+                    file_name <- sprintf("%s%s", plot_name, image_format)
+                    box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = plot_name, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                    setwd(plots_two_level_effect_analysis_subfolder)
+                    ggsave(box_plot, file = file_name, width = 4, height = 4)
+                    
+                    ##### Scatter plot
+                    plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " scatterplot")
+                    # Sort the dataframe rows according to the values of the non-signal variable
+                    ordered_signal_dataframe <- signal_dataframe[order(non_signal_as_ordered_factor),]
+                    ordered_signal_dataframe <- cbind(ordered_signal_dataframe, c(1:nrow(signal_dataframe[order(non_signal_as_ordered_factor),])))
+                    colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
+                    file_name <- sprintf("%s%s", plot_name, image_format)
+                    graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
+                    scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = plot_name, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                    setwd(plots_two_level_effect_analysis_subfolder)
+                    ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                    ##### UP-DOWN MATRIX
+                    s_split <- group_dependent_variable(selected_signals_for_inference_intensity_df[, s], as.factor(selected_signals_for_inference_intensity_df[, non_signal_variable]))
+                    for (x in 1:length(s_split)) {
+                        # Run the Shapiro test to see if to output the mean or the median
+                        if (length(s_split[[x]]) >= 3 && length(s_split[[x]]) <= 5000) {
+                            shapiro_test <- shapiro.test(s_split[[x]])
+                            shapiro_test_pvalue <- shapiro_test$p.value
+                            if (shapiro_test_pvalue <= pvalue_tests) {
+                                distribution_type <- "non-normal"
+                            } else {
+                                distribution_type <- "normal"
+                            }
+                        } else {
+                            distribution_type <- "non-normal"
+                        }
+                        # Fill the matrix
+                        if (distribution_type == "normal") {
+                            up_down_matrix[s, x] <- mean(s_split[[x]], na.rm = TRUE)
+                        } else if (distribution_type == "non-normal") {
+                            up_down_matrix[s, x] <- median(s_split[[x]], na.rm = TRUE)
+                        }
+                    }
+                }
+                setwd(tables_two_level_effect_analysis_subfolder)
+                write_file(file_name = "Up-Down matrix", data = up_down_matrix, file_format = file_format)
+                ### NO OUTLIERS
+                if (remove_outliers_two_level_effect_analysis == TRUE) {
+                    # Create the folder where to dump the files and go to it...
+                    plots_two_level_effect_analysis_no_outliers_subfolder <- file.path(combination_subfolder, "Plots (without outliers)")
+                    dir.create(plots_two_level_effect_analysis_no_outliers_subfolder)
+                    ##### UP-DOWN Table
+                    up_down_matrix_no_outliers <- matrix(0, nrow = length(selected_signals_for_inference), ncol = length(levels(as.factor(temp_data_frame_no_outliers[, non_signal_variable]))))
+                    rownames(up_down_matrix_no_outliers) <- selected_signals_for_inference
+                    colnames(up_down_matrix_no_outliers) <- levels(as.factor(temp_data_frame_no_outliers[, non_signal_variable]))
+                    for (s in selected_signals_for_inference) {
+                        # Extract the intensity
+                        signal_intensity <- selected_signals_for_inference_intensity_df_no_outliers[[s]]
+                        # Extract the non-signal variable as an ordered factor
+                        non_signal_as_ordered_factor <- ordered(temp_data_frame_no_outliers[, non_signal_variable])
+                        # Remove possible NA values
+                        non_signal_as_ordered_factor <- non_signal_as_ordered_factor[!is.na(signal_intensity)]
+                        signal_intensity <- signal_intensity[!is.na(signal_intensity)]
+                        # Number the observations
+                        IDs <- c(1:length(signal_intensity))
+                        # Generate a matrix with the ID, the intensities of the selected signal for inference and the non-signal variable
+                        signal_dataframe <- data.frame(IDs, signal_intensity, non_signal_as_ordered_factor)
+                        ##### Jitter plot
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " jitterplot (without outliers)")
+                        file_name <- sprintf("%s%s", plot_name, image_format)
+                        jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, "\n(without outliers)"), alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                        setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
+                        ggsave(jitter_plot, file = file_name, width = 4, height = 4)
+                        ##### Box plot
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot (without outliers)")
+                        file_name <- sprintf("%s%s", plot_name, image_format)
+                        box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot\n(without outliers)"), geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                        setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
+                        ggsave(box_plot, file = file_name, width = 4, height = 4)
+                        ##### Scatter plot
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " scatterplot (without outliers)")
+                        # Sort the dataframe rows according to the values of the non-signal variable
+                        ordered_signal_dataframe <- signal_dataframe[order(non_signal_as_ordered_factor),]
+                        ordered_signal_dataframe <- cbind(ordered_signal_dataframe, c(1:nrow(signal_dataframe[order(non_signal_as_ordered_factor),])))
+                        colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
+                        file_name <- sprintf("%s%s", plot_name, image_format)
+                        graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
+                        scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, "\n(without outliers)"), color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                        setwd(plots_two_level_effect_analysis_no_outliers_subfolder)
+                        ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                        ##### UP-DOWN MATRIX
+                        s_split <- group_dependent_variable(selected_signals_for_inference_intensity_df_no_outliers[, s], as.factor(selected_signals_for_inference_intensity_df_no_outliers[, non_signal_variable]))
+                        for (x in 1:length(s_split)) {
+                            # Run the Shapiro test to see if to output the mean or the median
+                            if (length(s_split[[x]]) >= 3 && length(s_split[[x]]) <= 5000) {
+                                shapiro_test <- shapiro.test(s_split[[x]])
+                                shapiro_test_pvalue <- shapiro_test$p.value
+                                if (shapiro_test_pvalue <= pvalue_tests) {
+                                    distribution_type <- "non-normal"
+                                } else {
+                                    distribution_type <- "normal"
+                                }
+                            } else {
+                                distribution_type <- "non-normal"
+                            }
+                            # Fill the matrix
+                            if (distribution_type == "normal") {
+                                up_down_matrix_no_outliers[s, x] <- mean(s_split[[x]], na.rm = TRUE)
+                            } else if (distribution_type == "non-normal") {
+                                up_down_matrix_no_outliers[s, x] <- median(s_split[[x]], na.rm = TRUE)
+                            }
+                        }
+                    }
+                    setwd(tables_two_level_effect_analysis_subfolder)
+                    write_file(file_name = "Up-Down matrix (without outliers)", data = up_down_matrix_no_outliers, file_format = file_format)
+                }
+                ### Dump the files
+                setwd(tables_two_level_effect_analysis_subfolder)
+                write_file(file_name = "Patient number matrix", data = patient_number_matrix, file_format = file_format)
+                write_file(file_name = "Outliers", data = outlier_matrix, file_format = file_format)
+                write_file(file_name = "Methods", data = inference_signals_method_matrix, file_format = file_format)
+                write_file(file_name = "Differentially expressed signals", data = selected_signals_for_inference_intensity_df, file_format = file_format)
+                write_file(file_name = "All signals", data = temp_data_frame_original, file_format = file_format)
+                write_file(file_name = "Test p-values", data = pvalue_matrix, file_format = file_format)
+                ### Sampling
+                if (isTRUE(sampling)) {
+                    filename <-  "RMdataTEST"
+                    dataname <- TEST
+                    WriteFile(filename,dataname, file_format)
+                    
+                    TFD_DIA <- as.data.frame(subset(input_data, input_data$Class == 3, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
+                    TFD_DIA <- TFD_DIA[c("No",SelectedSignsForEffect)]
+                    RowNumb <- dim(TFD_DIA)[1]
+                    Class <- rep(0,RowNumb)
+                    BaseClass <- rep(3,RowNumb)
+                    TFD_DIA <- cbind(BaseClass,Class,TFD_DIA)
+                    filename <-  "RMTESTDIABS"
+                    dataname <- TFD_DIA
+                    WriteFile(filename,dataname, file_format)
+                    
+                    TFD_DIAMA <- as.data.frame(subset(input_data, input_data$Class == 4, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
+                    TFD_DIAMA <- TFD_DIAMA[c("No",SelectedSignsForEffect)]
+                    RowNumb <- dim(TFD_DIAMA)[1]
+                    Class <- rep(0,RowNumb)
+                    BaseClass <- rep(4,RowNumb)
+                    TFD_DIAMA <- cbind(BaseClass,Class,TFD_DIAMA)
+                    filename <-  "RMTESTDIAMA.xlsx"
+                    dataname <- TFD_DIAMA
+                    WriteFile(filename,dataname)
+                    
+                    TFD_M <- as.data.frame(subset(input_data, input_data$Class == 5, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
+                    TFD_M <- TFD_M[c("No",SelectedSignsForEffect)]
+                    RowNumb <- dim(TFD_M)[1]
+                    Class <- rep(1,RowNumb)
+                    BaseClass <- rep(5,RowNumb)
+                    TFD_M <- cbind(BaseClass,Class,TFD_M)
+                    filename <-  "RMTESTMAL"
+                    dataname <- TFD_M
+                    WriteFile(filename,dataname, file_format)
+                    
+                    TFD_B <- as.data.frame(subset(input_data, input_data$Class == 6, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
+                    TFD_B <- TFD_B[c("No",SelectedSignsForEffect)]
+                    RowNumb <- dim(TFD_B)[1]
+                    Class <- rep(0,RowNumb)
+                    BaseClass <- rep(6,RowNumb)
+                    TFD_B <- cbind(BaseClass,Class,TFD_B)
+                    filename <-  "RMTESTBEN"
+                    dataname <- TFD_B
+                    WriteFile(filename,dataname, file_format)
+                    
+                }
+                # Go back to the output folder
+                setwd(output_folder)
+                # Restore the original data frame
+                #temp_data_frame <- temp_data_frame_original
+            }
+        }
+        
+        
+        
+        # Progress bar
+        setTkProgressBar(program_progress_bar, value = 0.65, title = NULL, label = "65 %")
+        
+        
+        
+        
+        
+        #################################################################################
+        #################### MULTI-LEVEL EFFECT ANALYSIS OVER SIGNAL INTENSITY
+        if (isTRUE(multi_level_effect_analysis)) {
+            # Establish the variables for the multi-level effect analysis (Append the discriminant column to the previously selected variables)
+            if (discriminant_feature != "NONE") {
+                multi_level_effect_analysis_non_features <- sort(c(discriminant_feature, multi_level_effect_analysis_non_features))
+            }
+            print("########## MULTI-LEVEL EFFECT ANALYSIS ##########")
+            ### Build up the combinations of possibilities (the possibilities are simply the name of the non-signal variables, since in each test, the test automatically reads all the levels of the variable)
+            combination_vector <- multi_level_effect_analysis_non_features
+            ##### For each combination... (everytime read all the levels)
+            for (comb in 1:length(combination_vector)) {
+                # Create the folder in which every file goes
+                # Create the folder where to dump the files and go to it...
+                combination_subfolder <- file.path(output_folder, paste(combination_vector[comb], "(multi-level)"))
+                dir.create(combination_subfolder)
+                setwd(combination_subfolder)
+                # Message
+                print(paste("Simple effects (multi-level) -> ", combination_vector[comb]))
+                # Non signal variable
+                non_signal_variable <- combination_vector[comb]
+                # Isolate the dataframe with the signals + the selected non-signal variable
+                temp_data_frame <- input_data[, c(non_signal_variable, names(signals_data))]
+                # Store the original data frame
+                temp_data_frame_original <- temp_data_frame
+                # Remove NAs from the non signal and from the signal
+                temp_data_frame <- temp_data_frame[!is.na(temp_data_frame[, non_signal_variable]), ]
+                # Convert the selected non-feature variable to character
+                temp_data_frame[, non_signal_variable] <- as.character(temp_data_frame[, non_signal_variable])
+                # Generate a corresponding temp data frame but without outliers
+                temp_data_frame_no_outliers <- temp_data_frame
+                # Levels of the non-signal variable
+                levels_non_signal_variable <- levels(as.factor(temp_data_frame[, non_signal_variable]))
+                ### Output initialization
+                shapiro_list_multi <- list() #one element per level of the non-signal variable
+                for (lv in 1:length(levels_non_signal_variable)) {
+                    shapiro_list_multi[[lv]] <- list()
+                }
+                bartlett_list_multi <- list()
+                kruskal_list_multi <- list()
+                leven_list_multi <- list()
+                welch_list_multi <- list()
+                anova_list_multi <- list()
+                permutation_test_list_multi <- list()
+                number_of_patients_list_multi <- list()
+                outlier_list_multi <- list()
+                ### For each signal...
+                for (ms in 1:ncol(signals_data)) {
+                    # Extract the name of the signal...
+                    m <- colnames(signals_data)[ms]
+                    ## Extract the column of the signal and the response variable...
+                    mass_x <- as.numeric(temp_data_frame[, m])
+                    response_variable <- temp_data_frame[, non_signal_variable]
+                    if (isTRUE(remove_outliers_multi_level_effect_analysis)) {
+                        ## Outlier detection
+                        # Detect the outliers (fence)
+                        outliers <- boxplot(as.numeric(mass_x) ~ response_variable, plot = FALSE)$out
+                        # If there are some...
+                        if (length(outliers) > 0) {
+                            # Build the dataframe to be dumped
+                            outliers_dataframe <- temp_data_frame[mass_x %in% outliers, c(non_signal_variable, m)]
+                            # Signal name
+                            sign_name <- rep(m, dim(outliers_dataframe)[1])
+                            # Patients
+                            patients <- rownames(outliers_dataframe)
+                            # Append the two columns...
+                            outliers_dataframe <- cbind(outliers_dataframe, patients, sign_name)
+                            # Fix the column names
+                            colnames(outliers_dataframe) <- c(non_signal_variable,"Intensity","Patient","Mass")
+                            # Store this in the final list of outlier dataframes
+                            outlier_list_multi[[ms]] <- outliers_dataframe
+                            # Replace the intensity in the original dataframe with NA (so that they are excluded)
+                            temp_data_frame_no_outliers[mass_x %in% outliers, m] <- NA
+                            mass_x[mass_x %in% outliers] <- NA
+                        }
+                    }
+                    ## Group the dependent variable (the mass column) according to the response variable (for Shapiro test)
+                    mass_x_split <- group_dependent_variable(as.numeric(mass_x), as.factor(response_variable))
+                    ### Clean the NA values (outliers) from the mass column and the response variable column (after the grouping, because the NA removal can cause the loss of a response variable, if it contains only the outlier)
+                    response_variable <- as.factor(response_variable[!is.na(mass_x)])
+                    mass_x <- as.factor(mass_x[!is.na(mass_x)])
+                    for (x in 1:length(mass_x_split)) {
+                        mass_x_split[[x]] <- mass_x_split[[x]][!is.na(mass_x_split[[x]])]
+                    }
+                    # Define the names and the number of patients
+                    number_of_patients_x_multi <- integer()
+                    for (x in 1:length(mass_x_split)) {
+                        number_of_patients_x_multi <- append(number_of_patients_x_multi, length(mass_x_split[[x]]))
+                    }
+                    number_of_patients_list_multi[[m]] <- number_of_patients_x_multi
+                    ### If the number of patients in the two lists is more than the minimum number of patients allowed and all the elements of the two groups are not the same...
+                    minimum_number_of_patients_for_all <- FALSE
+                    if (min(number_of_patients_list_multi[[m]]) >= minimum_number_of_patients) {
+                        minimum_number_of_patients_for_all <- TRUE
+                    }
+                    all_alements_are_the_same <- FALSE
+                    for (x in 1:length(mass_x_split)) {
+                        if (length(unique(mass_x_split[[x]])) == 1) {
+                            all_alements_are_the_same <- TRUE
+                        }
+                    }
+                    # If the condition is satisfied (enough patients per group)...
+                    if (isTRUE(minimum_number_of_patients_for_all) && !isTRUE(all_alements_are_the_same)) {
+                        # Checking for normal distributed data in the groups
+                        for (x in 1:length(mass_x_split)) {
+                            if (length(mass_x_split[[x]]) >= 3 && length(mass_x_split[[x]]) <= 5000) {
+                                shapiro_list_multi[[x]][[length(shapiro_list_multi[[x]]) + 1]] <- shapiro.test(as.numeric(mass_x_split[[x]]))
+                            } else if (length(mass_x_split[[x]]) < 3 || length(mass_x_split[[x]]) > 5000) {
+                                shapiro_list_multi[[x]][[length(shapiro_list_multi[[x]]) + 1]] <- NA
+                            }
+                        }
+                        # Do everything only if the factor variable has more than one level
+                        if (length(levels(as.factor(response_variable))) > 1) {
+                            # Checking variances
+                            bartlett_list_multi[[m]] <- bartlett.test(as.numeric(mass_x) ~ response_variable)
+                            ### Anova
+                            anova_list_multi[[m]] <- anova(lm(formula = as.numeric(mass_x) ~ response_variable))
+                            ### Leven
+                            leven_list_multi[[m]] <- levene.test(as.numeric(mass_x), response_variable, location = "mean", kruskal.test = T)
+                            ### Kruskal
+                            kruskal_list_multi[[m]] <- kruskal.test(as.numeric(mass_x) ~ response_variable)
+                            ### Welch
+                            welch_list_multi[[m]] <- oneway.test(as.numeric(mass_x) ~ response_variable, var.equal = F)
+                            ### k-sets Permutation Test for non parametric heteroschedastic data
+                            permutation_test_list_multi[[m]] <- oneway_test(as.numeric(mass_x) ~ response_variable, alternative = 'two.sided')
+                        } else {
+                            bartlett_list_multi[[m]] <- NA
+                            anova_list_multi[[m]] <- NA
+                            leven_list_multi[[m]] <- NA
+                            kruskal_list_multi[[m]] <- NA
+                            welch_list_multi[[m]] <- NA
+                            permutation_test_list_multi[[m]] <- NA
+                        }
+                    } else {
+                        for (x in 1:length(mass_x_split)) {
+                            shapiro_list_multi[[x]][[length(shapiro_list_multi[[x]]) + 1]] <- NA
+                        }
+                        bartlett_list_multi[[m]] <- NA
+                        anova_list_multi[[m]] <- NA
+                        leven_list_multi[[m]] <- NA
+                        kruskal_list_multi[[m]] <- NA
+                        welch_list_multi[[m]] <- NA
+                        permutation_test_list_multi[[m]] <- NA
+                    }
+                }
+                # Extract the pvalue list from the test lists...
+                list_of_shapiro_pvalue <- list()
+                for (s in 1:length(shapiro_list_multi)) {
+                    list_of_shapiro_pvalue[[s]] <- lapply(shapiro_list_multi[[s]], assumption_p)
+                }
+                list_of_bartlett_pvalue <- lapply(bartlett_list_multi, assumption_p)
+                list_of_leven_pvalue <- lapply(leven_list_multi, assumption_p)
+                list_of_anova_pvalue <- lapply(anova_list_multi, assumption_anova)
+                list_of_kruskal_pvalue <- lapply(kruskal_list_multi, assumption_p)
+                list_of_permutation_pvalue <- lapply(permutation_test_list_multi, assumption_permutation)
+                list_of_welch_pvalue <- lapply(welch_list_multi, assumption_p)
+                # Vectorize the lists...
+                vector_of_shapiro_pvalue_list <- list()
+                for (l in 1:length(list_of_shapiro_pvalue)) {
+                    vector_of_shapiro_pvalue_list[[l]] <- unlist(list_of_shapiro_pvalue[[l]])
+                }
+                for (l in 1:length(vector_of_shapiro_pvalue_list)) {
+                    names(vector_of_shapiro_pvalue_list[[l]]) <- colnames(signals_data)
+                }
+                vector_of_bartlett_pvalue <- unlist(list_of_bartlett_pvalue)
+                vector_of_leven_pvalue <- unlist(list_of_leven_pvalue)
+                vector_of_kruskal_pvalue <- unlist(list_of_kruskal_pvalue)
+                vector_of_welch_pvalue <- unlist(list_of_welch_pvalue)
+                vector_of_permutation_pvalue <- unlist(list_of_permutation_pvalue)
+                vector_of_anova_pvalue <- unlist(list_of_anova_pvalue)
+                # Message (if the elements in the lists are NA it means that there weren't enough patients per class)
+                #if (is.na(vector_of_bartlett_pvalue[1])) {
+                #    tkmessageBox(title = "Insufficient number of patients in one class or all patients in one class", message = "There is an insufficient number of patients in at least one class or there is only one class: the statistics cannot be performed!", icon = "warning")
+                #}
+                # Matrix of patient numbers...
+                patient_number_matrix_multi <- matrix(ncol = 4)
+                patient_number_matrix_multi <- do.call(rbind, number_of_patients_list_multi)
+                patient_number_matrix_multi <- cbind(rownames(patient_number_matrix_multi),patient_number_matrix_multi)
+                patient_number_matrix_multi_colnames <- character()
+                for (lv in 1:length(levels_non_signal_variable)) {
+                    patient_number_matrix_multi_colnames <- append(patient_number_matrix_multi_colnames, paste(non_signal_variable, levels_non_signal_variable[lv]))
+                }
+                colnames(patient_number_matrix_multi) <- c("Mass", patient_number_matrix_multi_colnames)
+                # Outlier matrix
+                outlier_matrix_multi <- do.call(rbind, outlier_list_multi)
+                # pvalue  matrix
+                p_value_shapiro <- matrix(unlist(vector_of_shapiro_pvalue_list), nrow = ncol(signals_data), byrow = F)
+                rownames(p_value_shapiro) <- colnames(signals_data)
+                p_value_shapiro_colnames <- character()
+                for (i in 1:ncol(p_value_shapiro)) {
+                    p_value_shapiro_colnames <- append(p_value_shapiro_colnames, paste("Shapiro", i))
+                }
+                colnames(p_value_shapiro) <- p_value_shapiro_colnames
+                pvalue_matrix_multi <- data.matrix(cbind(p_value_shapiro, vector_of_bartlett_pvalue, vector_of_leven_pvalue, vector_of_kruskal_pvalue, vector_of_welch_pvalue, vector_of_permutation_pvalue, vector_of_anova_pvalue))
+                rownames(pvalue_matrix_multi) <- names(signals_data)
+                # Generate a vector of features explaining if they are normally distributed
+                vector_of_normally_distributied_signals <- character()
+                vector_of_non_normally_distributied_signals <- character()
+                # For each signal...
+                for (p in 1:nrow(p_value_shapiro)) {
+                    # By default the signal is not normally distributed
+                    signal_is_normally_distributed <- TRUE
+                    # Scroll the column to change the distribution type according to the pvalue
+                    for (cl in 1:ncol(p_value_shapiro)) {
+                        if (!is.na(p_value_shapiro[p, cl])) {
+                            if (p_value_shapiro[p, cl] <= pvalue_tests) {
+                                signal_is_normally_distributed <- FALSE
+                            }
+                        } else if (is.na(p_value_shapiro[p, cl])) {
+                            signal_is_normally_distributed <- NULL
+                        }
+                    }
+                    # Add it to the right vector
+                    if (isTRUE(signal_is_normally_distributed)) {
+                        # Add this to the list of normally distributed signals
+                        vector_of_normally_distributied_signals <- append(vector_of_normally_distributied_signals, rownames(p_value_shapiro)[p])
+                    } else if (is.null(signal_is_normally_distributed)) {
+                        vector_of_normally_distributied_signals <- NULL
+                        vector_of_non_normally_distributied_signals <- NULL
+                    } else if (!isTRUE(signal_is_normally_distributed)) {
+                        # Add this to the list of non-normally distributed signals
+                        vector_of_non_normally_distributied_signals <- append(vector_of_non_normally_distributied_signals, rownames(p_value_shapiro)[p])
+                    }
+                }
+                ### Extract the data according to the conditions
+                # Extract the normal and non-normal data
+                normal_data <- as.data.frame(pvalue_matrix_multi[rownames(pvalue_matrix_multi) %in% vector_of_normally_distributied_signals, ])
+                non_normal_data <- as.data.frame(pvalue_matrix_multi[rownames(pvalue_matrix_multi) %in% vector_of_non_normally_distributied_signals, ])
+                # Extract the normal homoschedastic data
+                normal_homoschedastic_data <- as.data.frame(subset(normal_data, vector_of_bartlett_pvalue > pvalue_tests))
+                # Extract the normal heteroschedastic data
+                normal_heteroschedastic_data <- as.data.frame(subset(normal_data, vector_of_bartlett_pvalue <= pvalue_tests))
+                # Extract the non-normal homoschedastic data
+                non_normal_homoschedastic_data <-    as.data.frame(subset(non_normal_data, vector_of_leven_pvalue > pvalue_tests))
+                # Extract the non-normal heteroschedastic data
+                non_normal_heteroschedastic_data <- as.data.frame(subset(non_normal_data, vector_of_leven_pvalue <= pvalue_tests))
+                # Differentially expressed signals: normal homoschedastic data
+                diff_normal_homoschedastic_data <- as.data.frame(subset(normal_homoschedastic_data, vector_of_anova_pvalue <= pvalue_expression))
+                method_diff_norm_homo <- rep("ANOVA", nrow(diff_normal_homoschedastic_data))
+                matrix_diff_norm_homo <- as.data.frame(subset(diff_normal_homoschedastic_data, select = vector_of_anova_pvalue))
+                matrix_diff_norm_homo <- cbind(rownames(matrix_diff_norm_homo), matrix_diff_norm_homo, method_diff_norm_homo)
+                colnames(matrix_diff_norm_homo) <- c("Signal","pvalue","Test")
+                # Differentially expressed signals: normal heteroschedastic data
+                diff_normal_heteroschedastic_data <- as.data.frame(subset(normal_heteroschedastic_data, vector_of_welch_pvalue <= pvalue_expression))
+                method_diff_norm_hetero <- rep("Welch", nrow(diff_normal_heteroschedastic_data))
+                matrix_diff_norm_hetero <- as.data.frame(subset(diff_normal_heteroschedastic_data, select = vector_of_welch_pvalue))
+                matrix_diff_norm_hetero <- cbind(rownames(matrix_diff_norm_hetero), matrix_diff_norm_hetero, method_diff_norm_hetero)
+                colnames(matrix_diff_norm_hetero) <- c("Signal","pvalue","Test")
+                # Differentially expressed signals: non_normal homoschedastic data
+                diff_non_normal_homoschedastic_data <- as.data.frame(subset(non_normal_homoschedastic_data, vector_of_kruskal_pvalue <= pvalue_expression))
+                method_diff_non_norm_homo <- rep("Kruskal-Wallis", nrow(diff_non_normal_homoschedastic_data))
+                matrix_diff_non_norm_homo <- as.data.frame(subset(diff_non_normal_homoschedastic_data, select = vector_of_kruskal_pvalue))
+                matrix_diff_non_norm_homo <- cbind(rownames(matrix_diff_non_norm_homo), matrix_diff_non_norm_homo, method_diff_non_norm_homo)
+                colnames(matrix_diff_non_norm_homo) <- c("Signal","pvalue","Test")
+                # Differentially expressed signals: non-normal heteroschedastic data
+                diff_non_normal_heteroschedastic_data <- as.data.frame(subset(non_normal_heteroschedastic_data, vector_of_permutation_pvalue <= pvalue_expression))
+                method_diff_non_norm_hetero <- rep("Permutation", nrow(diff_non_normal_heteroschedastic_data))
+                matrix_diff_non_norm_hetero <- as.data.frame(subset(diff_non_normal_heteroschedastic_data, select = vector_of_permutation_pvalue))
+                matrix_diff_non_norm_hetero <- cbind(rownames(matrix_diff_non_norm_hetero), matrix_diff_non_norm_hetero, method_diff_non_norm_hetero)
+                colnames(matrix_diff_non_norm_hetero) <- c("Signal","pvalue","Test")
+                ########## POST-HOC TESTS
+                ### ANOVA POST-HOC
+                post_hoc_anova_list <- list()
+                if (nrow(diff_normal_homoschedastic_data)) {
+                    # For each signal...
+                    for (m in rownames(diff_normal_homoschedastic_data)) {
+                        ## Extract the column of the signal and the response variable...
+                        mass_x <- temp_data_frame[[m]]
+                        response_variable <- temp_data_frame[[non_signal_variable]]
+                        ### Clean the NA values from the mass column and the response variable column
+                        response_variable <- response_variable[!is.na(mass_x)]
+                        mass_x <- mass_x[!is.na(mass_x)]
+                        # Do not perform if the response variable has only one level...
+                        if (length(levels(as.factor(response_variable))) > 1) {
+                            ### Anova post hoc analysis: Tukey HSD test
+                            anova_test <- aov(lm(formula = mass_x ~ response_variable))
+                            # Post Hoc Tukey list creation
+                            tukey_post <- TukeyHSD(anova_test)
+                            rn <- rownames(tukey_post$response_variable)
+                            anova_table <- cbind(rn, tukey_post$response_variable)
+                            post_hoc_anova_list[[m]] <- anova_table
+                        } else {
+                            post_hoc_anova_list[[m]] <- NA
+                        }
+                    }
+                }
+                ### KRUSKAL-WALLIS POST-HOC
+                post_hoc_kruskal_list <- list()
+                if (nrow(diff_non_normal_homoschedastic_data)){
+                    # For each signal...
+                    for (m in rownames(diff_non_normal_homoschedastic_data)){
+                        ## Extract the column of the signal and the response variable...
+                        mass_x <- temp_data_frame[[m]]
+                        response_variable <- temp_data_frame[[non_signal_variable]]
+                        ### Clean the NA values from the mass column and the response variable column
+                        response_variable <- response_variable[!is.na(mass_x)]
+                        mass_x <- mass_x[!is.na(mass_x)]
+                        # Do not perform if the response variable has only one level...
+                        if (length(levels(as.factor(response_variable))) > 1) {
+                            ### Kruskal post hoc analysis: Nemenyi-Damico-Wolfe-Dunn test - coin required!
+                            signal_data_frame <- data.frame(mass_x, response_variable)
+                            # Post hoc test
+                            NDWD <- oneway_test(mass_x ~ response_variable, data = signal_data_frame, ytrafo = function(data) trafo(data, numeric_trafo = rank), xtrafo = function(data) trafo(data, factor_trafo = function(mass_x) model.matrix(~mass_x - 1) %*% t(contrMat(table(mass_x), "Tukey"))), teststat = "max", distribution = approximate(B = 90000))
+                            post_hoc_pvalue <- pvalue(NDWD, method = "single-step")
+                            rn <- rownames(post_hoc_pvalue)
+                            post_hoc_table <-  cbind(rn, post_hoc_pvalue)
+                            post_hoc_kruskal_list[[m]] <- post_hoc_table
+                        } else {
+                            post_hoc_kruskal_list[[m]] <- NA
+                        }
+                    }
+                }
+                ### WELCH POST-HOC
+                post_hoc_welch_list <- list()
+                if (nrow(diff_normal_heteroschedastic_data)) {
+                    # For each signal...
+                    for (m in rownames(diff_normal_heteroschedastic_data)) {
+                        ## Extract the column of the signal and the response variable...
+                        mass_x <- temp_data_frame[[m]]
+                        response_variable <- temp_data_frame[[non_signal_variable]]
+                        ### Clean the NA values from the mass column and the response variable column
+                        response_variable <- response_variable[!is.na(mass_x)]
+                        mass_x <- mass_x[!is.na(mass_x)]
+                        # Do not perform if the response variable has only one level...
+                        if (length(levels(as.factor(response_variable))) > 1) {
+                            ### Welch post hoc analysis: Duncan-Waller post-hoc test - agricolae required!
+                            degrees_of_freedom <- df.residual(lm(mass_x ~ response_variable))
+                            MSerror <- deviance(lm(mass_x ~ response_variable))/degrees_of_freedom
+                            Fc <- anova(lm(mass_x ~ response_variable))[1,4]
+                            comparison <- waller.test(mass_x, response_variable, degrees_of_freedom, MSerror, Fc, group = FALSE)
+                            rn <- rownames(as.data.frame(comparison[4]))
+                            ndf <- cbind(as.data.frame(comparison[4]), rn)
+                            post_hoc_welch_list[[m]] <- ndf
+                        } else {
+                            post_hoc_welch_list[[m]] <- NA
+                        }
+                    }
+                }
+                ### PERMUTATION POST-HOC
+                post_hoc_permutation_list <- list()
+                if (nrow(diff_non_normal_heteroschedastic_data)) {
+                    # For each signal...
+                    for (m in rownames(diff_non_normal_heteroschedastic_data)) {
+                        ## Extract the column of the signal and the response variable...
+                        mass_x <- temp_data_frame[[m]]
+                        response_variable <- temp_data_frame[[non_signal_variable]]
+                        ### Clean the NA values from the mass column and the response variable column
+                        response_variable <- response_variable[!is.na(mass_x)]
+                        mass_x <- mass_x[!is.na(mass_x)]
+                        # Do not perform if the response variable has only one level...
+                        if (length(levels(as.factor(response_variable))) > 1) {
+                            ### Permutation post hoc analysis: still follow Nemenyi-Damico-Wolfe-Dunn test - coin required!
+                            signal_data_frame <- data.frame(mass_x, response_variable)
+                            
+                            NDWD <- oneway_test(mass_x ~ response_variable, data = signal_data_frame, ytrafo = function(data) trafo(data, numeric_trafo = rank), xtrafo = function(data) trafo(data, factor_trafo = function(mass_x) model.matrix(~mass_x - 1) %*% t(contrMat(table(mass_x), "Tukey"))), teststat = "max", distribution = approximate(B = 90000))
+                            
+                            post_hoc_pvalue  <- pvalue(NDWD, method = "single-step")
+                            rn <- rownames(post_hoc_pvalue)
+                            post_hoc_table <-  cbind(rn, post_hoc_pvalue)
+                            post_hoc_permutation_list[[m]] <- post_hoc_table
+                        } else {
+                            post_hoc_permutation_list[[m]] <- NA
+                        }
+                    }
+                }
+                ##### Selected signals for inference
+                selected_signals_for_inference <- c(rownames(diff_normal_homoschedastic_data), rownames(diff_normal_heteroschedastic_data), rownames(diff_non_normal_homoschedastic_data), rownames(diff_non_normal_heteroschedastic_data))
+                # Print the message...
+                if (length(selected_signals_for_inference) > 0) {
+                    print("Differentially expressed signals for inference")
+                    print(selected_signals_for_inference)
+                } else {
+                    print(paste("There are no differentially expressed signals among the levels of:", non_signal_variable, "or there is an insuffucient number of patients in at least one class or there is only one class!"))
+                }
+                # Generate a matrix with the signals for inference and the method used to identify them...
+                inference_signals_method_matrix <- rbind(matrix_diff_norm_homo, matrix_diff_norm_hetero, matrix_diff_non_norm_homo, matrix_diff_non_norm_hetero)
+                # Select the signals to be used for inference and the non-signal variable
+                selected_signals_for_inference_intensity_df <- subset(temp_data_frame, select = c(non_signal_variable, selected_signals_for_inference))
+                # Select the signals to be used for inference and the non-signal variable (NO OUTLIERS)
+                if (remove_outliers_multi_level_effect_analysis == TRUE) {
+                    selected_signals_for_inference_intensity_df_no_outliers <- subset(temp_data_frame_no_outliers, select = c(non_signal_variable, selected_signals_for_inference))
+                } else {
+                    selected_signals_for_inference_intensity_df_no_outliers <- NULL
+                }
+                ########### Dump the files
+                # OUTLIERS
+                # Create the folder where to dump the files and go to it...
+                plots_multi_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Plots")
+                dir.create(plots_multi_level_effect_analysis_subfolder)
+                # Create the folder where to dump the table files and go to it...
+                tables_multi_level_effect_analysis_subfolder <- file.path(combination_subfolder, "Tables")
+                dir.create(tables_multi_level_effect_analysis_subfolder)
+                ##### UP-DOWN Table
+                up_down_matrix <- matrix(0, nrow = length(selected_signals_for_inference), ncol = length(levels(as.factor(temp_data_frame[, non_signal_variable]))))
+                rownames(up_down_matrix) <- selected_signals_for_inference
+                colnames(up_down_matrix) <- levels(as.factor(temp_data_frame[, non_signal_variable]))
+                # For each signals of inference...
+                for (s in selected_signals_for_inference) {
+                    # Extract the intensity
+                    signal_intensity <- selected_signals_for_inference_intensity_df[[s]]
+                    # Extract the non-signal variable as an ordered factor
+                    non_signal_as_ordered_factor <- ordered(temp_data_frame[, non_signal_variable])
+                    # Remove possible NA values
+                    non_signal_as_ordered_factor <- non_signal_as_ordered_factor[!is.na(signal_intensity)]
+                    signal_intensity <- signal_intensity[!is.na(signal_intensity)]
+                    # Number the observations
+                    IDs <- c(1:length(signal_intensity))
+                    # Generate a matrix with the ID, the intensities of the selected signal for inference and the non-signal variable
+                    signal_dataframe <- data.frame(IDs, signal_intensity, non_signal_as_ordered_factor)
+                    ##### Jitter plot
+                    plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " jitterplot")
+                    file_name <- sprintf("%s%s", plot_name, image_format)
+                    jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = plot_name, alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                    setwd(plots_multi_level_effect_analysis_subfolder)
+                    ggsave(jitter_plot, file = file_name, width = 4, height = 4)
+                    ##### Box plot
+                    plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot")
+                    file_name <- sprintf("%s%s", plot_name, image_format)
+                    box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = plot_name, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                    setwd(plots_multi_level_effect_analysis_subfolder)
+                    ggsave(box_plot, file = file_name, width = 4, height = 4)
+                    ##### Scatter plot
+                    plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " scatterplot")
+                    # Sort the dataframe rows according to the values of the non-signal variable
+                    ordered_signal_dataframe <- signal_dataframe[order(non_signal_as_ordered_factor),]
+                    ordered_signal_dataframe <- cbind(ordered_signal_dataframe, c(1:nrow(signal_dataframe[order(non_signal_as_ordered_factor),])))
+                    colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
+                    file_name <- sprintf("%s%s", plot_name, image_format)
+                    graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
+                    scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = plot_name, color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                    setwd(plots_multi_level_effect_analysis_subfolder)
+                    ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                    ##### UP-DOWN MATRIX
+                    s_split <- group_dependent_variable(selected_signals_for_inference_intensity_df[, s], as.factor(selected_signals_for_inference_intensity_df[, non_signal_variable]))
+                    for (x in 1:length(s_split)) {
+                        # Run the Shapiro test to see if to output the mean or the median
+                        if (length(s_split[[x]]) >= 3 && length(s_split[[x]]) <= 5000) {
+                            shapiro_test <- shapiro.test(s_split[[x]])
+                            shapiro_test_pvalue <- shapiro_test$p.value
+                            if (shapiro_test_pvalue <= pvalue_tests) {
+                                distribution_type <- "non-normal"
+                            } else {
+                                distribution_type <- "normal"
+                            }
+                        } else {
+                            distribution_type <- "non-normal"
+                        }
+                        # Fill the matrix
+                        if (distribution_type == "normal") {
+                            up_down_matrix[s, x] <- mean(s_split[[x]], na.rm = TRUE)
+                        } else if (distribution_type == "non-normal") {
+                            up_down_matrix[s, x] <- median(s_split[[x]], na.rm = TRUE)
+                        }
+                    }
+                }
+                setwd(tables_multi_level_effect_analysis_subfolder)
+                write_file(file_name = "Up-Down matrix", data = up_down_matrix, file_format = file_format)
+                ### NO OUTLIERS
+                if (remove_outliers_multi_level_effect_analysis == TRUE) {
+                    # Create the folder where to dump the files and go to it...
+                    plots_multi_level_effect_analysis_no_outliers_subfolder <- file.path(combination_subfolder, "Plots (without outliers)")
+                    dir.create(plots_multi_level_effect_analysis_no_outliers_subfolder)
+                    ##### UP-DOWN Table
+                    up_down_matrix_no_outliers <- matrix(0, nrow = length(selected_signals_for_inference), ncol = length(levels(as.factor(temp_data_frame_no_outliers[, non_signal_variable]))))
+                    rownames(up_down_matrix_no_outliers) <- selected_signals_for_inference
+                    colnames(up_down_matrix_no_outliers) <- levels(as.factor(temp_data_frame_no_outliers[, non_signal_variable]))
+                    # For each signals of inference...
+                    for (s in selected_signals_for_inference) {
+                        # Extract the intensity
+                        signal_intensity <- selected_signals_for_inference_intensity_df_no_outliers[[s]]
+                        # Extract the non-signal variable as an ordered factor
+                        non_signal_as_ordered_factor <- ordered(temp_data_frame_no_outliers[, non_signal_variable])
+                        # Remove possible NA values
+                        non_signal_as_ordered_factor <- non_signal_as_ordered_factor[!is.na(signal_intensity)]
+                        signal_intensity <- signal_intensity[!is.na(signal_intensity)]
+                        # Number the observations
+                        IDs <- c(1:length(signal_intensity))
+                        # Generate a matrix with the ID, the intensities of the selected signal for inference and the non-signal variable
+                        signal_dataframe <- data.frame(IDs, signal_intensity, non_signal_as_ordered_factor)
+                        ##### Jitter plot
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " jitterplot (without outliers)")
+                        file_name <- sprintf("%s%s", plot_name, image_format)
+                        jitter_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, geom = "jitter", main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, "\n(without outliers)"), alpha = I(1 / 5), ylab = "Signal intensity", xlab = non_signal_variable)
+                        setwd(plots_multi_level_effect_analysis_no_outliers_subfolder)
+                        ggsave(jitter_plot, file = file_name, width = 4, height = 4)
+                        ##### Box plot
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot (without outliers)")
+                        file_name <- sprintf("%s%s",plot_name, image_format)
+                        box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, " boxplot\n(without outliers)"), geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
+                        setwd(plots_multi_level_effect_analysis_no_outliers_subfolder)
+                        ggsave(box_plot, file = file_name, width = 4, height = 4)
+                        ##### Scatter plot
+                        plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " scatterplot (without outliers)")
+                        # Sort the dataframe rows according to the values of the non-signal variable
+                        ordered_signal_dataframe <- signal_dataframe[order(non_signal_as_ordered_factor),]
+                        ordered_signal_dataframe <- cbind(ordered_signal_dataframe, c(1:nrow(signal_dataframe[order(non_signal_as_ordered_factor),])))
+                        colnames(ordered_signal_dataframe) <- c("old_id","intensity", non_signal_variable,"id")
+                        file_name <- sprintf("%s%s", plot_name, image_format)
+                        graph_colors <- as.factor(ordered_signal_dataframe[[non_signal_variable]])
+                        scatter_plot <- qplot(id, intensity, data = ordered_signal_dataframe, geom = "line", main = sprintf("%s%s%s%s", non_signal_variable," vs ", s, "\n(without outliers)"), color = graph_colors, ylab = "Signal intensity", xlab = "Signals (grouped)")
+                        setwd(plots_multi_level_effect_analysis_no_outliers_subfolder)
+                        ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                    }
+                    setwd(tables_multi_level_effect_analysis_subfolder)
+                    write_file(file_name = "Up-Down matrix (no outliers)", data = up_down_matrix_no_outliers, file_format = file_format)
+                }
+                ### Dump the files
+                setwd(tables_multi_level_effect_analysis_subfolder)
+                write_file(file_name = "Patient number matrix", data = patient_number_matrix_multi, file_format = file_format)
+                write_file(file_name = "Outliers", data = outlier_matrix_multi, file_format = file_format)
+                write_file(file_name = "Methods", data = inference_signals_method_matrix, file_format = file_format)
+                write_file(file_name = "Differentially expressed signals", data = selected_signals_for_inference_intensity_df, file_format = file_format)
+                write_file(file_name = "All signals", data = temp_data_frame_original, file_format = file_format)
+                write_file(file_name = "Test p-values", data = pvalue_matrix_multi, file_format = file_format)
+                if (nrow(diff_normal_homoschedastic_data)){
+                    write_posthoc_file(file_name = "PostHoc ANOVA", data = post_hoc_anova_list, file_format = file_format)
+                }
+                if (nrow(diff_non_normal_homoschedastic_data)) {
+                    write_posthoc_file(file_name = "PostHoc Kruskal-Wallis", data = post_hoc_kruskal_list, file_format = file_format)
+                }
+                if (nrow(diff_normal_heteroschedastic_data)) {
+                    write_posthoc_file(file_name = "PostHoc Welch", data = post_hoc_welch_list, file_format = file_format)
+                }
+                if (nrow(diff_non_normal_heteroschedastic_data)) {
+                    write_posthoc_file(file_name = "PostHoc Permutation", data = post_hoc_permutation_list, file_format = file_format)
+                }
+                # Go back to the output folder
+                setwd(output_folder)
+            }
+        }
+        
+        # Progress bar
+        setTkProgressBar(program_progress_bar, value = 1.00, title = NULL, label = "100%")
+        close(program_progress_bar)
+        
+        ##### FINISH
+        finish_message <- tkmessageBox(title = "Operation completed", message = "All the statistical operations have been performed and the files have been dumped", icon = "info")
+    } else {
+        tkmessageBox(title = "No input file selected", message = "No input file has been selected!!!\nPlease, select a file to be imported", icon = "warning")
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###############################################################################
+
+
+
+
+##################################################################### WINDOW GUI
+
+### Check for updates
+check_for_updates_function()
+
+########## List of variables, whose values are taken from the entries in the GUI
+pvalue_expression <- tclVar("")
+pvalue_tests <- tclVar("")
+#TestPer_Base <- tclVar("")
+#TestPer_adv <- tclVar("")
+minimum_number_of_patients <- tclVar("")
+
+
+
+######################## GUI
+
+# Get system info (Platform - Release - Version (- Linux Distro))
+system_os = Sys.info()[1]
+os_release = Sys.info()[2]
+os_version = Sys.info()[3]
+
+### Get the screen resolution
+# Windows
+if (system_os == "Windows") {
+    # Windows 7
+    if (length(grep("7", os_release, fixed = TRUE)) > 0) {
+        # Get system info
+        screen_height <- system("wmic desktopmonitor get screenheight", intern = TRUE)
+        screen_width <- system("wmic desktopmonitor get screenwidth", intern = TRUE)
+        # Retrieve the values
+        screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
+        screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
+    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
+        # Windows 10
+        # Get system info
+        screen_info <- system("wmic path Win32_VideoController get VideoModeDescription", intern = TRUE)[2]
+        # Get the resolution
+        screen_resolution <- unlist(strsplit(screen_info, "x"))
+        # Retrieve the values
+        screen_height <- as.numeric(screen_resolution[2])
+        screen_width <- as.numeric(screen_resolution[1])
+    }
+} else if (system_os == "Linux") {
+    # Get system info
+    screen_info <- system("xdpyinfo -display :0", intern = TRUE)
+    # Get the resolution
+    screen_resolution <- screen_info[which(screen_info == "screen #0:") + 1]
+    screen_resolution <- unlist(strsplit(screen_resolution, "dimensions: ")[1])
+    screen_resolution <- unlist(strsplit(screen_resolution, "pixels"))[2]
+    # Retrieve the wto dimensions...
+    screen_width <- as.numeric(unlist(strsplit(screen_resolution, "x"))[1])
+    screen_height <- as.numeric(unlist(strsplit(screen_resolution, "x"))[2])
+}
+
+
+### FONTS
+# Default sizes (determined on a 1680x1050 screen) (in order to make them adjust to the size screen, the screen resolution should be retrieved)
+title_font_size <- 24
+other_font_size <- 11
+# Windows
+if (system_os == "Windows") {
+    # Windows 7
+    if (length(grep("7", os_release, fixed = TRUE)) > 0) {
+        # Determine the font size according to the resolution
+        total_number_of_pixels <- screen_width * screen_height
+        # Determine the scaling factor (according to a complex formula)
+        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
+        # Windows 10
+        # Determine the font size according to the resolution
+        total_number_of_pixels <- screen_width * screen_height
+        # Determine the scaling factor (according to a complex formula)
+        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    }
+    # Define the fonts
+    garamond_title_bold = tkfont.create(family = "Garamond", size = title_font_size, weight = "bold")
+    garamond_other_normal = tkfont.create(family = "Garamond", size = other_font_size, weight = "normal")
+    arial_title_bold = tkfont.create(family = "Arial", size = title_font_size, weight = "bold")
+    arial_other_normal = tkfont.create(family = "Arial", size = other_font_size, weight = "normal")
+    trebuchet_title_bold = tkfont.create(family = "Trebuchet MS", size = title_font_size, weight = "bold")
+    trebuchet_other_normal = tkfont.create(family = "Trebuchet MS", size = other_font_size, weight = "normal")
+    trebuchet_other_bold = tkfont.create(family = "Trebuchet MS", size = other_font_size, weight = "bold")
+    # Use them in the GUI
+    title_font = trebuchet_title_bold
+    label_font = trebuchet_other_normal
+    entry_font = trebuchet_other_normal
+    button_font = trebuchet_other_bold
+} else if (system_os == "Linux") {
+    # Linux
+    # Determine the font size according to the resolution
+    total_number_of_pixels <- screen_width * screen_height
+    # Determine the scaling factor (according to a complex formula)
+    scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+    scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+    title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+    other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    # Ubuntu
+    if (length(grep("Ubuntu", os_version, ignore.case = TRUE)) > 0) {
+        # Define the fonts
+        ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = title_font_size, weight = "bold")
+        ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "normal")
+        ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "bold")
+        liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
+        liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
+        liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
+        bitstream_charter_title_bold = tkfont.create(family = "Bitstream Charter", size = title_font_size, weight = "bold")
+        bitstream_charter_other_normal = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "normal")
+        bitstream_charter_other_bold = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "bold")
+        # Use them in the GUI
+        title_font = bitstream_charter_title_bold
+        label_font = bitstream_charter_other_normal
+        entry_font = bitstream_charter_other_normal
+        button_font = bitstream_charter_other_bold
+    } else if (length(grep("Fedora", os_version, ignore.case = TRUE)) > 0) {
+        # Fedora
+        # Define the fonts
+        cantarell_title_bold = tkfont.create(family = "Cantarell", size = title_font_size, weight = "bold")
+        cantarell_other_normal = tkfont.create(family = "Cantarell", size = other_font_size, weight = "normal")
+        cantarell_other_bold = tkfont.create(family = "Cantarell", size = other_font_size, weight = "bold")
+        liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
+        liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
+        liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
+        # Use them in the GUI
+        title_font = cantarell_title_bold
+        label_font = cantarell_other_normal
+        entry_font = cantarell_other_normal
+        button_font = cantarell_other_bold
+    } else {
+        # Other linux distros
+        # Define the fonts
+        liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
+        liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
+        liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
+        # Use them in the GUI
+        title_font = liberation_title_bold
+        label_font = liberation_other_normal
+        entry_font = liberation_other_normal
+        button_font = liberation_other_bold
+    }
+} else if (system_os == "Darwin") {
+    # macOS
+    # Define the fonts
+    helvetica_title_bold = tkfont.create(family = "Helvetica", size = title_font_size, weight = "bold")
+    helvetica_other_normal = tkfont.create(family = "Helvetica", size = other_font_size, weight = "normal")
+    helvetica_other_bold = tkfont.create(family = "Helvetica", size = other_font_size, weight = "bold")
+    # Use them in the GUI
+    title_font = helvetica_title_bold
+    label_font = helvetica_other_normal
+    entry_font = helvetica_other_normal
+    button_font = helvetica_other_bold
+}
+
+
+# The "area" where we will put our input lines
+window <- tktoplevel()
+tktitle(window) <- "LC-MS PEAK STATISTICS"
+#### Browse
+select_input_button <- tkbutton(window, text="Import file...", command = file_import_function, font = button_font)
+browse_output_button <- tkbutton(window, text="Browse\noutput folder", command = browse_output_function, font = button_font)
+#### Entries
+output_file_type_export_entry <- tkbutton(window, text="Output\nfile type", command = output_file_type_export_choice, font = button_font)
+image_file_type_export_entry <- tkbutton(window, text="Image\nfile type", command = image_file_type_export_choice, font = button_font)
+data_record_entry <- tkbutton(window, text="Data REC", command = data_record_choice, font = button_font)
+correlation_analysis_entry <- tkbutton(window, text="Correlation\nanalysis", command = correlation_analysis_choice, font = button_font)
+remove_outliers_correlation_analysis_entry <- tkbutton(window, text="Remove outliers\nCorrelation analysis", command = remove_outliers_correlation_analysis_choice, font = button_font)
+two_level_effect_analysis_entry <- tkbutton(window, text="Two-level effect\nanalysis", command = two_level_effect_analysis_choice, font = button_font)
+remove_outliers_two_level_effect_analysis_entry <- tkbutton(window, text="Remove outliers\nTwo-level effect\nanalysis", command = remove_outliers_two_level_effect_analysis_choice, font = button_font)
+multi_level_effect_analysis_entry <- tkbutton(window, text="Multi-level effect\nanalysis", command = multi_level_effect_analysis_choice, font = button_font)
+remove_outliers_multi_level_effect_analysis_entry <- tkbutton(window, text="Remove outliers\nMulti-level effect\nanalysis", command = remove_outliers_multi_level_effect_analysis_choice, font = button_font)
+minimum_number_of_patients_label <- tklabel(window, text="Minimum number of patients", font = label_font)
+minimum_number_of_patients_entry <- tkentry(window, width = 10, textvariable = minimum_number_of_patients, font = entry_font)
+tkinsert(minimum_number_of_patients_entry, "end", "3")
+pvalue_expression_label <- tklabel(window, text="p-value for signal\nexpression difference", font = label_font)
+pvalue_expression_entry <- tkentry(window, width = 10, textvariable = pvalue_expression, font = entry_font)
+tkinsert(pvalue_expression_entry, "end", "0.05")
+pvalue_tests_label <- tklabel(window, text="p-value for significance\nin statistical tests", font = label_font)
+pvalue_tests_entry <- tkentry(window, width = 10, textvariable = pvalue_tests, font = entry_font)
+tkinsert(pvalue_tests_entry, "end", "0.05")
+cumulative_class_in_two_level_effect_analysis_entry <- tkbutton(window, text="Cumulative class in the\ntwo-level effect analysis", command = cumulative_class_in_two_level_effect_analysis_choice, font = button_font)
+plot_correlation_graphs_entry <- tkbutton(window, text = "Plot correlation\ngraphs", command = plot_correlation_graphs_choice, font = button_font)
+#TestPer_Base_label <- tklabel(window, text="TestPer_Base", font = label_font)
+#TestPer_Base_entry <- tkentry(window, width = 10, textvariable = TestPer_Base, font = entry_font)
+#tkinsert(TestPer_Base_entry, "end", "0.17")
+#TestPer_Adv_label <- tklabel(window, text="TestPer_Adv", font = label_font)
+#TestPer_Adv_entry <- tkentry(window, width = 10, textvariable = TestPer_Adv, font = entry_font)
+#tkinsert(TestPer_Adv_entry, "end", "0.19")
+# Buttons
+download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE", command = download_updates_function, font = button_font)
+run_statistics_function_button <- tkbutton(window, text="RUN\nSTATISTICS", command = run_statistics_function, font = button_font)
+end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
+#### Displaying labels
+check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font)
+output_file_type_export_value_label <- tklabel(window, text = output_file_type_export_value, font = label_font)
+image_file_type_export_value_label <- tklabel(window, text = image_file_type_export_value, font = label_font)
+data_record_value_label <- tklabel(window, text = data_record_value, font = label_font)
+correlation_analysis_value_label <- tklabel(window, text = correlation_analysis_value, font = label_font)
+remove_outliers_correlation_analysis_value_label <- tklabel(window, text = remove_outliers_correlation_analysis_value, font = label_font)
+two_level_effect_analysis_value_label <- tklabel(window, text = two_level_effect_analysis_value, font = label_font)
+remove_outliers_two_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_two_level_effect_analysis_value, font = label_font)
+multi_level_effect_analysis_value_label <- tklabel(window, text = multi_level_effect_analysis_value, font = label_font)
+remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_multi_level_effect_analysis_value, font = label_font)
+cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font)
+plot_correlation_graphs_value_label <- tklabel(window, text = plot_correlation_graphs_value, font = label_font)
+#### Geometry manager
+tkgrid(download_updates_button, row = 1, column = 2)
+tkgrid(check_for_updates_value_label, row = 1, column = 3)
+tkgrid(output_file_type_export_entry, row = 2, column = 1)
+tkgrid(image_file_type_export_entry, row = 3, column = 1)
+tkgrid(data_record_entry, row = 4, column = 1)
+tkgrid(correlation_analysis_entry, row = 5, column = 1)
+tkgrid(remove_outliers_correlation_analysis_entry, row = 6, column = 1)
+tkgrid(two_level_effect_analysis_entry, row = 2, column = 3)
+tkgrid(remove_outliers_two_level_effect_analysis_entry, row = 3, column = 3)
+tkgrid(multi_level_effect_analysis_entry, row = 4, column = 3)
+tkgrid(remove_outliers_multi_level_effect_analysis_entry, row = 5, column = 3)
+tkgrid(output_file_type_export_value_label, row = 2, column = 2)
+tkgrid(image_file_type_export_value_label, row = 3, column = 2)
+tkgrid(data_record_value_label, row = 4, column = 2)
+tkgrid(correlation_analysis_value_label, row = 5, column = 2)
+tkgrid(remove_outliers_correlation_analysis_value_label, row = 6, column = 2)
+tkgrid(two_level_effect_analysis_value_label, row = 2, column = 4)
+tkgrid(remove_outliers_two_level_effect_analysis_value_label, row = 3, column = 4)
+tkgrid(multi_level_effect_analysis_value_label, row = 4, column = 4)
+tkgrid(remove_outliers_multi_level_effect_analysis_value_label, row = 5, column = 4)
+tkgrid(minimum_number_of_patients_label, row = 6, column = 3)
+tkgrid(minimum_number_of_patients_entry, row = 6, column = 4)
+tkgrid(pvalue_expression_label, row = 7, column = 1)
+tkgrid(pvalue_expression_entry, row = 7, column = 2)
+tkgrid(pvalue_tests_label, row = 8, column = 1)
+tkgrid(pvalue_tests_entry, row = 8, column = 2)
+tkgrid(cumulative_class_in_two_level_effect_analysis_entry, row = 7, column = 3)
+tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 7, column = 4)
+tkgrid(plot_correlation_graphs_entry, row = 8, column = 3)
+tkgrid(plot_correlation_graphs_value_label, row = 8, column = 4)
+#tkgrid(TestPer_Base_label, row = 7, column = 3)
+#tkgrid(TestPer_Base_entry, row = 7, column = 4)
+#tkgrid(TestPer_Adv_label, row = 8, column = 3)
+#tkgrid(TestPer_Adv_entry, row = 8, column = 4)
+tkgrid(browse_output_button, row = 9, column = 1)
+tkgrid(select_input_button, row = 9, column = 2)
+tkgrid(run_statistics_function_button, row = 9, column = 3)
+tkgrid(end_session_button, row = 9, column = 4)
