@@ -6132,13 +6132,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.27.1"
+R_script_version <- "2017.03.27.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
 script_file_name <- paste("MS PIXEL TYPER (", R_script_version, ").R", sep = "")
 # Change log
-change_log <- "1. New software!!\n2. Improved file dumping"
+change_log <- "1. New software!!\n2. Improved file dumping\n3. Spectral alignment implemented"
 
 
 
@@ -6192,7 +6192,7 @@ vote_weights_ensemble <- "equal"
 
 
 ################## Values of the variables (for displaying and dumping purposes)
-tof_mode_value <- "linear"
+tof_mode_value <- "    Linear    "
 filepath_import_value <- NULL
 output_folder_value <- output_folder
 spectra_format_value <- "imzML"
@@ -6201,9 +6201,9 @@ peak_picking_algorithm_value <- "Super Smoother"
 low_intensity_peak_removal_threshold_method_value <- "element-wise"
 allow_parallelization_value <- "   NO   "
 transform_data_value <- "    NO    "
-smoothing_value <- "YES (SavitzkyGolay , medium)"
-baseline_subtraction_value <- "YES (SNIP , iterations: 200)"
-normalization_value <- "YES (TIC , mass range: )"
+smoothing_value <- "YES ( SavitzkyGolay , medium )"
+baseline_subtraction_value <- "YES ( SNIP , iterations: 200 )"
+normalization_value <- "YES ( TIC , mass range: )"
 spectral_alignment_value <- "   NO   "
 spectral_alignment_algorithm_value <- ""
 peaks_deisotoping_value <- "   NO   "
@@ -6513,13 +6513,19 @@ preprocessing_window_function <- function() {
             if (spectral_alignment_algorithm == "") {
                 spectral_alignment_algorithm <- "cubic"
             }
+            ## Ask for the reference peaklist
+            spectral_alignment_reference <- select.list(c("auto","average"), title = "Choose")
+            if (spectral_alignment_reference == "") {
+                spectral_alignment_reference <- "auto"
+            }
         } else if (spectral_alignment == "NO" || spectral_alignment == "") {
             spectral_alignment <- FALSE
             spectral_alignment_algorithm <- NULL
+            spectral_alignment_reference <- NULL
         }
         # Set the value of the displaying label
         if (spectral_alignment == TRUE) {
-            spectral_alignment_value <- paste("YES", "(", spectral_alignment_algorithm, ")")
+            spectral_alignment_value <- paste("YES", "(", spectral_alignment_algorithm, ",", spectral_alignment_reference, ")")
         } else {
             spectral_alignment_value <- "                                   NO                            "
         }
@@ -6528,6 +6534,7 @@ preprocessing_window_function <- function() {
         # Escape the function
         .GlobalEnv$spectral_alignment <- spectral_alignment
         .GlobalEnv$spectral_alignment_algorithm <- spectral_alignment_algorithm
+        .GlobalEnv$spectral_alignment_reference <- spectral_alignment_reference
         .GlobalEnv$spectral_alignment_value <- spectral_alignment_value
     }
     # TOF mode
@@ -6925,7 +6932,7 @@ run_patient_classification_function <- function() {
         setTkProgressBar(program_progress_bar, value = 0, title = NULL, label = "0 %")
         setTkProgressBar(program_progress_bar, value = 0.25, title = NULL, label = "25 %")
         ########## Run the classification function
-        classification_of_patients <- spectral_classification(spectra_path = filepath_import, filepath_R = filepath_R, model_list_object = "model_list", classification_mode = classification_mode, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = peaks_deisotoping, preprocessing_parameters = list(mass_range = mass_range, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range, spectral_alignment_algorithm = spectral_alignment_algorithm, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of), tof_mode = tof_mode, allow_parallelization = allow_parallelization, decision_method_ensemble = decision_method_ensemble, vote_weights_ensemble = vote_weights_ensemble, pixel_grouping = pixel_grouping, moving_window_size = moving_window_size, number_of_hca_nodes = number_of_hca_nodes, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 50, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE)
+        classification_of_patients <- spectral_classification(spectra_path = filepath_import, filepath_R = filepath_R, model_list_object = "model_list", classification_mode = classification_mode, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = peaks_deisotoping, preprocessing_parameters = list(mass_range = mass_range, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range, spectral_alignment_algorithm = spectral_alignment_algorithm, spectral_alignment_reference = spectral_alignment_reference, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of), tof_mode = tof_mode, allow_parallelization = allow_parallelization, decision_method_ensemble = decision_method_ensemble, vote_weights_ensemble = vote_weights_ensemble, pixel_grouping = pixel_grouping, moving_window_size = moving_window_size, number_of_hca_nodes = number_of_hca_nodes, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 50, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE)
         setTkProgressBar(program_progress_bar, value = 0.25, title = NULL, label = "75 %")
         # Dump the files
         ms_pixel_typer_data_dumper(classification_output = classification_of_patients, working_directory = output_folder, file_type_export_images = file_type_export_images, file_type_export_matrix = file_type_export_matrix)
