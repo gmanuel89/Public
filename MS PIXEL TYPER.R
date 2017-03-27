@@ -1,60 +1,56 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.24 ####################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.27 ####################
 
 ########################################################################## MISC
 
 ###################################################### CHECK INTERNET CONNECTION
-# This function checks if there is internet connection, by pinging a website. It returns TRUE or FALSE
-check_internet_connection <- function(website_to_ping = "www.google.it") {
-    if (Sys.info()[1] == "Linux") {
-        # -c: number of packets sent/received (attempts) ; -W timeout in seconds
-        there_is_internet <- !as.logical(system(command = paste("ping -c 1 -W 2", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
-    } else if (Sys.info()[1] == "Windows") {
-        # -n: number of packets sent/received (attempts) ; -w timeout in milliseconds
-        there_is_internet <- !as.logical(system(command = paste("ping -n 1 -w 2000", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
-    } else {
-        there_is_internet <- !as.logical(system(command = paste("ping", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+# This function checks if there is internet connection, by pinging a website. It returns TRUE or FALSE.
+# Two methods are available: 'ping' tries to ping the website, while 'getURL' connects to it directly. The default is 'getURL', since it is more reliable than ping.
+check_internet_connection <- function(method = "getURL", website_to_ping = "www.google.it") {
+    ##### PING
+    if (method == "ping") {
+        if (Sys.info()[1] == "Linux") {
+            # -c: number of packets sent/received (attempts) ; -W timeout in seconds
+            there_is_internet <- !as.logical(system(command = paste("ping -c 1 -W 2", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+        } else if (Sys.info()[1] == "Windows") {
+            # -n: number of packets sent/received (attempts) ; -w timeout in milliseconds
+            there_is_internet <- !as.logical(system(command = paste("ping -n 1 -w 2000", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+        } else {
+            there_is_internet <- !as.logical(system(command = paste("ping", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+        }
+    } else if (method == "getURL") {
+        ##### GET URL
+        if ("RCurl" %in% installed.packages()[,1]) {
+            library(RCurl)
+        } else {
+            install.packages("RCurl", repos = "http://cran.mirror.garr.it/mirrors/CRAN/", quiet = TRUE, verbose = FALSE)
+        }
+        there_is_internet <- try(is.character(getURL(website_to_ping))) == TRUE
     }
     return(there_is_internet)
 }
+
+
+
+
+
+################################################################################
+
+
+
+
 
 ##################################################### INSTALL REQUIRED PACKAGES
 # This function installs and loads the selected packages
 install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
     ### Check internet connection
-    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
+    there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     ########## Update all the packages (if there is internet connection)
     if (there_is_internet == TRUE) {
         ##### If a repository is specified
         if (repository != "" || !is.null(repository)) {
-            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                # Try to build the package from source
-                update_successful <- FALSE
-                try({
-                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-                    update_successful <- TRUE
-                }, silent = TRUE)
-                # Otherwise use the binary files
-                if (update_successful == FALSE) {
-                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
-                }
-            } else if (Sys.info()[1] == "Linux") {
-                update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-            }
+            update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
         } else {
-            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                # Try to build the package from source
-                update_successful <- FALSE
-                try({
-                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-                    update_successful <- TRUE
-                }, silent = TRUE)
-                # Otherwise use the binary files
-                if (update_successful == FALSE) {
-                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
-                }
-            } else if (Sys.info()[1] == "Linux") {
-                update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-            }
+            update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
         }
         print("Packages updated")
     } else {
@@ -75,36 +71,10 @@ install_and_load_required_packages <- function(required_packages, repository = "
         if (there_is_internet == TRUE) {
             ### If a repository is specified
             if (repository != "" || !is.null(repository)) {
-                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                    # Try to build the package from source
-                    installed_successful <- FALSE
-                    try({
-                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
-                        installed_successful <- TRUE
-                    }, silent = TRUE)
-                    # Otherwise use the binary files
-                    if (installed_successful == FALSE) {
-                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
-                    }
-                } else if (Sys.info()[1] == "Linux") {
-                    install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
-                }
+                install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
             } else {
                 ### If NO repository is specified
-                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                    # Try to build the package from source
-                    installed_successful <- FALSE
-                    try({
-                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
-                        installed_successful <- TRUE
-                    }, silent = TRUE)
-                    # Otherwise use the binary files
-                    if (installed_successful == FALSE) {
-                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
-                    }
-                } else if (Sys.info()[1] == "Linux") {
-                    install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
-                }
+                install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
             }
             print("All the required packages have been installed")
         } else {
@@ -114,9 +84,13 @@ install_and_load_required_packages <- function(required_packages, repository = "
     } else {
         print("All the packages are up-to-date")
     }
-    ##### Load the packages
-    for (i in 1:length(required_packages)) {
-        library(required_packages[i], character.only = TRUE)
+    ##### Load the packages (if there are all the packages)
+    if ((length(missing_packages) > 0 && there_is_internet == TRUE) || length(missing_packages) == 0) {
+        for (i in 1:length(required_packages)) {
+            library(required_packages[i], character.only = TRUE)
+        }
+    } else {
+        print("Packages cannot be loaded... Expect issues...")
     }
 }
 
@@ -1640,7 +1614,7 @@ replace_class_name <- function (spectra, class_list = NULL, class_in_file_name =
 # The function allows to select some additional parameters of the preprocessing.
 # This version of the function whould be faster because each element of the spectral list is subjected to all the preprocessing step.
 # If an algorithm is set to NULL, that preprocessing step will not be performed.
-preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_method = NULL), allow_parallelization = FALSE) {
+preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"), allow_parallelization = FALSE) {
     ##### Load the required libraries
     install_and_load_required_packages(c("MALDIquant", "parallel"))
     ##### Rename the trim function
@@ -1655,7 +1629,8 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
     normalization_algorithm <- preprocessing_parameters$normalization_algorithm
     normalization_mass_range <- preprocessing_parameters$normalization_mass_range
     preprocess_spectra_in_packages_of <- preprocessing_parameters$preprocess_spectra_in_packages_of
-    spectral_alignment_method <- preprocessing_parameters$spectral_alignment_method
+    spectral_alignment_algorithm <- preprocessing_parameters$spectral_alignment_algorithm
+    spectral_alignment_reference <- preprocessing_parameters$spectral_alignment_reference
     ##### Fix the names
     if (!is.null(smoothing_algorithm) && (smoothing_algorithm == "SavitzkyGolay" || smoothing_algorithm == "Savitzky-Golay" || smoothing_algorithm == "SG")) {
         smoothing_algorithm <- "SavitzkyGolay"
@@ -1665,12 +1640,6 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
     ##### Define the smoothing half wondow size
     smoothing_half_window_size <- NULL
     if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-        #if (!is.null(smoothing_strength) && smoothing_strength == "small") {
-        #if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-        #smoothing_half_window_size <- 5
-        #} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-        #smoothing_half_window_size <- 1
-        #}
         if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
             if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
                 smoothing_half_window_size <- 10
@@ -1691,12 +1660,6 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
             }
         }
     } else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-        #if (!is.null(smoothing_strength) && smoothing_strength == "small") {
-        #if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-        #smoothing_half_window_size <- 1
-        #} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-        #smoothing_half_window_size <- 0.2
-        #}
         if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
             if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
                 smoothing_half_window_size <- 3
@@ -1719,8 +1682,6 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
     }
     ##### Generate the preprocessing function to be applied to every element of the spectra_temp list (x = spectrum)
     preprocessing_subfunction <- function(x, mass_range, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range) {
-        ### Remove flat spectra
-        # x <- removeEmptyMassObjects (x)
         ### Trimming
         # Mass range specified
         if (!is.null(mass_range)) {
@@ -1759,7 +1720,7 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
         ### Return the preprocessed spectrum (x)
         return(x)
     }
-    ######################################### Multiple spectra
+    #################### Multiple spectra
     if (isMassSpectrumList(spectra)) {
         ##### Trimming (same mass range for all the dataset)
         if (is.null(mass_range)) {
@@ -1806,26 +1767,29 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
             preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
         }
     } else if (isMassSpectrum(spectra)) {
-    ########## Single spectrum
+    #################### Single spectrum
         spectra <- preprocessing_subfunction(spectra, mass_range, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range)
         # Add to the final preprocessed spectral dataset
         preprocessed_spectra <- spectra
     }
-    ######################################### SPECTRAL ALIGNMENT
-    try({
-        if (!is.null(spectral_alignment_method)) {
-            if (isMassSpectrumList(preprocessed_spectra)) {
-                if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-                    half_window_alignment <- 20
-                    tolerance_ppm <- 2000
-                } else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-                    half_window_alignment <- 5
-                    tolerance_ppm <- 200
-                }
-                preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 2, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_method)
+    #################### SPECTRAL ALIGNMENT (Multiple spectra)
+    if (!is.null(spectral_alignment_algorithm)) {
+        if (isMassSpectrumList(preprocessed_spectra)) {
+            spectral_alignment_performed <- FALSE
+            try({
+                # Perform the alignment
+                preprocessed_spectra <- align_spectra(preprocessed_spectra, spectral_alignment_algorithm = spectral_alignment_algorithm, spectral_alignment_reference = spectral_alignment_reference, tof_mode = tof_mode)
+                spectral_alignment_performed <- TRUE
+            })
+            # Return message
+            if (spectral_alignment_performed == TRUE) {
+                print("The spectral aligment has been performed successfully!")
+            } else {
+                print("The spectral aligment could not be performed!")
             }
         }
-    })
+    }
+    ########## Return preprocessed (and aligned) spectra
     return(preprocessed_spectra)
 }
 
@@ -1834,6 +1798,63 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
 
 
 ###############################################################################
+
+
+
+
+
+############################################################# SPECTRAL ALIGNMENT
+align_spectra <- function(spectra, spectral_alignment_algorithm = "cubic", spectral_alignment_reference = "auto", tof_mode = "linear", deisotope_peaklist = FALSE) {
+    # Perform only if a method is specified
+    if (!is.null(spectral_alignment_algorithm)) {
+        if (isMassSpectrumList(spectra)) {
+            if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+                half_window_alignment <- 20
+                tolerance_ppm <- 2000
+            } else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+                half_window_alignment <- 5
+                tolerance_ppm <- 200
+            }
+            ##### Perform the alignment: Automatic computation of the reference peaklist
+            if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "auto") {
+                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm)
+            } else if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "average") {
+                ##### Perform the alignment: Average spectrum
+                # Ganerate the average spectrum
+                average_spectrum <- averageMassSpectra(spectra, method = "mean")
+                # Preprocess the average spectrum
+                if (tof_mode == "reflectron") {
+                    smoothing_algorithm_avg <- NULL
+                } else {
+                    smoothing_algorithm_avg <- "SavitzkyGolay"
+                }
+                average_spectrum <- preprocess_spectra(average_spectrum, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = smoothing_algorithm_avg, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"))
+                # Detect peaks onto the average spectrum: refference peaklist
+                average_spectrum_peaks <- detectPeaks(average_spectrum, halfWindowSize = half_window_alignment, method = "SuperSmoother", SNR = 3)
+                # Deisotope peaklist
+                if (deisotope_peaklist == TRUE) {
+                    average_spectrum_peaks <- deisotope_peaks(average_spectrum_peaks)
+                }
+                # Align the spectra
+                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm, reference = average_spectrum_peaks)
+            }
+            ### Return the aligned spectra
+            return(aligned_spectra)
+        } else {
+            ### Return the original spectra if there is only one spectrum
+            return(spectra)
+        }
+    } else {
+        ### Return the original spectra if the alignment algorithm is not specified
+        return(spectra)
+    }
+}
+
+
+
+
+
+################################################################################
 
 
 
@@ -6111,7 +6132,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.24.0"
+R_script_version <- "2017.03.27.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -6207,7 +6228,7 @@ check_for_updates_function <- function() {
     ### Initialize the change log
     online_change_log <- "Bug fixes"
     # Check if there is internet connection by pinging a website
-    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
+    there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     # Check for updates only in case of working internet connection
     if (there_is_internet == TRUE) {
         try({
