@@ -2,123 +2,6 @@
 
 ########################################################################## MISC
 
-##################################################### INSTALL REQUIRED PACKAGES
-# This function installs and loads the selected packages
-install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
-    ### Check internet connection
-    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
-    ########## Update all the packages (if there is internet connection)
-    if (there_is_internet == TRUE) {
-        ##### If a repository is specified
-        if (repository != "" || !is.null(repository)) {
-            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                # Try to build the package from source
-                update_successful <- FALSE
-                try({
-                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-                    update_successful <- TRUE
-                }, silent = TRUE)
-                # Otherwise use the binary files
-                if (update_successful == FALSE) {
-                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
-                }
-            } else if (Sys.info()[1] == "Linux") {
-                update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-            }
-        } else {
-            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                # Try to build the package from source
-                update_successful <- FALSE
-                try({
-                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-                    update_successful <- TRUE
-                }, silent = TRUE)
-                # Otherwise use the binary files
-                if (update_successful == FALSE) {
-                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
-                }
-            } else if (Sys.info()[1] == "Linux") {
-                update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-            }
-        }
-        print("Packages updated")
-    } else {
-        print("Packages cannot be updated due to internet connection problems")
-    }
-    ##### Retrieve the installed packages
-    installed_packages <- installed.packages()[,1]
-    ##### Determine the missing packages
-    missing_packages <- character()
-    for (p in 1:length(required_packages)) {
-        if ((required_packages[p] %in% installed_packages) == FALSE) {
-            missing_packages <- append(missing_packages, required_packages[p])
-        }
-    }
-    ##### If there are packages to install...
-    if (length(missing_packages) > 0) {
-        ### If there is internet...
-        if (there_is_internet == TRUE) {
-            ### If a repository is specified
-            if (repository != "" || !is.null(repository)) {
-                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                    # Try to build the package from source
-                    installed_successful <- FALSE
-                    try({
-                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
-                        installed_successful <- TRUE
-                    }, silent = TRUE)
-                    # Otherwise use the binary files
-                    if (installed_successful == FALSE) {
-                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
-                    }
-                } else if (Sys.info()[1] == "Linux") {
-                    install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
-                }
-            } else {
-                ### If NO repository is specified
-                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                    # Try to build the package from source
-                    installed_successful <- FALSE
-                    try({
-                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
-                        installed_successful <- TRUE
-                    }, silent = TRUE)
-                    # Otherwise use the binary files
-                    if (installed_successful == FALSE) {
-                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
-                    }
-                } else if (Sys.info()[1] == "Linux") {
-                    install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
-                }
-            }
-            print("All the required packages have been installed")
-        } else {
-            ### If there is NO internet...
-            print("Some packages cannot be installed due to internet connection problems")
-        }
-    } else {
-        print("All the packages are up-to-date")
-    }
-    ##### Load the packages (if there are all the packages)
-    if ((length(missing_packages) > 0 && there_is_internet == TRUE) || length(missing_packages) == 0) {
-        for (i in 1:length(required_packages)) {
-            library(required_packages[i], character.only = TRUE)
-        }
-    } else {
-        print("Packages cannot be loaded... Expect issues...")
-    }
-}
-
-
-
-
-
-###############################################################################
-
-
-
-
-
 ###################################################### CHECK INTERNET CONNECTION
 # This function checks if there is internet connection, by pinging a website. It returns TRUE or FALSE.
 # Two methods are available: 'ping' tries to ping the website, while 'getURL' connects to it directly. The default is 'getURL', since it is more reliable than ping.
@@ -145,6 +28,78 @@ check_internet_connection <- function(method = "getURL", website_to_ping = "www.
     }
     return(there_is_internet)
 }
+
+
+
+
+
+################################################################################
+
+
+
+
+
+##################################################### INSTALL REQUIRED PACKAGES
+# This function installs and loads the selected packages
+install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
+    ### Check internet connection
+    there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
+    ########## Update all the packages (if there is internet connection)
+    if (there_is_internet == TRUE) {
+        ##### If a repository is specified
+        if (repository != "" || !is.null(repository)) {
+            update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+        } else {
+            update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+        }
+        print("Packages updated")
+    } else {
+        print("Packages cannot be updated due to internet connection problems")
+    }
+    ##### Retrieve the installed packages
+    installed_packages <- installed.packages()[,1]
+    ##### Determine the missing packages
+    missing_packages <- character()
+    for (p in 1:length(required_packages)) {
+        if ((required_packages[p] %in% installed_packages) == FALSE) {
+            missing_packages <- append(missing_packages, required_packages[p])
+        }
+    }
+    ##### If there are packages to install...
+    if (length(missing_packages) > 0) {
+        ### If there is internet...
+        if (there_is_internet == TRUE) {
+            ### If a repository is specified
+            if (repository != "" || !is.null(repository)) {
+                install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
+            } else {
+                ### If NO repository is specified
+                install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
+            }
+            print("All the required packages have been installed")
+        } else {
+            ### If there is NO internet...
+            print("Some packages cannot be installed due to internet connection problems")
+        }
+    } else {
+        print("All the packages are up-to-date")
+    }
+    ##### Load the packages (if there are all the packages)
+    if ((length(missing_packages) > 0 && there_is_internet == TRUE) || length(missing_packages) == 0) {
+        for (i in 1:length(required_packages)) {
+            library(required_packages[i], character.only = TRUE)
+        }
+    } else {
+        print("Packages cannot be loaded... Expect issues...")
+    }
+}
+
+
+
+
+
+###############################################################################
+
 
 
 
@@ -6180,7 +6135,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.27.4"
+R_script_version <- "2017.03.27.5"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -6271,7 +6226,7 @@ check_for_updates_function <- function() {
     ### Initialize the change log
     online_change_log <- "Bug fixes"
     # Check if there is internet connection by pinging a website
-    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
+    there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     # Check for updates only in case of working internet connection
     if (there_is_internet == TRUE) {
         try({
@@ -7463,6 +7418,7 @@ tkgrid(signals_avg_and_sd_button, row = 8, column = 5)
 tkgrid(end_session_button, row = 8, column = 6)
 tkgrid(download_updates_button, row = 1, column = 5)
 tkgrid(check_for_updates_value_label, row = 1, column = 6)
+
 
 
 
