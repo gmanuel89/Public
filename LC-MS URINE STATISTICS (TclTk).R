@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.24.1"
+R_script_version <- "2017.03.27.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -20,15 +20,26 @@ change_log <- "1. It should be faster when no internet connection is present"
 
 ########## FUNCTIONS
 # Check internet connection
-check_internet_connection <- function(website_to_ping = "www.google.it") {
-    if (Sys.info()[1] == "Linux") {
-        # -c: number of packets sent/received (attempts) ; -W timeout in seconds
-        there_is_internet <- !as.logical(system(command = paste("ping -c 1 -W 2", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
-    } else if (Sys.info()[1] == "Windows") {
-        # -n: number of packets sent/received (attempts) ; -w timeout in milliseconds
-        there_is_internet <- !as.logical(system(command = paste("ping -n 1 -w 2000", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
-    } else {
-        there_is_internet <- !as.logical(system(command = paste("ping", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+check_internet_connection <- function(method = "getURL", website_to_ping = "www.google.it") {
+    ##### PING
+    if (method == "ping") {
+        if (Sys.info()[1] == "Linux") {
+            # -c: number of packets sent/received (attempts) ; -W timeout in seconds
+            there_is_internet <- !as.logical(system(command = paste("ping -c 1 -W 2", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+        } else if (Sys.info()[1] == "Windows") {
+            # -n: number of packets sent/received (attempts) ; -w timeout in milliseconds
+            there_is_internet <- !as.logical(system(command = paste("ping -n 1 -w 2000", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+        } else {
+            there_is_internet <- !as.logical(system(command = paste("ping", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+        }
+    } else if (method == "getURL") {
+        ##### GET URL
+        if ("RCurl" %in% installed.packages()[,1]) {
+            library(RCurl)
+        } else {
+            install.packages("RCurl", repos = "http://cran.mirror.garr.it/mirrors/CRAN/", quiet = TRUE, verbose = FALSE)
+        }
+        there_is_internet <- try(is.character(getURL(website_to_ping))) == TRUE
     }
     return(there_is_internet)
 }
@@ -36,40 +47,14 @@ check_internet_connection <- function(website_to_ping = "www.google.it") {
 # Install and load required packages
 install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
     ### Check internet connection
-    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
+    there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     ########## Update all the packages (if there is internet connection)
     if (there_is_internet == TRUE) {
         ##### If a repository is specified
         if (repository != "" || !is.null(repository)) {
-            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                # Try to build the package from source
-                update_successful <- FALSE
-                try({
-                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-                    update_successful <- TRUE
-                }, silent = TRUE)
-                # Otherwise use the binary files
-                if (update_successful == FALSE) {
-                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
-                }
-            } else if (Sys.info()[1] == "Linux") {
-                update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-            }
+            update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
         } else {
-            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                # Try to build the package from source
-                update_successful <- FALSE
-                try({
-                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-                    update_successful <- TRUE
-                }, silent = TRUE)
-                # Otherwise use the binary files
-                if (update_successful == FALSE) {
-                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
-                }
-            } else if (Sys.info()[1] == "Linux") {
-                update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-            }
+            update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
         }
         print("Packages updated")
     } else {
@@ -90,36 +75,10 @@ install_and_load_required_packages <- function(required_packages, repository = "
         if (there_is_internet == TRUE) {
             ### If a repository is specified
             if (repository != "" || !is.null(repository)) {
-                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                    # Try to build the package from source
-                    installed_successful <- FALSE
-                    try({
-                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
-                        installed_successful <- TRUE
-                    }, silent = TRUE)
-                    # Otherwise use the binary files
-                    if (installed_successful == FALSE) {
-                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
-                    }
-                } else if (Sys.info()[1] == "Linux") {
-                    install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
-                }
+                install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
             } else {
                 ### If NO repository is specified
-                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                    # Try to build the package from source
-                    installed_successful <- FALSE
-                    try({
-                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
-                        installed_successful <- TRUE
-                    }, silent = TRUE)
-                    # Otherwise use the binary files
-                    if (installed_successful == FALSE) {
-                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
-                    }
-                } else if (Sys.info()[1] == "Linux") {
-                    install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
-                }
+                install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
             }
             print("All the required packages have been installed")
         } else {
@@ -129,9 +88,13 @@ install_and_load_required_packages <- function(required_packages, repository = "
     } else {
         print("All the packages are up-to-date")
     }
-    ##### Load the packages
-    for (i in 1:length(required_packages)) {
-        library(required_packages[i], character.only = TRUE)
+    ##### Load the packages (if there are all the packages)
+    if ((length(missing_packages) > 0 && there_is_internet == TRUE) || length(missing_packages) == 0) {
+        for (i in 1:length(required_packages)) {
+            library(required_packages[i], character.only = TRUE)
+        }
+    } else {
+        print("Packages cannot be loaded... Expect issues...")
     }
 }
 
@@ -418,7 +381,7 @@ file_import_function <- function() {
                 # Replace the Age with the Age_BINNED
                 input_data$Age <- cbind(Age_BINNED)
             }
-        }, silent = TRUE)
+            }, silent = TRUE)
         ##### Separate the mass spectrometric data from the demographic data
         # All features
         feature_vector <- colnames(input_data)
@@ -780,13 +743,13 @@ run_statistics_function <- function() {
         }
         # Go to the new working directory
         setwd(output_folder)
-        
+
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.05, title = NULL, label = "5 %")
-        
+
         ################################################################################
-        
-        
+
+
         # Retrieve the values from the entries
         pvalue_expression <- tclvalue(pvalue_expression)
         pvalue_expression <- as.numeric(pvalue_expression)
@@ -803,22 +766,22 @@ run_statistics_function <- function() {
         minimum_number_of_patients <- tclvalue(minimum_number_of_patients)
         minimum_number_of_patients <- as.integer(minimum_number_of_patients)
         minimum_number_of_patients_value <- as.character(minimum_number_of_patients)
-        
-        
-        
-        
+
+
+
+
         ########## Exception handling
         #if (isTRUE(two_level_effect_analysis)) {
         #    ifelse(isTRUE(sampling), print("The Two-Level Effect analysis is performed with sampling for RM"), print("WARNING!!! The Two-Level Effect analysis is performed without sampling!"))
         #}
-        
+
         ################################# FUNCTIONS
-        
-        
+
+
         ########## General Statistic Function: definition ###############################
-        
+
         ################################ P-value extractor functions
-        
+
         assumption_p <- function(objt) {
             ifelse(is.object(objt), return(objt$p.value), return(NA))
         }
@@ -828,8 +791,8 @@ run_statistics_function <- function() {
         assumption_permutation <- function(objt) {
             ifelse(is.object(objt), return(pvalue(objt)[1]), return(NA))
         }
-        
-        
+
+
         #################  Post hoc tests
         write_posthoc_file <- function(file_name, data, file_format = "xlsx"){
             # Store the original filename
@@ -874,9 +837,9 @@ run_statistics_function <- function() {
                 write.csv(output_matrix, file = file_name)
             }
         }
-        
+
         ###################################################
-        
+
         sammy <- function(pn, minpos, maxpos){
             sam <- NULL
             while (length(sam) < pn){
@@ -886,8 +849,8 @@ run_statistics_function <- function() {
             }
             return(sam)
         }
-        
-        
+
+
         ##### Split the dependent variable according to the factor variable
         group_dependent_variable <- function(dependent_variable, factor_variable) {
             # Extract the levels of the factor variable
@@ -904,11 +867,11 @@ run_statistics_function <- function() {
             # Return
             return(dependent_variable_split)
         }
-        
-        
-        
-        
-        
+
+
+
+
+
         ###################################################
         # Function to export the data files
         write_file <- function(file_name, data, file_format = "xlsx"){
@@ -939,7 +902,7 @@ run_statistics_function <- function() {
                 write.csv(data, file = file_name)
             }
         }
-        
+
         SamplingForRM <- function(Per_Base , Per_Adv){
             ##### sampling indexes from group 0
             p <- Per_Base
@@ -968,18 +931,18 @@ run_statistics_function <- function() {
             print(n2)
             return (list(N1=n1,N2=n2))
         }
-        
+
         ################################################################################
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+
+
+
+
+
+
+
+
+
+
         ################ Data from input_data #######################
         if (isTRUE(data_record)) {
             print("########## Data Management ##########")
@@ -992,7 +955,7 @@ run_statistics_function <- function() {
                 list_of_dataframes[[1]] <- input_data[,!(names(input_data) %in% non_signals)]
                 list_of_filenames <- "Whole data"
             } else if (length(class_list) == 2) {
-                # If there are only two classes...
+            # If there are only two classes...
                 # Generate a dataframe with those two classes, otherwise dump one dataframe per each class
                 list_of_dataframes[[1]] <- input_data[,!(names(input_data) %in% non_signals)]
                 list_of_filenames <- paste("Class", class_list[1], "vs", class_list[2])
@@ -1015,11 +978,11 @@ run_statistics_function <- function() {
             # Go back to the original output folder
             setwd(output_folder)
         }
-        
+
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.15, title = NULL, label = "15 %")
-        
-        
+
+
         ################################################################################
         #################### CORRELATION ANALYSIS (Done only with patients affected by RCC, because controls do not have pT, grade, dimension, etc...)
         if (isTRUE(correlation_analysis)) {
@@ -1172,10 +1135,10 @@ run_statistics_function <- function() {
                 }
             }
         }
-        
+
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.30, title = NULL, label = "30 %")
-        
+
         #################################################################################
         #################### 2-LEVEL EFFECT ANALYSIS OVER SIGNAL INTENSITY
         if (isTRUE(two_level_effect_analysis)) {
@@ -1257,14 +1220,14 @@ run_statistics_function <- function() {
                 }
                 ##### Sampling
                 if (isTRUE(sampling)){
-                    
+
                     base_sampling_df <- temp_data_frame[temp_data_frame[, non_signal_variable] == 0, ]
                     adv_sampling_df <- temp_data_frame[temp_data_frame[, non_signal_variable] == 1, ]
-                    
+
                     Samlist <- SamplingForRM(TestPer_Base,TestPer_Adv)
                     n1 <- Samlist$N1
                     n2 <- Samlist$N2
-                    
+
                     TFD <- rbind(BaseTFD[n1,],AdvTFD[n2,])
                     DIAGTFD <- rbind(BaseTFD[-n1,],AdvTFD[-n2,])
                 }
@@ -1499,7 +1462,7 @@ run_statistics_function <- function() {
                     box_plot <- qplot(non_signal_as_ordered_factor, signal_intensity, data = signal_dataframe, main = plot_name, geom = "boxplot", ylab = "Signal intensity", xlab = non_signal_variable)
                     setwd(plots_two_level_effect_analysis_subfolder)
                     ggsave(box_plot, file = file_name, width = 4, height = 4)
-                    
+
                     ##### Scatter plot
                     plot_name <- sprintf("%s%s%s%s", non_signal_variable," vs ", s, " scatterplot")
                     # Sort the dataframe rows according to the values of the non-signal variable
@@ -1619,7 +1582,7 @@ run_statistics_function <- function() {
                     filename <-  "RMdataTEST"
                     dataname <- TEST
                     WriteFile(filename,dataname, file_format)
-                    
+
                     TFD_DIA <- as.data.frame(subset(input_data, input_data$Class == 3, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
                     TFD_DIA <- TFD_DIA[c("No",SelectedSignsForEffect)]
                     RowNumb <- dim(TFD_DIA)[1]
@@ -1629,7 +1592,7 @@ run_statistics_function <- function() {
                     filename <-  "RMTESTDIABS"
                     dataname <- TFD_DIA
                     WriteFile(filename,dataname, file_format)
-                    
+
                     TFD_DIAMA <- as.data.frame(subset(input_data, input_data$Class == 4, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
                     TFD_DIAMA <- TFD_DIAMA[c("No",SelectedSignsForEffect)]
                     RowNumb <- dim(TFD_DIAMA)[1]
@@ -1639,7 +1602,7 @@ run_statistics_function <- function() {
                     filename <-  "RMTESTDIAMA.xlsx"
                     dataname <- TFD_DIAMA
                     WriteFile(filename,dataname)
-                    
+
                     TFD_M <- as.data.frame(subset(input_data, input_data$Class == 5, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
                     TFD_M <- TFD_M[c("No",SelectedSignsForEffect)]
                     RowNumb <- dim(TFD_M)[1]
@@ -1649,7 +1612,7 @@ run_statistics_function <- function() {
                     filename <-  "RMTESTMAL"
                     dataname <- TFD_M
                     WriteFile(filename,dataname, file_format)
-                    
+
                     TFD_B <- as.data.frame(subset(input_data, input_data$Class == 6, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
                     TFD_B <- TFD_B[c("No",SelectedSignsForEffect)]
                     RowNumb <- dim(TFD_B)[1]
@@ -1659,7 +1622,7 @@ run_statistics_function <- function() {
                     filename <-  "RMTESTBEN"
                     dataname <- TFD_B
                     WriteFile(filename,dataname, file_format)
-                    
+
                 }
                 # Go back to the output folder
                 setwd(output_folder)
@@ -1667,16 +1630,16 @@ run_statistics_function <- function() {
                 #temp_data_frame <- temp_data_frame_original
             }
         }
-        
-        
-        
+
+
+
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.65, title = NULL, label = "65 %")
-        
-        
-        
-        
-        
+
+
+
+
+
         #################################################################################
         #################### MULTI-LEVEL EFFECT ANALYSIS OVER SIGNAL INTENSITY
         if (isTRUE(multi_level_effect_analysis)) {
@@ -2030,9 +1993,9 @@ run_statistics_function <- function() {
                         if (length(levels(as.factor(response_variable))) > 1) {
                             ### Permutation post hoc analysis: still follow Nemenyi-Damico-Wolfe-Dunn test - coin required!
                             signal_data_frame <- data.frame(mass_x, response_variable)
-                            
+
                             NDWD <- oneway_test(mass_x ~ response_variable, data = signal_data_frame, ytrafo = function(data) trafo(data, numeric_trafo = rank), xtrafo = function(data) trafo(data, factor_trafo = function(mass_x) model.matrix(~mass_x - 1) %*% t(contrMat(table(mass_x), "Tukey"))), teststat = "max", distribution = approximate(B = 90000))
-                            
+
                             post_hoc_pvalue  <- pvalue(NDWD, method = "single-step")
                             rn <- rownames(post_hoc_pvalue)
                             post_hoc_table <-  cbind(rn, post_hoc_pvalue)
@@ -2207,11 +2170,11 @@ run_statistics_function <- function() {
                 setwd(output_folder)
             }
         }
-        
+
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 1.00, title = NULL, label = "100%")
         close(program_progress_bar)
-        
+
         ##### FINISH
         finish_message <- tkmessageBox(title = "Operation completed", message = "All the statistical operations have been performed and the files have been dumped", icon = "info")
     } else {
@@ -2281,7 +2244,7 @@ if (system_os == "Windows") {
         screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
         screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
     } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
-        # Windows 10
+    # Windows 10
         # Get system info
         screen_info <- system("wmic path Win32_VideoController get VideoModeDescription", intern = TRUE)[2]
         # Get the resolution
@@ -2319,7 +2282,7 @@ if (system_os == "Windows") {
         title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
         other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
     } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
-        # Windows 10
+    # Windows 10
         # Determine the font size according to the resolution
         total_number_of_pixels <- screen_width * screen_height
         # Determine the scaling factor (according to a complex formula)
