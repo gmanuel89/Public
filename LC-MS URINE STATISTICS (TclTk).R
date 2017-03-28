@@ -5,11 +5,11 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.27.0"
+R_script_version <- "2017.03.28.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
-script_file_name <- paste("LC-MS URINE STATISTICS (", R_script_version, ").R", sep = "")
+script_file_name <- "LC-MS URINE STATISTICS"
 # Change log
 change_log <- "1. It should be faster when no internet connection is present"
 
@@ -34,12 +34,17 @@ check_internet_connection <- function(method = "getURL", website_to_ping = "www.
         }
     } else if (method == "getURL") {
         ##### GET URL
+        # Install the RCurl package if not installed
         if ("RCurl" %in% installed.packages()[,1]) {
             library(RCurl)
         } else {
             install.packages("RCurl", repos = "http://cran.mirror.garr.it/mirrors/CRAN/", quiet = TRUE, verbose = FALSE)
+            library(RCurl)
         }
-        there_is_internet <- try(is.character(getURL(website_to_ping))) == TRUE
+        there_is_internet <- FALSE
+        try({
+            there_is_internet <- is.character(getURL(u = website_to_ping, followLocation = TRUE, .opts = list(timeout = 1, maxredirs = 2, verbose = FALSE)))
+        }, silent = TRUE)
     }
     return(there_is_internet)
 }
@@ -180,7 +185,7 @@ check_for_updates_function <- function() {
     ### Initialize the change log
     online_change_log <- "Bug fixes"
     # Check if there is internet connection by pinging a website
-    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
+    there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     # Check for updates only in case of working internet connection
     if (there_is_internet == TRUE) {
         try({
@@ -265,6 +270,7 @@ check_for_updates_function <- function() {
     .GlobalEnv$update_available <- update_available
     .GlobalEnv$online_change_log <- online_change_log
     .GlobalEnv$check_for_updates_value <- check_for_updates_value
+    .GlobalEnv$online_version_number <- online_version_number
 }
 
 ##### Download the updated file (from my GitHub page)
@@ -285,7 +291,7 @@ download_updates_function <- function() {
         tkmessageBox(message = paste("The updated script file will be downloaded in:\n\n", download_folder, sep = ""))
         # Download the file
         try({
-            download.file(url = github_R_url, destfile = script_file_name, method = "auto")
+            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ")", sep = ""), method = "auto")
             file_downloaded <- TRUE
         }, silent = TRUE)
         if (file_downloaded == TRUE) {
