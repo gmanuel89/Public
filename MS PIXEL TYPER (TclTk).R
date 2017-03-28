@@ -28,7 +28,7 @@ check_internet_connection <- function(method = "getURL", website_to_ping = "www.
         }
         there_is_internet <- FALSE
         try({
-            there_is_internet <- is.character(getURL(u = website_to_ping, followLocation = TRUE, .opts = list(timeout = 1, maxredirs = 2, verbose = TRUE)))
+            there_is_internet <- is.character(getURL(u = website_to_ping, followLocation = TRUE, .opts = list(timeout = 1, maxredirs = 2, verbose = FALSE)))
             }, silent = TRUE)
     }
     return(there_is_internet)
@@ -6137,7 +6137,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.28.0"
+R_script_version <- "2017.03.28.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -6186,6 +6186,7 @@ preprocess_spectra_in_packages_of <- 0
 mass_range <- c(3000, 15000)
 spectral_alignment <- FALSE
 spectral_alignment_algorithm <- NULL
+spectral_alignment_reference <- NULL
 peaks_deisotoping <- FALSE
 RData_file_integrity <- FALSE
 classification_mode <- "pixel"
@@ -6211,8 +6212,9 @@ baseline_subtraction_value <- "YES ( SNIP , iterations: 200 )"
 normalization_value <- "YES ( TIC , mass range: )"
 spectral_alignment_value <- "   NO   "
 spectral_alignment_algorithm_value <- ""
+spectral_alignment_reference_value <- ""
 peaks_deisotoping_value <- "   NO   "
-RData_file_integrity_value <- ""
+RData_file_integrity_value <- "NO RDATA FILE\nSELECTED"
 classification_mode_value <- "pixel"
 decision_method_ensemble_value <- "majority"
 vote_weights_ensemble_value <- "equal"
@@ -6358,7 +6360,7 @@ preprocessing_window_function <- function() {
     # Transform the data
     transform_data_choice <- function() {
         # Catch the value from the menu
-        transform_data <- select.list(c("YES","NO"), title="Choose")
+        transform_data <- select.list(c("YES","NO"), title = "Choose")
         # Default
         if (transform_data == "YES") {
             transform_data <- TRUE
@@ -6424,7 +6426,7 @@ preprocessing_window_function <- function() {
     # Baseline subtraction
     baseline_subtraction_choice <- function() {
         # Catch the value from the menu
-        baseline_subtraction <- select.list(c("YES","NO"), title="Choose")
+        baseline_subtraction <- select.list(c("YES","NO"), title = "Choose")
         # Default
         if (baseline_subtraction == "YES" || baseline_subtraction == "") {
             baseline_subtraction <- TRUE
@@ -6508,12 +6510,12 @@ preprocessing_window_function <- function() {
     # Spectral alignment
     spectral_alignment_choice <- function() {
         # Catch the value from the menu
-        spectral_alignment <- select.list(c("YES","NO"), title="Choose")
+        spectral_alignment <- select.list(c("YES","NO"), title = "Choose")
         # YES and Default
         if (spectral_alignment == "YES") {
             spectral_alignment <- TRUE
             # Ask for the algorithm
-            spectral_alignment_algorithm <- select.list(c("cubic","quadratic","linear","lowess"), title="Choose")
+            spectral_alignment_algorithm <- select.list(c("cubic","quadratic","linear","lowess"), title = "Choose")
             # Default
             if (spectral_alignment_algorithm == "") {
                 spectral_alignment_algorithm <- "cubic"
@@ -6717,9 +6719,9 @@ classification_mode_choice <- function() {
     # Fix the displaying value
     if ("profile" %in% classification_mode && "pixel" %in% classification_mode) {
         classification_mode_value <- "pixel + profile"
-    } else if (classification_mode_value == "profile") {
+    } else if (classification_mode == "profile") {
         classification_mode_value <- "   profile   "
-    } else if (classification_mode_value == "pixel") {
+    } else if (classification_mode == "pixel") {
         classification_mode_value <- "  pixel  "
     }
     # Escape the function
@@ -6743,7 +6745,7 @@ select_samples_function <- function() {
     }
     # Folder
     if (spectra_input_type == "folder") {
-        filepath_import_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra (stored as imzML files) to be imported. Each imzML file should correspond to a patient's spectral dataset.", icon = "info")
+        filepath_import_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra (stored as imzML files) to be imported: each imzML file should correspond to a patient's spectral dataset, and the imzML files should be put in folders corresponding to the different classes of samples", icon = "info")
         filepath_import <- tclvalue(tkchooseDirectory())
         if (!nchar(filepath_import)) {
             tkmessageBox(message = "No folder selected")
@@ -6753,7 +6755,7 @@ select_samples_function <- function() {
         }
     } else if (spectra_input_type == "file") {
         # File
-        filepath_import_select <- tkmessageBox(title = "Sample file", message = "Select the imzML file for the spectra to be imported. The imzML file should correspond to a patient's spectral dataset.", icon = "info")
+        filepath_import_select <- tkmessageBox(title = "Sample file", message = "Select the imzML file for the spectra to be imported: the imzML file should correspond to a patient's spectral dataset", icon = "info")
         filepath_import <- tclvalue(tkgetOpenFile(filetypes = "{{imzML files} {.imzML .imzml}}"))
         if (!nchar(filepath_import)) {
             tkmessageBox(message = "No file selected")
@@ -6772,7 +6774,7 @@ select_samples_function <- function() {
 select_RData_file_function <- function() {
     # Set the working directory
     setwd(getwd())
-    filepath_R_import_select <- tkmessageBox(title = "RData file", message = "Select the RData file containing the model list.", icon = "info")
+    filepath_R_import_select <- tkmessageBox(title = "RData file", message = "Select the RData file containing the model list", icon = "info")
     filepath_R <- tclvalue(tkgetOpenFile(filetypes = "{{RData files} {.RData}}"))
     if (!nchar(filepath_R)) {
         tkmessageBox(message = "No RData file selected")
@@ -6902,7 +6904,7 @@ vote_weights_ensemble_choice <- function() {
 ##### Multicore processing
 allow_parallelization_choice <- function() {
     ##### Messagebox
-    tkmessageBox(title = "Parallel processing is resource hungry", message = "Parallel processing is resource hungry. By activating it, the computation becomes faster, but the program will eat a lot of RAM, possibly causing your computer to freeze. If you want to play safe, do not enable it.", icon = "warning")
+    tkmessageBox(title = "Parallel processing is resource hungry", message = "Parallel processing is resource hungry.\nBy activating it, the computation becomes faster, but the program will eat a lot of RAM, possibly causing your computer to freeze. If you want to play safe, do not enable it.", icon = "warning")
     # Catch the value from the menu
     allow_parallelization <- select.list(c("YES","NO"), title="Choose")
     # Default
@@ -6992,22 +6994,18 @@ ms_pixel_typer_data_dumper_function <- function() {
             # The new folder number will be the greater + 1
             try(CLASSIFICATION_new_folder_number <- CLASSIFICATION_present_folder_numbers[length(CLASSIFICATION_present_folder_numbers)] + 1)
             # Generate the new subfolder
-            subfolder <- paste("CLASSIFICATION", CLASSIFICATION_new_folder_number)
+            subfolder <- file.path(output_folder, paste("CLASSIFICATION", CLASSIFICATION_new_folder_number))
             # Create the subfolder
-            dir.create(file.path(output_folder, subfolder))
-            # Estimate the new output folder
-            output_folder <- file.path(output_folder, subfolder)
+            dir.create(subfolder)
         } else {
             # If it not present...
             # Create the folder where to dump the files and go to it...
-            subfolder <- paste("CLASSIFICATION", "1")
+            subfolder <- file.path(output_folder, paste("CLASSIFICATION", "1"))
             # Create the subfolder
-            dir.create(file.path(output_folder, subfolder))
-            # Estimate the new output folder
-            output_folder <- file.path(output_folder, subfolder)
+            dir.create(subfolder)
         }
         # Go to the new working directory
-        setwd(output_folder)
+        setwd(subfolder)
         ##### Dump the files
         # Determine the number of patients, to create subfolders
         number_of_patients <- length(classification_of_patients$final_result_matrix_msi_list)
@@ -7015,10 +7013,13 @@ ms_pixel_typer_data_dumper_function <- function() {
         for (p in 1:number_of_patients) {
             # Retrieve the patient name
             patient_name <- names(classification_of_patients[[p]])
-            # Create the subfolder
-            subfolder <- file.path(output_folder, patient_name)
-            dir.create(subfolder)
-            setwd(subfolder)
+            if (is.null(patient_name) || patient_name == "") {
+                patient_name <- p
+            }
+            # Create the subfolder and go to it
+            subfolder_patient <- file.path(subfolder, patient_name)
+            dir.create(subfolder_patient)
+            setwd(subfolder_patient)
             ### Dump the files
             ## MSI classification matrix
             if (file_type_export_matrix == "csv") {
@@ -7051,7 +7052,7 @@ ms_pixel_typer_data_dumper_function <- function() {
                         model_name <- names(classification_of_patients$classification_ms_images_list[[p]])[i]
                         # Save the plot
                         classification_of_patients$classification_ms_images_list[[p]][[i]]
-                        dev.copy(device = png, filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1280, height = 1024, pointsize = 20, units = "px", res = 150)
+                        dev.copy(device = png, filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7063,7 +7064,7 @@ ms_pixel_typer_data_dumper_function <- function() {
                         model_name <- names(classification_of_patients$classification_ms_images_list[[p]])[i]
                         # Save the plot
                         classification_of_patients$classification_ms_images_list[[p]][[i]]
-                        dev.copy(device = tiff, filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1280, height = 1024, pointsize = 20, units = "px", res = 150)
+                        dev.copy(device = tiff, filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7075,7 +7076,7 @@ ms_pixel_typer_data_dumper_function <- function() {
                         model_name <- names(classification_of_patients$classification_ms_images_list[[p]])[i]
                         # Save the plot
                         classification_of_patients$classification_ms_images_list[[p]][[i]]
-                        dev.copy(device = jpeg, filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1280, height = 1024, pointsize = 20, units = "px", res = 150, quality = 100)
+                        dev.copy(device = jpeg, filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150, quality = 100)
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7107,21 +7108,21 @@ ms_pixel_typer_data_dumper_function <- function() {
             if (file_type_export_images == "png") {
                 try({
                     classification_of_patients$classification_ensemble_ms_image_list[[p]]
-                    dev.copy(device = png, filename = paste("Ensemble Pixel-by-pixel classification ", ".", file_type_export_images, sep = ""), width = 1280, height = 1024, pointsize = 20, units = "px", res = 150)
+                    dev.copy(device = png, filename = paste("Ensemble Pixel-by-pixel classification ", ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
                     dev.off()
                 }, silent = TRUE)
             } else if (file_type_export_images == "tiff") {
                 # TIFF
                 try({
                     classification_of_patients$classification_ensemble_ms_image_list[[p]]
-                    dev.copy(device = tiff, filename = paste("Ensemble Pixel-by-pixel classification ", ".", file_type_export_images, sep = ""), width = 1280, height = 1024, pointsize = 20, units = "px", res = 150)
+                    dev.copy(device = tiff, filename = paste("Ensemble Pixel-by-pixel classification ", ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
                     dev.off()
                 }, silent = TRUE)
             } else if (file_type_export_images == "jpg" || file_type_export_images == "jpeg") {
                 # JPEG
                 try({
                     classification_of_patients$classification_ensemble_ms_image_list[[p]]
-                    dev.copy(device = jpeg, filename = paste("Ensemble Pixel-by-pixel classification ", ".", file_type_export_images, sep = ""), width = 1280, height = 1024, pointsize = 20, units = "px", res = 150, quality = 100)
+                    dev.copy(device = jpeg, filename = paste("Ensemble Pixel-by-pixel classification ", ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150, quality = 100)
                     dev.off()
                 }, silent = TRUE)
             }
@@ -7134,7 +7135,7 @@ ms_pixel_typer_data_dumper_function <- function() {
                         model_name <- names(classification_of_patients$average_spectrum_with_bars_profile_list[[p]])[i]
                         # Save the plot
                         classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]]
-                        dev.copy(device = png, filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1280, height = 1024, pointsize = 20, units = "px", res = 150)
+                        dev.copy(device = png, filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7146,7 +7147,7 @@ ms_pixel_typer_data_dumper_function <- function() {
                         model_name <- names(classification_of_patients$average_spectrum_with_bars_profile_list[[p]])[i]
                         # Save the plot
                         classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]]
-                        dev.copy(device = tiff, filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1280, height = 1024, pointsize = 20, units = "px", res = 150)
+                        dev.copy(device = tiff, filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7158,14 +7159,14 @@ ms_pixel_typer_data_dumper_function <- function() {
                         model_name <- names(classification_of_patients$average_spectrum_with_bars_profile_list[[p]])[i]
                         # Save the plot
                         classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]]
-                        dev.copy(device = jpeg, filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1280, height = 1024, pointsize = 20, units = "px", res = 150)
+                        dev.copy(device = jpeg, filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
                         dev.off()
                     }
                 }, silent = TRUE)
             }
         }
         ## Ensemble classification profile matrix ALL
-        setwd(output_folder)
+        setwd(subfolder)
         if (file_type_export_matrix == "csv") {
             try(write.csv(classification_of_patients$classification_ensemble_matrix_profile_all, file = paste("Ensemble MS profile classification matrix ALL", ".", file_type_export_matrix, sep = "")), silent = TRUE)
         } else if (file_type_export_matrix == "xls" || file_type_export_matrix == "xlsx") {
