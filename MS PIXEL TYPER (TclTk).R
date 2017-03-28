@@ -1809,6 +1809,7 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
 
 
 ############################################################# SPECTRAL ALIGNMENT
+# The function allows to perform the alignment among spectra. By selecting 'auto', the reference peaks will be automatically determined; if 'average spectrum' is selected, the reference peaklist is the peaklist of the average spectrum; if 'skyline spectrum' is selected, the reference peaklist is the peaklist of the skyline spectrum.
 align_spectra <- function(spectra, spectral_alignment_algorithm = "cubic", spectral_alignment_reference = "auto", tof_mode = "linear", deisotope_peaklist = FALSE) {
     # Perform only if a method is specified
     if (!is.null(spectral_alignment_algorithm)) {
@@ -1823,7 +1824,7 @@ align_spectra <- function(spectra, spectral_alignment_algorithm = "cubic", spect
             ##### Perform the alignment: Automatic computation of the reference peaklist
             if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "auto") {
                 aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm)
-            } else if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "average") {
+            } else if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "average spectrum") {
                 ##### Perform the alignment: Average spectrum
                 # Ganerate the average spectrum
                 average_spectrum <- averageMassSpectra(spectra, method = "mean")
@@ -1842,6 +1843,25 @@ align_spectra <- function(spectra, spectral_alignment_algorithm = "cubic", spect
                 }
                 # Align the spectra
                 aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm, reference = average_spectrum_peaks)
+            } else if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "skyline spectrum") {
+                ##### Perform the alignment: Skyline spectrum
+                # Ganerate the skyline spectrum
+                skyline_spectrum <- averageMassSpectra(spectra, method = "sum")
+                # Preprocess the skyline spectrum
+                if (tof_mode == "reflectron") {
+                    smoothing_algorithm_skyline <- NULL
+                } else {
+                    smoothing_algorithm_skyline <- "SavitzkyGolay"
+                }
+                skyline_spectrum <- preprocess_spectra(skyline_spectrum, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = smoothing_algorithm_avg, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"))
+                # Detect peaks onto the skyline spectrum: refference peaklist
+                skyline_spectrum_peaks <- detectPeaks(skyline_spectrum, halfWindowSize = half_window_alignment, method = "SuperSmoother", SNR = 3)
+                # Deisotope peaklist
+                if (deisotope_peaklist == TRUE) {
+                    skyline_spectrum_peaks <- deisotope_peaks(skyline_spectrum_peaks)
+                }
+                # Align the spectra
+                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm, reference = skyline_spectrum_peaks)
             }
             ### Return the aligned spectra
             return(aligned_spectra)
@@ -2438,7 +2458,7 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
 # The pixel grouping cannot be 'graph', otherwise, when embedded in the pixel by pixel classification function, the graph segmentation is performed for each model before making the predictons.
-single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", preprocessing_parameters = NULL, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 1, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 100, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, number_of_spectra_partitions = 1, partitioning_method = "space", plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE) {
+single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", preprocessing_parameters = NULL, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 1, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 5, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, number_of_spectra_partitions = 1, partitioning_method = "space", plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE) {
     # Class list (from the custom model entry)
     class_list <- model_x$class_list
     # Outcome list (from the custom model entry)
@@ -6137,7 +6157,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.28.5"
+R_script_version <- "2017.03.28.6"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -6193,6 +6213,8 @@ classification_mode <- "pixel"
 pixel_grouping <- "single"
 decision_method_ensemble <- "majority"
 vote_weights_ensemble <- "equal"
+number_of_hca_nodes <- 4
+moving_window_size <- 5
 
 
 
@@ -6521,7 +6543,7 @@ preprocessing_window_function <- function() {
                 spectral_alignment_algorithm <- "cubic"
             }
             ## Ask for the reference peaklist
-            spectral_alignment_reference <- select.list(c("auto","average"), title = "Choose")
+            spectral_alignment_reference <- select.list(c("auto","average spectrum", "skyline spectrum"), title = "Choose")
             if (spectral_alignment_reference == "") {
                 spectral_alignment_reference <- "auto"
             }
@@ -6694,23 +6716,23 @@ classification_mode_choice <- function() {
     # Choose the pixel grouping
     if ("pixel" %in% classification_mode) {
         ## Choose the pixel grouping
-        pixel_grouping <- select.list(c("single", "hca", "moving window average", "graph"), title = "Choose", preselect = "single")
+        pixel_grouping <- select.list(c("single", "hca", "moving window average", "graph"), title = "Choose pixel grouping", preselect = "single")
         if (pixel_grouping == "") {
             pixel_grouping <- "single"
         }
         # Escape the function
         .GlobalEnv$pixel_grouping <- pixel_grouping
         if (pixel_grouping == "moving window average") {
-            moving_window_size <- as.integer(select.list(c(2, 3, 4, 5, 10, 15, 20, 25, 50, 100, 200, 300, 500, 1000), title = "Choose", preselect = 5))
+            moving_window_size <- as.integer(select.list(c(2, 3, 4, 5, 10, 15, 20, 25, 50, 100, 200, 300, 500, 1000), title = "Choose moving window size", preselect = 5))
             if (moving_window_size == "") {
-                moving_window_size <<- 5
+                moving_window_size <- 5
             }
             # Escape the function
             .GlobalEnv$moving_window_size <- moving_window_size
         } else if (pixel_grouping == "hca") {
-            number_of_hca_nodes <- as.integer(select.list(c(2, 3, 4, 5, 10, 15, 20, 25, 50, 100, 200, 300, 500, 1000), title = "Choose", preselect = 4))
+            number_of_hca_nodes <- as.integer(select.list(c(2, 3, 4, 5, 10, 15, 20, 25, 50, 100, 200, 300, 500, 1000), title = "Choose number of HC nodes", preselect = 4))
             if (number_of_hca_nodes == "") {
-                number_of_hca_nodes <<- 4
+                number_of_hca_nodes <- 4
             }
             # Escape the function
             .GlobalEnv$number_of_hca_nodes <- number_of_hca_nodes
