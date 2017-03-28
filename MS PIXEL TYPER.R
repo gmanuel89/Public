@@ -6137,7 +6137,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.28.3"
+R_script_version <- "2017.03.28.5"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -7007,13 +7007,27 @@ ms_pixel_typer_data_dumper_function <- function() {
         # Go to the new working directory
         setwd(subfolder)
         ##### Dump the files
-        # Determine the number of patients, to create subfolders
+        # Determine the number of patients, to create subfolders (try with the msi list, if it is still zero because only the profile has been classified, use the profile list)
         number_of_patients <- length(classification_of_patients$final_result_matrix_msi_list)
+        if (number_of_patients == 0) {
+            number_of_patients <- length(classification_of_patients$final_result_matrix_profile_list)
+        }
         ##### For each patient...
         for (p in 1:number_of_patients) {
             # Retrieve the patient name
-            patient_name <- names(classification_of_patients[[p]])
-            if (is.null(patient_name) || patient_name == "") {
+            if (length(classification_of_patients$final_result_matrix_msi_list) > 0) {
+                patient_name <- names(classification_of_patients$final_result_matrix_msi_list)[[p]]
+            } else {
+                patient_name <- NULL
+            }
+            if (is.null(patient_name)) {
+                if (length(classification_of_patients$final_result_matrix_profile_list) > 0) {
+                    patient_name <- names(classification_of_patients$final_result_matrix_profile_list)[[p]]
+                } else {
+                    patient_name <- NULL
+                }
+            }
+            if (is.null(patient_name)) {
                 patient_name <- p
             }
             # Create the subfolder and go to it
