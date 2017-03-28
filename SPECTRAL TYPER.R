@@ -1,60 +1,61 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.24 ####################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.28 ####################
 
 ########################################################################## MISC
 
 ###################################################### CHECK INTERNET CONNECTION
-# This function checks if there is internet connection, by pinging a website. It returns TRUE or FALSE
-check_internet_connection <- function(website_to_ping = "www.google.it") {
-    if (Sys.info()[1] == "Linux") {
-        # -c: number of packets sent/received (attempts) ; -W timeout in seconds
-        there_is_internet <- !as.logical(system(command = paste("ping -c 1 -W 2", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
-    } else if (Sys.info()[1] == "Windows") {
-        # -n: number of packets sent/received (attempts) ; -w timeout in milliseconds
-        there_is_internet <- !as.logical(system(command = paste("ping -n 1 -w 2000", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
-    } else {
-        there_is_internet <- !as.logical(system(command = paste("ping", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+# This function checks if there is internet connection, by pinging a website. It returns TRUE or FALSE.
+# Two methods are available: 'ping' tries to ping the website, while 'getURL' connects to it directly. The default is 'getURL', since it is more reliable than ping.
+check_internet_connection <- function(method = "getURL", website_to_ping = "www.google.it") {
+    ##### PING
+    if (method == "ping") {
+        if (Sys.info()[1] == "Linux") {
+            # -c: number of packets sent/received (attempts) ; -W timeout in seconds
+            there_is_internet <- !as.logical(system(command = paste("ping -c 1 -W 2", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+        } else if (Sys.info()[1] == "Windows") {
+            # -n: number of packets sent/received (attempts) ; -w timeout in milliseconds
+            there_is_internet <- !as.logical(system(command = paste("ping -n 1 -w 2000", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+        } else {
+            there_is_internet <- !as.logical(system(command = paste("ping", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
+        }
+    } else if (method == "getURL") {
+        ##### GET URL
+        # Install the RCurl package if not installed
+        if ("RCurl" %in% installed.packages()[,1]) {
+            library(RCurl)
+        } else {
+            install.packages("RCurl", repos = "http://cran.mirror.garr.it/mirrors/CRAN/", quiet = TRUE, verbose = FALSE)
+            library(RCurl)
+        }
+        there_is_internet <- FALSE
+        try({
+            there_is_internet <- is.character(getURL(u = website_to_ping, followLocation = TRUE, .opts = list(timeout = 1, maxredirs = 2, verbose = FALSE)))
+            }, silent = TRUE)
     }
     return(there_is_internet)
 }
+
+
+
+
+
+################################################################################
+
+
+
+
 
 ##################################################### INSTALL REQUIRED PACKAGES
 # This function installs and loads the selected packages
 install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
     ### Check internet connection
-    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
+    there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     ########## Update all the packages (if there is internet connection)
     if (there_is_internet == TRUE) {
         ##### If a repository is specified
         if (repository != "" || !is.null(repository)) {
-            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                # Try to build the package from source
-                update_successful <- FALSE
-                try({
-                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-                    update_successful <- TRUE
-                }, silent = TRUE)
-                # Otherwise use the binary files
-                if (update_successful == FALSE) {
-                    update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
-                }
-            } else if (Sys.info()[1] == "Linux") {
-                update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-            }
+            update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
         } else {
-            if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                # Try to build the package from source
-                update_successful <- FALSE
-                try({
-                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-                    update_successful <- TRUE
-                }, silent = TRUE)
-                # Otherwise use the binary files
-                if (update_successful == FALSE) {
-                    update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
-                }
-            } else if (Sys.info()[1] == "Linux") {
-                update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE, type = "source")
-            }
+            update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
         }
         print("Packages updated")
     } else {
@@ -75,36 +76,10 @@ install_and_load_required_packages <- function(required_packages, repository = "
         if (there_is_internet == TRUE) {
             ### If a repository is specified
             if (repository != "" || !is.null(repository)) {
-                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                    # Try to build the package from source
-                    installed_successful <- FALSE
-                    try({
-                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
-                        installed_successful <- TRUE
-                    }, silent = TRUE)
-                    # Otherwise use the binary files
-                    if (installed_successful == FALSE) {
-                        install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
-                    }
-                } else if (Sys.info()[1] == "Linux") {
-                    install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE, type = "source")
-                }
+                install.packages(missing_packages, repos = repository, quiet = TRUE, verbose = FALSE)
             } else {
                 ### If NO repository is specified
-                if (Sys.info()[1] == "Windows" || Sys.info()[1] == "Darwin") {
-                    # Try to build the package from source
-                    installed_successful <- FALSE
-                    try({
-                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
-                        installed_successful <- TRUE
-                    }, silent = TRUE)
-                    # Otherwise use the binary files
-                    if (installed_successful == FALSE) {
-                        install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
-                    }
-                } else if (Sys.info()[1] == "Linux") {
-                    install.packages(missing_packages, quiet = TRUE, verbose = FALSE, type = "source")
-                }
+                install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
             }
             print("All the required packages have been installed")
         } else {
@@ -114,9 +89,13 @@ install_and_load_required_packages <- function(required_packages, repository = "
     } else {
         print("All the packages are up-to-date")
     }
-    ##### Load the packages
-    for (i in 1:length(required_packages)) {
-        library(required_packages[i], character.only = TRUE)
+    ##### Load the packages (if there are all the packages)
+    if ((length(missing_packages) > 0 && there_is_internet == TRUE) || length(missing_packages) == 0) {
+        for (i in 1:length(required_packages)) {
+            library(required_packages[i], character.only = TRUE)
+        }
+    } else {
+        print("Packages cannot be loaded... Expect issues...")
     }
 }
 
@@ -1640,7 +1619,7 @@ replace_class_name <- function (spectra, class_list = NULL, class_in_file_name =
 # The function allows to select some additional parameters of the preprocessing.
 # This version of the function whould be faster because each element of the spectral list is subjected to all the preprocessing step.
 # If an algorithm is set to NULL, that preprocessing step will not be performed.
-preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_method = NULL), allow_parallelization = FALSE) {
+preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"), allow_parallelization = FALSE) {
     ##### Load the required libraries
     install_and_load_required_packages(c("MALDIquant", "parallel"))
     ##### Rename the trim function
@@ -1655,7 +1634,8 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
     normalization_algorithm <- preprocessing_parameters$normalization_algorithm
     normalization_mass_range <- preprocessing_parameters$normalization_mass_range
     preprocess_spectra_in_packages_of <- preprocessing_parameters$preprocess_spectra_in_packages_of
-    spectral_alignment_method <- preprocessing_parameters$spectral_alignment_method
+    spectral_alignment_algorithm <- preprocessing_parameters$spectral_alignment_algorithm
+    spectral_alignment_reference <- preprocessing_parameters$spectral_alignment_reference
     ##### Fix the names
     if (!is.null(smoothing_algorithm) && (smoothing_algorithm == "SavitzkyGolay" || smoothing_algorithm == "Savitzky-Golay" || smoothing_algorithm == "SG")) {
         smoothing_algorithm <- "SavitzkyGolay"
@@ -1665,12 +1645,6 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
     ##### Define the smoothing half wondow size
     smoothing_half_window_size <- NULL
     if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-        #if (!is.null(smoothing_strength) && smoothing_strength == "small") {
-        #if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-        #smoothing_half_window_size <- 5
-        #} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-        #smoothing_half_window_size <- 1
-        #}
         if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
             if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
                 smoothing_half_window_size <- 10
@@ -1691,12 +1665,6 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
             }
         }
     } else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-        #if (!is.null(smoothing_strength) && smoothing_strength == "small") {
-        #if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
-        #smoothing_half_window_size <- 1
-        #} else if (!is.null(smoothing_algorithm) && smoothing_algorithm == "MovingAverage") {
-        #smoothing_half_window_size <- 0.2
-        #}
         if (!is.null(smoothing_strength) && smoothing_strength == "medium") {
             if (!is.null(smoothing_algorithm) && smoothing_algorithm == "SavitzkyGolay") {
                 smoothing_half_window_size <- 3
@@ -1719,8 +1687,6 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
     }
     ##### Generate the preprocessing function to be applied to every element of the spectra_temp list (x = spectrum)
     preprocessing_subfunction <- function(x, mass_range, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range) {
-        ### Remove flat spectra
-        # x <- removeEmptyMassObjects (x)
         ### Trimming
         # Mass range specified
         if (!is.null(mass_range)) {
@@ -1759,7 +1725,7 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
         ### Return the preprocessed spectrum (x)
         return(x)
     }
-    ######################################### Multiple spectra
+    #################### Multiple spectra
     if (isMassSpectrumList(spectra)) {
         ##### Trimming (same mass range for all the dataset)
         if (is.null(mass_range)) {
@@ -1806,26 +1772,29 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
             preprocessed_spectra <- append(preprocessed_spectra, spectra_temp)
         }
     } else if (isMassSpectrum(spectra)) {
-    ########## Single spectrum
+    #################### Single spectrum
         spectra <- preprocessing_subfunction(spectra, mass_range, transformation_algorithm, smoothing_algorithm, smoothing_half_window_size, baseline_subtraction_algorithm, baseline_subtraction_iterations, normalization_algorithm, normalization_mass_range)
         # Add to the final preprocessed spectral dataset
         preprocessed_spectra <- spectra
     }
-    ######################################### SPECTRAL ALIGNMENT
-    try({
-        if (!is.null(spectral_alignment_method)) {
-            if (isMassSpectrumList(preprocessed_spectra)) {
-                if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
-                    half_window_alignment <- 20
-                    tolerance_ppm <- 2000
-                } else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
-                    half_window_alignment <- 5
-                    tolerance_ppm <- 200
-                }
-                preprocessed_spectra <- alignSpectra(preprocessed_spectra, halfWindowSize = half_window_alignment, SNR = 2, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_method)
+    #################### SPECTRAL ALIGNMENT (Multiple spectra)
+    if (!is.null(spectral_alignment_algorithm)) {
+        if (isMassSpectrumList(preprocessed_spectra)) {
+            spectral_alignment_performed <- FALSE
+            try({
+                # Perform the alignment
+                preprocessed_spectra <- align_spectra(preprocessed_spectra, spectral_alignment_algorithm = spectral_alignment_algorithm, spectral_alignment_reference = spectral_alignment_reference, tof_mode = tof_mode)
+                spectral_alignment_performed <- TRUE
+            })
+            # Return message
+            if (spectral_alignment_performed == TRUE) {
+                print("The spectral aligment has been performed successfully!")
+            } else {
+                print("The spectral aligment could not be performed!")
             }
         }
-    })
+    }
+    ########## Return preprocessed (and aligned) spectra
     return(preprocessed_spectra)
 }
 
@@ -1834,6 +1803,83 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
 
 
 ###############################################################################
+
+
+
+
+
+############################################################# SPECTRAL ALIGNMENT
+# The function allows to perform the alignment among spectra. By selecting 'auto', the reference peaks will be automatically determined; if 'average spectrum' is selected, the reference peaklist is the peaklist of the average spectrum; if 'skyline spectrum' is selected, the reference peaklist is the peaklist of the skyline spectrum.
+align_spectra <- function(spectra, spectral_alignment_algorithm = "cubic", spectral_alignment_reference = "auto", tof_mode = "linear", deisotope_peaklist = FALSE) {
+    # Perform only if a method is specified
+    if (!is.null(spectral_alignment_algorithm)) {
+        if (isMassSpectrumList(spectra)) {
+            if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
+                half_window_alignment <- 20
+                tolerance_ppm <- 2000
+            } else if (tof_mode == "reflector" || tof_mode == "reflectron" || tof_mode == "R") {
+                half_window_alignment <- 5
+                tolerance_ppm <- 200
+            }
+            ##### Perform the alignment: Automatic computation of the reference peaklist
+            if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "auto") {
+                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm)
+            } else if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "average spectrum") {
+                ##### Perform the alignment: Average spectrum
+                # Ganerate the average spectrum
+                average_spectrum <- averageMassSpectra(spectra, method = "mean")
+                # Preprocess the average spectrum
+                if (tof_mode == "reflectron") {
+                    smoothing_algorithm_avg <- NULL
+                } else {
+                    smoothing_algorithm_avg <- "SavitzkyGolay"
+                }
+                average_spectrum <- preprocess_spectra(average_spectrum, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = smoothing_algorithm_avg, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"))
+                # Detect peaks onto the average spectrum: refference peaklist
+                average_spectrum_peaks <- detectPeaks(average_spectrum, halfWindowSize = half_window_alignment, method = "SuperSmoother", SNR = 3)
+                # Deisotope peaklist
+                if (deisotope_peaklist == TRUE) {
+                    average_spectrum_peaks <- deisotope_peaks(average_spectrum_peaks)
+                }
+                # Align the spectra
+                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm, reference = average_spectrum_peaks)
+            } else if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "skyline spectrum") {
+                ##### Perform the alignment: Skyline spectrum
+                # Ganerate the skyline spectrum
+                skyline_spectrum <- averageMassSpectra(spectra, method = "sum")
+                # Preprocess the skyline spectrum
+                if (tof_mode == "reflectron") {
+                    smoothing_algorithm_skyline <- NULL
+                } else {
+                    smoothing_algorithm_skyline <- "SavitzkyGolay"
+                }
+                skyline_spectrum <- preprocess_spectra(skyline_spectrum, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = smoothing_algorithm_avg, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"))
+                # Detect peaks onto the skyline spectrum: refference peaklist
+                skyline_spectrum_peaks <- detectPeaks(skyline_spectrum, halfWindowSize = half_window_alignment, method = "SuperSmoother", SNR = 3)
+                # Deisotope peaklist
+                if (deisotope_peaklist == TRUE) {
+                    skyline_spectrum_peaks <- deisotope_peaks(skyline_spectrum_peaks)
+                }
+                # Align the spectra
+                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm, reference = skyline_spectrum_peaks)
+            }
+            ### Return the aligned spectra
+            return(aligned_spectra)
+        } else {
+            ### Return the original spectra if there is only one spectrum
+            return(spectra)
+        }
+    } else {
+        ### Return the original spectra if the alignment algorithm is not specified
+        return(spectra)
+    }
+}
+
+
+
+
+
+################################################################################
 
 
 
@@ -2412,7 +2458,7 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
 # The pixel grouping cannot be 'graph', otherwise, when embedded in the pixel by pixel classification function, the graph segmentation is performed for each model before making the predictons.
-single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", preprocessing_parameters = NULL, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 1, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 100, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, number_of_spectra_partitions = 1, partitioning_method = "space", plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE) {
+single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", preprocessing_parameters = NULL, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 1, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 5, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, number_of_spectra_partitions = 1, partitioning_method = "space", plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE) {
     # Class list (from the custom model entry)
     class_list <- model_x$class_list
     # Outcome list (from the custom model entry)
@@ -6093,18 +6139,18 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 
-#################### SPECTRAL TYPER PROGRAM ####################
+#################### SPECTRAL TYPER ####################
 
 
 
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.24.1"
+R_script_version <- "2017.03.28.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
-script_file_name <- paste("SPECTRAL TYPER (", R_script_version, ").R", sep = "")
+script_file_name <- "SPECTRAL TYPER"
 # Change log
 change_log <- "1. New GUI\n2. Check for updates\n3. Adaptive fonts"
 
@@ -6202,7 +6248,7 @@ check_for_updates_function <- function() {
     ### Initialize the change log
     online_change_log <- "Bug fixes"
     # Check if there is internet connection by pinging a website
-    there_is_internet <- check_internet_connection(website_to_ping = "www.google.it")
+    there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     # Check for updates only in case of working internet connection
     if (there_is_internet == TRUE) {
         try({
@@ -6287,6 +6333,7 @@ check_for_updates_function <- function() {
     .GlobalEnv$update_available <- update_available
     .GlobalEnv$online_change_log <- online_change_log
     .GlobalEnv$check_for_updates_value <- check_for_updates_value
+    .GlobalEnv$online_version_number <- online_version_number
 }
 
 ##### Download the updated file (from my GitHub page)
@@ -6307,7 +6354,7 @@ download_updates_function <- function() {
         tkmessageBox(message = paste("The updated script file will be downloaded in:\n\n", download_folder, sep = ""))
         # Download the file
         try({
-            download.file(url = github_R_url, destfile = script_file_name, method = "auto")
+            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ")", sep = ""), method = "auto")
             file_downloaded <- TRUE
         }, silent = TRUE)
         if (file_downloaded == TRUE) {
@@ -6327,7 +6374,7 @@ preprocessing_window_function <- function() {
     # Transform the data
     transform_data_choice <- function() {
         # Catch the value from the menu
-        transform_data <- select.list(c("YES","NO"), title="Choose")
+        transform_data <- select.list(c("YES","NO"), title = "Choose")
         # Default
         if (transform_data == "YES") {
             transform_data <- TRUE
@@ -6339,12 +6386,13 @@ preprocessing_window_function <- function() {
             }
         } else if (transform_data == "NO" || transform_data == "") {
             transform_data <- FALSE
+            transform_data_algorithm <- NULL
         }
         # Set the value of the displaying label
         if (transform_data == TRUE) {
             transform_data_value <- paste("YES", "(", transform_data_algorithm, ")")
         } else {
-            transform_data_value <- "    NO    "
+            transform_data_value <- "                      NO                           "
         }
         transform_data_value_label <- tklabel(preproc_window, text = transform_data_value, font = label_font)
         tkgrid(transform_data_value_label, row = 3, column = 2)
@@ -6352,9 +6400,6 @@ preprocessing_window_function <- function() {
         .GlobalEnv$transform_data <- transform_data
         .GlobalEnv$transform_data_algorithm <- transform_data_algorithm
         .GlobalEnv$transform_data_value <- transform_data_value
-        # Add the parameters to the list of preprocessing parameters (to be dumped)
-        .GlobalEnv$preprocessing_parameters_database$data_transformation <- transform_data
-        .GlobalEnv$preprocessing_parameters_database$transformation_algorithm <- transform_data_algorithm
     }
     # Smoothing
     smoothing_choice <- function() {
@@ -6376,12 +6421,13 @@ preprocessing_window_function <- function() {
             }
         } else if (smoothing == "NO") {
             smoothing <- FALSE
+            smoothing_algorithm <- NULL
         }
         # Set the value of the displaying label
         if (smoothing == TRUE) {
             smoothing_value <- paste("YES", "(", smoothing_algorithm, "," , smoothing_strength, ")")
         } else {
-            smoothing_value <- "    NO    "
+            smoothing_value <- "                           NO                             "
         }
         smoothing_value_label <- tklabel(preproc_window, text = smoothing_value, font = label_font)
         tkgrid(smoothing_value_label, row = 4, column = 2)
@@ -6390,14 +6436,11 @@ preprocessing_window_function <- function() {
         .GlobalEnv$smoothing_strength <- smoothing_strength
         .GlobalEnv$smoothing_algorithm <- smoothing_algorithm
         .GlobalEnv$smoothing_value <- smoothing_value
-        # Add the parameters to the list of preprocessing parameters (to be dumped)
-        .GlobalEnv$preprocessing_parameters_database$smoothing_strength <- smoothing_strength
-        .GlobalEnv$preprocessing_parameters_database$smoothing_algorithm <- smoothing_algorithm
     }
     # Baseline subtraction
     baseline_subtraction_choice <- function() {
         # Catch the value from the menu
-        baseline_subtraction <- select.list(c("YES","NO"), title="Choose")
+        baseline_subtraction <- select.list(c("YES","NO"), title = "Choose")
         # Default
         if (baseline_subtraction == "YES" || baseline_subtraction == "") {
             baseline_subtraction <- TRUE
@@ -6416,6 +6459,7 @@ preprocessing_window_function <- function() {
             }
         } else if (baseline_subtraction == "NO") {
             baseline_subtraction <- FALSE
+            baseline_subtraction_algorithm <- NULL
         }
         # Set the value of the displaying label
         if (baseline_subtraction == TRUE && baseline_subtraction_algorithm != "SNIP") {
@@ -6423,7 +6467,7 @@ preprocessing_window_function <- function() {
         } else if (baseline_subtraction == TRUE && baseline_subtraction_algorithm == "SNIP") {
             baseline_subtraction_value <- paste("YES", "(", baseline_subtraction_algorithm, ", iterations:", baseline_subtraction_iterations, ")")
         } else {
-            baseline_subtraction_value <- "    NO    "
+            baseline_subtraction_value <- "                                    NO                                 "
         }
         baseline_subtraction_value_label <- tklabel(preproc_window, text = baseline_subtraction_value, font = label_font)
         tkgrid(baseline_subtraction_value_label, row = 5, column = 3)
@@ -6432,9 +6476,6 @@ preprocessing_window_function <- function() {
         .GlobalEnv$baseline_subtraction_iterations <- baseline_subtraction_iterations
         .GlobalEnv$baseline_subtraction_algorithm <- baseline_subtraction_algorithm
         .GlobalEnv$baseline_subtraction_value <- baseline_subtraction_value
-        # Add the parameters to the list of preprocessing parameters (to be dumped)
-        .GlobalEnv$preprocessing_parameters_database$baseline_subtraction_iterations <- baseline_subtraction_iterations
-        .GlobalEnv$preprocessing_parameters_database$baseline_subtraction_algorithm <- baseline_subtraction_algorithm
     }
     # Normalization
     normalization_choice <- function() {
@@ -6462,6 +6503,7 @@ preprocessing_window_function <- function() {
             }
         } else if (normalization == "NO") {
             normalization <- FALSE
+            normalization_algorithm <- NULL
         }
         # Set the value of the displaying label
         if (normalization == TRUE && normalization_algorithm != "TIC") {
@@ -6469,7 +6511,7 @@ preprocessing_window_function <- function() {
         } else if (normalization == TRUE && normalization_algorithm == "TIC") {
             normalization_value <- paste("YES", "(", normalization_algorithm, ", range:", normalization_mass_range_value, ")")
         } else {
-            normalization_value <- "    NO    "
+            normalization_value <- "                                 NO                             "
         }
         normalization_value_label <- tklabel(preproc_window, text = normalization_value, font = label_font)
         tkgrid(normalization_value_label, row = 6, column = 3)
@@ -6478,9 +6520,43 @@ preprocessing_window_function <- function() {
         .GlobalEnv$normalization_mass_range <- normalization_mass_range
         .GlobalEnv$normalization_algorithm <- normalization_algorithm
         .GlobalEnv$normalization_value <- normalization_value
-        # Add the parameters to the list of preprocessing parameters (to be dumped)
-        .GlobalEnv$preprocessing_parameters_database$normalization_mass_range <- normalization_mass_range
-        .GlobalEnv$preprocessing_parameters_database$normalization_algorithm <- normalization_algorithm
+    }
+    # Spectral alignment
+    spectral_alignment_choice <- function() {
+        # Catch the value from the menu
+        spectral_alignment <- select.list(c("YES","NO"), title = "Choose")
+        # YES and Default
+        if (spectral_alignment == "YES") {
+            spectral_alignment <- TRUE
+            # Ask for the algorithm
+            spectral_alignment_algorithm <- select.list(c("cubic","quadratic","linear","lowess"), title = "Choose")
+            # Default
+            if (spectral_alignment_algorithm == "") {
+                spectral_alignment_algorithm <- "cubic"
+            }
+            ## Ask for the reference peaklist
+            spectral_alignment_reference <- select.list(c("auto","average spectrum", "skyline spectrum"), title = "Choose")
+            if (spectral_alignment_reference == "") {
+                spectral_alignment_reference <- "auto"
+            }
+        } else if (spectral_alignment == "NO" || spectral_alignment == "") {
+            spectral_alignment <- FALSE
+            spectral_alignment_algorithm <- NULL
+            spectral_alignment_reference <- NULL
+        }
+        # Set the value of the displaying label
+        if (spectral_alignment == TRUE) {
+            spectral_alignment_value <- paste("YES", "(", spectral_alignment_algorithm, ",", spectral_alignment_reference, ")")
+        } else {
+            spectral_alignment_value <- "                                   NO                            "
+        }
+        spectral_alignment_value_label <- tklabel(preproc_window, text = spectral_alignment_value, font = label_font)
+        tkgrid(spectral_alignment_value_label, row = 8, column = 2)
+        # Escape the function
+        .GlobalEnv$spectral_alignment <- spectral_alignment
+        .GlobalEnv$spectral_alignment_algorithm <- spectral_alignment_algorithm
+        .GlobalEnv$spectral_alignment_reference <- spectral_alignment_reference
+        .GlobalEnv$spectral_alignment_value <- spectral_alignment_value
     }
     # TOF mode
     tof_mode_choice <- function() {
@@ -6494,9 +6570,10 @@ preprocessing_window_function <- function() {
             tof_mode <- "reflector"
         }
         # Set the value of the displaying label
-        tof_mode_value <- tof_mode
-        if (tof_mode_value == "linear") {
-            tof_mode_value <- "   linear   "
+        if (tof_mode == "linear") {
+            tof_mode_value <- "    Linear    "
+        } else if (tof_mode == "reflector") {
+            tof_mode_value <- "Reflector"
         }
         tof_mode_value_label <- tklabel(preproc_window, text = tof_mode_value, font = label_font)
         tkgrid(tof_mode_value_label, row = 2, column = 3)
@@ -6517,11 +6594,7 @@ preprocessing_window_function <- function() {
         preprocess_spectra_in_packages_of_value <- as.character(preprocess_spectra_in_packages_of)
         # Escape the function
         .GlobalEnv$mass_range <- mass_range
-        .GlobalEnv$mass_range_value <- mass_range_value
         .GlobalEnv$preprocess_spectra_in_packages_of <- preprocess_spectra_in_packages_of
-        .GlobalEnv$preprocess_spectra_in_packages_of_value <- preprocess_spectra_in_packages_of_value
-        # Add the parameters to the list of preprocessing parameters (to be dumped)
-        .GlobalEnv$preprocessing_parameters_database$mass_range <- mass_range
         # Destroy the window upon committing
         tkdestroy(preproc_window)
     }
@@ -6552,10 +6625,12 @@ preprocessing_window_function <- function() {
     baseline_subtraction_button <- tkbutton(preproc_window, text="Baseline subtraction", command = baseline_subtraction_choice, font = button_font)
     baseline_subtraction_iterations_entry <- tkentry(preproc_window, width = 15, textvariable = baseline_subtraction_iterations2, font = entry_font)
     tkinsert(baseline_subtraction_iterations_entry, "end", as.character(baseline_subtraction_iterations))
-    # normalization
+    # Normalization
     normalization_button <- tkbutton(preproc_window, text="Normalization", command = normalization_choice, font = button_font)
     normalization_mass_range_entry <- tkentry(preproc_window, width = 15, textvariable = normalization_mass_range2, font = entry_font)
     tkinsert(normalization_mass_range_entry, "end", as.character(normalization_mass_range))
+    # Spectral alignment
+    spectral_alignment_button <- tkbutton(preproc_window, text="Align spectra", command = spectral_alignment_choice, font = button_font)
     # Commit preprocessing
     commit_preprocessing_button <- tkbutton(preproc_window, text="Commit preprocessing", command = commit_preprocessing_function, font = button_font)
     ##### Displaying labels
@@ -6564,6 +6639,7 @@ preprocessing_window_function <- function() {
     smoothing_value_label <- tklabel(preproc_window, text = smoothing_value, font = label_font)
     baseline_subtraction_value_label <- tklabel(preproc_window, text = baseline_subtraction_value, font = label_font)
     normalization_value_label <- tklabel(preproc_window, text = normalization_value, font = label_font)
+    spectral_alignment_value_label <- tklabel(preproc_window, text = spectral_alignment_value, font = label_font)
     #### Geometry manager
     tkgrid(mass_range_label, row = 1, column = 1)
     tkgrid(mass_range_entry, row = 1, column = 2)
@@ -6582,7 +6658,9 @@ preprocessing_window_function <- function() {
     tkgrid(normalization_value_label, row = 6, column = 3)
     tkgrid(preprocess_spectra_in_packages_of_label, row = 7, column = 1)
     tkgrid(preprocess_spectra_in_packages_of_entry, row = 7, column = 2)
-    tkgrid(commit_preprocessing_button, row = 8, column = 1)
+    tkgrid(spectral_alignment_button, row = 8, column = 1)
+    tkgrid(spectral_alignment_value_label, row = 8, column = 2)
+    tkgrid(commit_preprocessing_button, row = 9, column = 1)
 }
 
 ##### File type (export)
