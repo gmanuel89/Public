@@ -6165,7 +6165,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.29.0"
+R_script_version <- "2017.03.29.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -7169,8 +7169,9 @@ dump_spectra_files_function <- function() {
     ### Run only if there are spectra
     if (!is.null(spectra)) {
         # Go to the working directory and create a folder named 'Spectra files'
-        setwd(output_folder)
-        dir.create("Spectra files")
+        spectra_files_subfolder <- file.path(output_folder, "Spectra files")
+        dir.create(spectra_files_subfolder)
+        setwd(spectra_files_subfolder)
         # Replace the sample path with the sample name in the metadata
         spectra <- replace_sample_name(spectra, spectra_format = spectra_format, allow_parallelization = allow_parallelization)
         # Get the names of the spectra and generate a vector of names
