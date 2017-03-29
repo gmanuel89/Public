@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.28.0"
+R_script_version <- "2017.03.29.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -2378,7 +2378,7 @@ if (system_os == "Windows") {
 
 # The "area" where we will put our input lines
 window <- tktoplevel()
-tktitle(window) <- "LC-MS PEAK STATISTICS"
+tktitle(window) <- "LC-MS URINE STATISTICS"
 #### Browse
 select_input_button <- tkbutton(window, text="Import file...", command = file_import_function, font = button_font)
 browse_output_button <- tkbutton(window, text="Browse\noutput folder", command = browse_output_function, font = button_font)
@@ -2414,6 +2414,7 @@ download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE", command = d
 run_statistics_function_button <- tkbutton(window, text="RUN\nSTATISTICS", command = run_statistics_function, font = button_font)
 end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
 #### Displaying labels
+title_label <- tklabel(window, text = "LC-MS URINE\nSTATISTICS", font = title_font)
 check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font)
 output_file_type_export_value_label <- tklabel(window, text = output_file_type_export_value, font = label_font)
 image_file_type_export_value_label <- tklabel(window, text = image_file_type_export_value, font = label_font)
@@ -2427,6 +2428,7 @@ remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text 
 cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font)
 plot_correlation_graphs_value_label <- tklabel(window, text = plot_correlation_graphs_value, font = label_font)
 #### Geometry manager
+tkgrid(title_label, row = 1, column = 1)
 tkgrid(download_updates_button, row = 1, column = 2)
 tkgrid(check_for_updates_value_label, row = 1, column = 3)
 tkgrid(output_file_type_export_entry, row = 2, column = 1)
