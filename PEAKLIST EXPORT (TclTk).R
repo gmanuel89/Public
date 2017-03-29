@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.28 ####################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.29 ####################
 
 ########################################################################## MISC
 
@@ -1503,28 +1503,33 @@ replace_sample_name <- function(spectra, spectra_format = "imzml", allow_paralle
         ### Return
         return(spectra)
     }
-    ##### Apply the function
-    if (allow_parallelization == TRUE) {
-        # Detect the number of cores
-        cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
-        if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-            spectra <- mclapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format), mc.cores = cpu_thread_number)
-        } else if (Sys.info()[1] == "Windows") {
-            # Make the CPU cluster for parallelisation
-            cl <- makeCluster(cpu_thread_number)
-            # Make the cluster use the custom functions and the package functions along with their parameters
-            clusterEvalQ(cl, {library(MALDIquant)})
-            # Pass the variables to the cluster for running the function
-            clusterExport(cl = cl, varlist = c("spectra", "spectra_format"), envir = environment())
-            # Apply the multicore function
-            spectra <- parLapply(cl, spectra, fun = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
-            stopCluster(cl)
+    ##### More elements
+    if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+        ##### Apply the function
+        if (allow_parallelization == TRUE) {
+            # Detect the number of cores
+            cpu_thread_number <- detectCores(logical = TRUE)
+            cpu_thread_number <- cpu_thread_number / 2
+            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                spectra <- mclapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format), mc.cores = cpu_thread_number)
+            } else if (Sys.info()[1] == "Windows") {
+                # Make the CPU cluster for parallelisation
+                cl <- makeCluster(cpu_thread_number)
+                # Make the cluster use the custom functions and the package functions along with their parameters
+                clusterEvalQ(cl, {library(MALDIquant)})
+                # Pass the variables to the cluster for running the function
+                clusterExport(cl = cl, varlist = c("spectra", "spectra_format"), envir = environment())
+                # Apply the multicore function
+                spectra <- parLapply(cl, spectra, fun = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
+                stopCluster(cl)
+            } else {
+                spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
+            }
         } else {
             spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
         }
-    } else {
-        spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
+    } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
+        spectra <- name_replacing_subfunction(spectra, spectra_format = spectra_format)
     }
     ### Return
     return(spectra)
@@ -6160,13 +6165,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.28.0"
+R_script_version <- "2017.03.29.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
 script_file_name <- "PEAKLIST EXPORT"
 # Change log
-change_log <- "1. Bugfix\n2. Progress bar\n3. Fixed check for updates\n4. Alignment implemented"
+change_log <- "1. Allow to dump the MSD spectra"
 
 
 
@@ -7158,6 +7163,67 @@ run_peaklist_export_function <- function() {
     }
 }
 
+##### Dump the spectral files
+dump_spectra_files_function <- function() {
+    install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
+    ### Run only if there are spectra
+    if (!is.null(spectra)) {
+        # Go to the working directory and create a folder named 'Spectra files'
+        setwd(output_folder)
+        dir.create("Spectra files")
+        # Replace the sample path with the sample name in the metadata
+        spectra <- replace_sample_name(spectra, spectra_format = spectra_format, allow_parallelization = allow_parallelization)
+        # Get the names of the spectra and generate a vector of names
+        spectra_name_vector <- character()
+        if (isMassSpectrumList(spectra)) {
+            for (s in 1:length(spectra)) {
+                spectra_name_vector <- append(spectra_name_vector, spectra[[s]]@metaData$file[1])
+            }
+        } else if (isMassSpectrum(spectra)) {
+            spectra_name_vector <- spectra@metaData$file[1]
+        }
+        # If there are already unique names, leave the spectra_name_vector as it is...
+        if (length(spectra_name_vector) == length(unique(spectra_name_vector))) {
+            spectra_name_vector <- spectra_name_vector
+        } else {
+            # Otherwise, generate unique names...
+            spectra_name_vector <- make.names(spectra_name_vector, unique = TRUE)
+        }
+        ### Dump the spectal files
+        # Choose the file format
+        spectra_output_format <- select.list(c("MSD", "TXT"), preselect = "MSD", multiple = FALSE, title = "Select the spectra format")
+        # MSD
+        if (spectra_output_format == "MSD") {
+            if (isMassSpectrumList(spectra)) {
+                for (s in 1:length(spectra)) {
+                    exportMsd(spectra[[s]], file = paste(spectra_name_vector[s], ".msd", sep = ""))
+                }
+            } else if (isMassSpectrum(spectra)) {
+                exportMsd(spectra, file = paste(spectra_name_vector, ".msd", sep = ""))
+            }
+        } else if (spectra_output_format == "TXT") {
+            if (isMassSpectrumList(spectra)) {
+                for (s in 1:length(spectra)) {
+                    spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra[[s]]@mass))
+                    spectra_txt[, 1] <- cbind(spectra[[s]]@mass)
+                    spectra_txt[, 2] <- cbind(spectra[[s]]@intensity)
+                    write.table(spectra_txt, file = paste(spectra_name_vector[s], ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                }
+            } else if (isMassSpectrum(spectra)) {
+                spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra@mass))
+                spectra_txt[, 1] <- cbind(spectra@mass)
+                spectra_txt[, 2] <- cbind(spectra@intensity)
+                write.table(spectra_txt, file = paste(spectra_name_vector, ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+            }
+        }
+        ### Messagebox
+        tkmessageBox(title = "Spectra files dumped", message = "The spectra files have been succesfully dumped!", icon = "info")
+        
+    } else {
+        ### Messagebox
+        tkmessageBox(title = "Spectra not loaded", message = "No spectra have been imported yet!", icon = "warning")
+    }
+}
 
 
 
@@ -7375,6 +7441,8 @@ average_replicates_button <- tkbutton(window, text="AVERAGE\nREPLICATES", comman
 end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
 # Import the spectra
 import_spectra_button <- tkbutton(window, text="IMPORT AND\nPREPROCESS\nSPECTRA...", command = import_spectra_function, font = button_font)
+# Import the spectra
+dump_spectra_files_button <- tkbutton(window, text="DUMP SPECTRA\nFILES...", command = dump_spectra_files_function, font = button_font)
 # Peak picking
 peak_picking_button <- tkbutton(window, text="PEAK\nPICKING...", command = peak_picking_function, font = button_font)
 # Run the Peaklist Export!!
@@ -7437,13 +7505,15 @@ tkgrid(average_replicates_value_label, row = 6, column = 2)
 tkgrid(allow_parallelization_button, row = 6, column = 3)
 tkgrid(allow_parallelization_value_label, row = 6, column = 4)
 tkgrid(spectra_preprocessing_button, row = 6, column = 5)
-tkgrid(import_spectra_button, row = 8, column = 2)
-tkgrid(peak_picking_button, row = 8, column = 3)
-tkgrid(peaklist_export_button, row = 8, column = 4)
-tkgrid(signals_avg_and_sd_button, row = 8, column = 5)
+tkgrid(import_spectra_button, row = 8, column = 1)
+tkgrid(peak_picking_button, row = 8, column = 2)
+tkgrid(peaklist_export_button, row = 8, column = 3)
+tkgrid(signals_avg_and_sd_button, row = 8, column = 4)
+tkgrid(dump_spectra_files_button, row = 8, column = 5)
 tkgrid(end_session_button, row = 8, column = 6)
 tkgrid(download_updates_button, row = 1, column = 5)
 tkgrid(check_for_updates_value_label, row = 1, column = 6)
+
 
 
 
