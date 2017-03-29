@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.28 ####################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.29 ####################
 
 ########################################################################## MISC
 
@@ -1503,28 +1503,33 @@ replace_sample_name <- function(spectra, spectra_format = "imzml", allow_paralle
         ### Return
         return(spectra)
     }
-    ##### Apply the function
-    if (allow_parallelization == TRUE) {
-        # Detect the number of cores
-        cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
-        if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-            spectra <- mclapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format), mc.cores = cpu_thread_number)
-        } else if (Sys.info()[1] == "Windows") {
-            # Make the CPU cluster for parallelisation
-            cl <- makeCluster(cpu_thread_number)
-            # Make the cluster use the custom functions and the package functions along with their parameters
-            clusterEvalQ(cl, {library(MALDIquant)})
-            # Pass the variables to the cluster for running the function
-            clusterExport(cl = cl, varlist = c("spectra", "spectra_format"), envir = environment())
-            # Apply the multicore function
-            spectra <- parLapply(cl, spectra, fun = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
-            stopCluster(cl)
+    ##### More elements
+    if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+        ##### Apply the function
+        if (allow_parallelization == TRUE) {
+            # Detect the number of cores
+            cpu_thread_number <- detectCores(logical = TRUE)
+            cpu_thread_number <- cpu_thread_number / 2
+            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                spectra <- mclapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format), mc.cores = cpu_thread_number)
+            } else if (Sys.info()[1] == "Windows") {
+                # Make the CPU cluster for parallelisation
+                cl <- makeCluster(cpu_thread_number)
+                # Make the cluster use the custom functions and the package functions along with their parameters
+                clusterEvalQ(cl, {library(MALDIquant)})
+                # Pass the variables to the cluster for running the function
+                clusterExport(cl = cl, varlist = c("spectra", "spectra_format"), envir = environment())
+                # Apply the multicore function
+                spectra <- parLapply(cl, spectra, fun = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
+                stopCluster(cl)
+            } else {
+                spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
+            }
         } else {
             spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
         }
-    } else {
-        spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
+    } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
+        spectra <- name_replacing_subfunction(spectra, spectra_format = spectra_format)
     }
     ### Return
     return(spectra)
@@ -6157,13 +6162,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.28.7"
+R_script_version <- "2017.03.29.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
 script_file_name <- "MS PIXEL TYPER"
 # Change log
-change_log <- "1. New software!!\n2. Improved file dumping\n3. Spectral alignment implemented"
+change_log <- "1. Bugfix"
 
 
 
@@ -7087,9 +7092,9 @@ ms_pixel_typer_data_dumper_function <- function() {
                     for (i in 1:length(classification_of_patients$classification_ms_images_list[[p]])) {
                         # Retrieve the model name
                         model_name <- names(classification_of_patients$classification_ms_images_list[[p]])[i]
-                        # Save the plot
-                        classification_of_patients$classification_ms_images_list[[p]][[i]]
-                        dev.copy(device = png, filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        # Save the plot 
+                        png(filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        replayPlot(classification_of_patients$classification_ms_images_list[[p]][[i]])
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7100,8 +7105,8 @@ ms_pixel_typer_data_dumper_function <- function() {
                         # Retrieve the model name
                         model_name <- names(classification_of_patients$classification_ms_images_list[[p]])[i]
                         # Save the plot
-                        classification_of_patients$classification_ms_images_list[[p]][[i]]
-                        dev.copy(device = tiff, filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        tiff(filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        replayPlot(classification_of_patients$classification_ms_images_list[[p]][[i]])
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7112,8 +7117,8 @@ ms_pixel_typer_data_dumper_function <- function() {
                         # Retrieve the model name
                         model_name <- names(classification_of_patients$classification_ms_images_list[[p]])[i]
                         # Save the plot
-                        classification_of_patients$classification_ms_images_list[[p]][[i]]
-                        dev.copy(device = jpeg, filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150, quality = 100)
+                        jpeg(filename = paste("Pixel-by-pixel classification ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150, quality = 100)
+                        replayPlot(classification_of_patients$classification_ms_images_list[[p]][[i]])
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7144,22 +7149,22 @@ ms_pixel_typer_data_dumper_function <- function() {
             # PNG
             if (file_type_export_images == "png") {
                 try({
-                    classification_of_patients$classification_ensemble_ms_image_list[[p]]
-                    dev.copy(device = png, filename = paste("Ensemble Pixel-by-pixel classification ", ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                    png(filename = paste("Ensemble Pixel-by-pixel classification", ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                    replayPlot(classification_of_patients$classification_ensemble_ms_image_list[[p]])
                     dev.off()
                 }, silent = TRUE)
             } else if (file_type_export_images == "tiff") {
                 # TIFF
                 try({
-                    classification_of_patients$classification_ensemble_ms_image_list[[p]]
-                    dev.copy(device = tiff, filename = paste("Ensemble Pixel-by-pixel classification ", ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                    tiff(filename = paste("Ensemble Pixel-by-pixel classification", ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                    replayPlot(classification_of_patients$classification_ensemble_ms_image_list[[p]])
                     dev.off()
                 }, silent = TRUE)
             } else if (file_type_export_images == "jpg" || file_type_export_images == "jpeg") {
                 # JPEG
                 try({
-                    classification_of_patients$classification_ensemble_ms_image_list[[p]]
-                    dev.copy(device = jpeg, filename = paste("Ensemble Pixel-by-pixel classification ", ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150, quality = 100)
+                    jpeg(filename = paste("Ensemble Pixel-by-pixel classification", ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150, quality = 100)
+                    replayPlot(classification_of_patients$classification_ensemble_ms_image_list[[p]])
                     dev.off()
                 }, silent = TRUE)
             }
@@ -7171,8 +7176,8 @@ ms_pixel_typer_data_dumper_function <- function() {
                         # Retrieve the model name
                         model_name <- names(classification_of_patients$average_spectrum_with_bars_profile_list[[p]])[i]
                         # Save the plot
-                        classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]]
-                        dev.copy(device = png, filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        png(which = dev.cur(), filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        replayPlot(classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]])
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7183,8 +7188,8 @@ ms_pixel_typer_data_dumper_function <- function() {
                         # Retrieve the model name
                         model_name <- names(classification_of_patients$average_spectrum_with_bars_profile_list[[p]])[i]
                         # Save the plot
-                        classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]]
-                        dev.copy(device = tiff, filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        tiff(filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        replayPlot(classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]])
                         dev.off()
                     }
                 }, silent = TRUE)
@@ -7195,8 +7200,8 @@ ms_pixel_typer_data_dumper_function <- function() {
                         # Retrieve the model name
                         model_name <- names(classification_of_patients$average_spectrum_with_bars_profile_list[[p]])[i]
                         # Save the plot
-                        classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]]
-                        dev.copy(device = jpeg, filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        jpeg(filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        replayPlot(classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]])
                         dev.off()
                     }
                 }, silent = TRUE)
