@@ -6162,7 +6162,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.29.0"
+R_script_version <- "2017.03.29.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -7176,7 +7176,7 @@ ms_pixel_typer_data_dumper_function <- function() {
                         # Retrieve the model name
                         model_name <- names(classification_of_patients$average_spectrum_with_bars_profile_list[[p]])[i]
                         # Save the plot
-                        png(which = dev.cur(), filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
+                        png(filename = paste("Average spectrum with bars ", model_name, ".", file_type_export_images, sep = ""), width = 1920, height = 1080, pointsize = 20, units = "px", res = 150)
                         replayPlot(classification_of_patients$average_spectrum_with_bars_profile_list[[p]][[i]])
                         dev.off()
                     }
