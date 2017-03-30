@@ -6149,9 +6149,9 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.30.0"
+R_script_version <- "2017.03.30.1"
 ### GitHub URL where the R file is
-github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAK%20STATISTICS%20(TclTk).R"
+github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAK%20STATISTICS.R"
 ### Name of the file when downloaded
 script_file_name <- "PEAK STATISTICS"
 # Change log
