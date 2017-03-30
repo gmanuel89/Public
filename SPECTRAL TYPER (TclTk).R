@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.28 ####################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.29 ####################
 
 ########################################################################## MISC
 
@@ -46,20 +46,22 @@ check_internet_connection <- function(method = "getURL", website_to_ping = "www.
 
 ##################################################### INSTALL REQUIRED PACKAGES
 # This function installs and loads the selected packages
-install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
+install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/", update_packages = FALSE) {
     ### Check internet connection
     there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     ########## Update all the packages (if there is internet connection)
-    if (there_is_internet == TRUE) {
-        ##### If a repository is specified
-        if (repository != "" || !is.null(repository)) {
-            update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+    if (update_packages == TRUE) {
+        if (there_is_internet == TRUE) {
+            ##### If a repository is specified
+            if (repository != "" || !is.null(repository)) {
+                update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            } else {
+                update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            }
+            print("Packages updated")
         } else {
-            update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            print("Packages cannot be updated due to internet connection problems")
         }
-        print("Packages updated")
-    } else {
-        print("Packages cannot be updated due to internet connection problems")
     }
     ##### Retrieve the installed packages
     installed_packages <- installed.packages()[,1]
@@ -87,7 +89,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
             print("Some packages cannot be installed due to internet connection problems")
         }
     } else {
-        print("All the packages are up-to-date")
+        print("All the required packages are installed")
     }
     ##### Load the packages (if there are all the packages)
     if ((length(missing_packages) > 0 && there_is_internet == TRUE) || length(missing_packages) == 0) {
@@ -95,7 +97,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
             library(required_packages[i], character.only = TRUE)
         }
     } else {
-        print("Packages cannot be loaded... Expect issues...")
+        print("Packages cannot be installed/loaded... Expect issues...")
     }
 }
 
@@ -1503,28 +1505,33 @@ replace_sample_name <- function(spectra, spectra_format = "imzml", allow_paralle
         ### Return
         return(spectra)
     }
-    ##### Apply the function
-    if (allow_parallelization == TRUE) {
-        # Detect the number of cores
-        cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
-        if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-            spectra <- mclapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format), mc.cores = cpu_thread_number)
-        } else if (Sys.info()[1] == "Windows") {
-            # Make the CPU cluster for parallelisation
-            cl <- makeCluster(cpu_thread_number)
-            # Make the cluster use the custom functions and the package functions along with their parameters
-            clusterEvalQ(cl, {library(MALDIquant)})
-            # Pass the variables to the cluster for running the function
-            clusterExport(cl = cl, varlist = c("spectra", "spectra_format"), envir = environment())
-            # Apply the multicore function
-            spectra <- parLapply(cl, spectra, fun = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
-            stopCluster(cl)
+    ##### More elements
+    if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+        ##### Apply the function
+        if (allow_parallelization == TRUE) {
+            # Detect the number of cores
+            cpu_thread_number <- detectCores(logical = TRUE)
+            cpu_thread_number <- cpu_thread_number / 2
+            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                spectra <- mclapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format), mc.cores = cpu_thread_number)
+            } else if (Sys.info()[1] == "Windows") {
+                # Make the CPU cluster for parallelisation
+                cl <- makeCluster(cpu_thread_number)
+                # Make the cluster use the custom functions and the package functions along with their parameters
+                clusterEvalQ(cl, {library(MALDIquant)})
+                # Pass the variables to the cluster for running the function
+                clusterExport(cl = cl, varlist = c("spectra", "spectra_format"), envir = environment())
+                # Apply the multicore function
+                spectra <- parLapply(cl, spectra, fun = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
+                stopCluster(cl)
+            } else {
+                spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
+            }
         } else {
             spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
         }
-    } else {
-        spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format))
+    } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
+        spectra <- name_replacing_subfunction(spectra, spectra_format = spectra_format)
     }
     ### Return
     return(spectra)
@@ -6146,7 +6153,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.28.0"
+R_script_version <- "2017.03.30.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -6159,7 +6166,7 @@ change_log <- "1. New GUI\n2. Check for updates\n3. Adaptive fonts"
 
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
-install_and_load_required_packages(c("tcltk", "ggplot2"), repository = "http://cran.mirror.garr.it/mirrors/CRAN/")
+install_and_load_required_packages(c("tcltk", "ggplot2"), repository = "http://cran.mirror.garr.it/mirrors/CRAN/", update_packages = TRUE)
 
 
 
@@ -6354,7 +6361,7 @@ download_updates_function <- function() {
         tkmessageBox(message = paste("The updated script file will be downloaded in:\n\n", download_folder, sep = ""))
         # Download the file
         try({
-            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ")", sep = ""), method = "auto")
+            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ").R", sep = ""), method = "auto")
             file_downloaded <- TRUE
         }, silent = TRUE)
         if (file_downloaded == TRUE) {
@@ -7948,5 +7955,4 @@ tkgrid(end_session_button, row = 15, column = 4)
 tkgrid(download_updates_button, row = 15, column = 5)
 tkgrid(check_for_updates_value_label, row = 15, column = 6)
 #window_scrollbar
-
 
