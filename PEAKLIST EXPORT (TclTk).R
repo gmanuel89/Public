@@ -6167,7 +6167,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.30.1"
+R_script_version <- "2017.03.30.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -7203,12 +7203,15 @@ dump_spectra_files_function <- function() {
         ### Dump the spectal files
         # Choose the file format
         spectra_output_format <- select.list(c("MSD", "TXT"), preselect = "MSD", multiple = FALSE, title = "Select the spectra format")
+        if (spectra_output_format == "") {
+            spectra_output_format <- "MSD"
+        }
         # MSD
         if (spectra_output_format == "MSD") {
             if (isMassSpectrumList(spectra)) {
                 if (isMassPeaksList(peaks) && length(peaks) == length(spectra)) {
                     for (s in 1:length(spectra)) {
-                        exportMsd(spectra[[s]], file = paste(spectra_name_vector[s], ".msd", sep = ""), force = TRUE, peaks = peaks)
+                        exportMsd(spectra[[s]], file = paste(spectra_name_vector[s], ".msd", sep = ""), force = TRUE, peaks = peaks[[s]])
                     }
                 } else {
                     for (s in 1:length(spectra)) {
@@ -7551,6 +7554,8 @@ tkgrid(dump_spectra_files_button, row = 8, column = 5)
 tkgrid(end_session_button, row = 8, column = 6)
 tkgrid(download_updates_button, row = 1, column = 5)
 tkgrid(check_for_updates_value_label, row = 1, column = 6)
+
+
 
 
 
