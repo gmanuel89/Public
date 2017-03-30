@@ -6162,7 +6162,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.29.1"
+R_script_version <- "2017.03.30.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -6368,7 +6368,7 @@ download_updates_function <- function() {
         tkmessageBox(message = paste("The updated script file will be downloaded in:\n\n", download_folder, sep = ""))
         # Download the file
         try({
-            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ")", sep = ""), method = "auto")
+            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ").R", sep = ""), method = "auto")
             file_downloaded <- TRUE
         }, silent = TRUE)
         if (file_downloaded == TRUE) {
