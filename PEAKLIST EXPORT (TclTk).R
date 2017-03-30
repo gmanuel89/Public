@@ -46,20 +46,22 @@ check_internet_connection <- function(method = "getURL", website_to_ping = "www.
 
 ##################################################### INSTALL REQUIRED PACKAGES
 # This function installs and loads the selected packages
-install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
+install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/", update_packages = FALSE) {
     ### Check internet connection
     there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     ########## Update all the packages (if there is internet connection)
-    if (there_is_internet == TRUE) {
-        ##### If a repository is specified
-        if (repository != "" || !is.null(repository)) {
-            update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+    if (update_packages == TRUE) {
+        if (there_is_internet == TRUE) {
+            ##### If a repository is specified
+            if (repository != "" || !is.null(repository)) {
+                update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            } else {
+                update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            }
+            print("Packages updated")
         } else {
-            update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            print("Packages cannot be updated due to internet connection problems")
         }
-        print("Packages updated")
-    } else {
-        print("Packages cannot be updated due to internet connection problems")
     }
     ##### Retrieve the installed packages
     installed_packages <- installed.packages()[,1]
@@ -87,7 +89,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
             print("Some packages cannot be installed due to internet connection problems")
         }
     } else {
-        print("All the packages are up-to-date")
+        print("All the required packages are installed")
     }
     ##### Load the packages (if there are all the packages)
     if ((length(missing_packages) > 0 && there_is_internet == TRUE) || length(missing_packages) == 0) {
@@ -95,7 +97,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
             library(required_packages[i], character.only = TRUE)
         }
     } else {
-        print("Packages cannot be loaded... Expect issues...")
+        print("Packages cannot be installed/loaded... Expect issues...")
     }
 }
 
@@ -6165,13 +6167,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.29.1"
+R_script_version <- "2017.03.30.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
 script_file_name <- "PEAKLIST EXPORT"
 # Change log
-change_log <- "1. Allow to dump the MSD spectra"
+change_log <- "1. Allow to dump the spectral files"
 
 
 
@@ -6179,7 +6181,7 @@ change_log <- "1. Allow to dump the MSD spectra"
 
 
 ############## INSTALL AND LOAD THE REQUIRED PACKAGES
-install_and_load_required_packages(c("tcltk", "parallel"), repository = "http://cran.mirror.garr.it/mirrors/CRAN/")
+install_and_load_required_packages(c("tcltk", "parallel"), repository = "http://cran.mirror.garr.it/mirrors/CRAN/", update_packages = TRUE)
 
 
 
@@ -6691,7 +6693,10 @@ file_type_export_choice <- function() {
 
 ##### File name (export)
 set_file_name <- function() {
+    # Retrieve the peaklist file name from the entry...
     filename <- tclvalue(file_name)
+    # Create a copy for the subfolder name (for the spectral files)
+    filename_subfolder <- filename
     # Add the date and time to the filename
     current_date <- unlist(strsplit(as.character(Sys.time()), " "))[1]
     current_date_split <- unlist(strsplit(current_date, "-"))
@@ -6727,6 +6732,7 @@ set_file_name <- function() {
     filename_value <- filename
     #### Exit the function and put the variable into the R workspace
     .GlobalEnv$filename <- filename
+    .GlobalEnv$filename_subfolder <- filename_subfolder
 }
 
 ##### Samples
@@ -7140,11 +7146,13 @@ run_peaklist_export_function <- function() {
         setTkProgressBar(program_progress_bar, value = 0.90, title = NULL, label = "90 %")
         # Save the files (CSV)
         if (file_type_export == "csv") {
-            filename <- set_file_name()
+            # Get the filename from the entry
+            set_file_name()
             write.csv(peaklist, file = filename, row.names = FALSE)
         } else if (file_type_export == "xlsx" || file_type_export == "xls") {
         # Save the files (Excel)
-            filename <- set_file_name()
+            # Get the filename from the entry
+            set_file_name()
             peaklist <- as.data.frame(peaklist)
             # Generate unique row names
             unique_row_names <- make.names(rownames(peaklist), unique = TRUE)
@@ -7167,9 +7175,11 @@ run_peaklist_export_function <- function() {
 dump_spectra_files_function <- function() {
     install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
     ### Run only if there are spectra
-    if (!is.null(spectra)) {
+    if (!is.null(spectra) && !is.null(peaks)) {
+        # Get the filename from the entry (filename_subfolder)
+        set_file_name()
         # Go to the working directory and create a folder named 'Spectra files'
-        spectra_files_subfolder <- file.path(output_folder, "Spectra files")
+        spectra_files_subfolder <- file.path(output_folder, paste(filename_subfolder, "- Spectral files"))
         dir.create(spectra_files_subfolder)
         setwd(spectra_files_subfolder)
         # Replace the sample path with the sample name in the metadata
@@ -7196,25 +7206,52 @@ dump_spectra_files_function <- function() {
         # MSD
         if (spectra_output_format == "MSD") {
             if (isMassSpectrumList(spectra)) {
-                for (s in 1:length(spectra)) {
-                    exportMsd(spectra[[s]], file = paste(spectra_name_vector[s], ".msd", sep = ""))
+                if (isMassPeaksList(peaks) && length(peaks) == length(spectra)) {
+                    for (s in 1:length(spectra)) {
+                        exportMsd(spectra[[s]], file = paste(spectra_name_vector[s], ".msd", sep = ""), force = TRUE, peaks = peaks)
+                    }
+                } else {
+                    for (s in 1:length(spectra)) {
+                        exportMsd(spectra[[s]], file = paste(spectra_name_vector[s], ".msd", sep = ""), force = TRUE)
+                    }
                 }
             } else if (isMassSpectrum(spectra)) {
-                exportMsd(spectra, file = paste(spectra_name_vector, ".msd", sep = ""))
+                if (isMassPeaks(peaks)) {
+                    exportMsd(spectra, file = paste(spectra_name_vector, ".msd", sep = ""), force = TRUE, peaks = peaks)
+                } else {
+                    exportMsd(spectra, file = paste(spectra_name_vector, ".msd", sep = ""), force = TRUE)
+                }
             }
         } else if (spectra_output_format == "TXT") {
             if (isMassSpectrumList(spectra)) {
-                for (s in 1:length(spectra)) {
-                    spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra[[s]]@mass))
-                    spectra_txt[, 1] <- cbind(spectra[[s]]@mass)
-                    spectra_txt[, 2] <- cbind(spectra[[s]]@intensity)
-                    write.table(spectra_txt, file = paste(spectra_name_vector[s], ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                if (isMassPeaksList(peaks) && length(peaks) == length(spectra)) {
+                    for (s in 1:length(spectra)) {
+                        spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra[[s]]@mass))
+                        peaks_txt <- matrix(0, ncol = 2, nrow = length(peaks[[s]]@mass))
+                        spectra_txt[, 1] <- cbind(spectra[[s]]@mass)
+                        spectra_txt[, 2] <- cbind(spectra[[s]]@intensity)
+                        peaks_txt[, 1] <- cbind(peaks[[s]]@mass)
+                        peaks_txt[, 2] <- cbind(peaks[[s]]@intensity)
+                        write.table(spectra_txt, file = paste(spectra_name_vector[s], ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                        write.table(peaks_txt, file = paste(spectra_name_vector[s], " - Peaks.txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                    }
+                } else {
+                    for (s in 1:length(spectra)) {
+                        spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra[[s]]@mass))
+                        spectra_txt[, 1] <- cbind(spectra[[s]]@mass)
+                        spectra_txt[, 2] <- cbind(spectra[[s]]@intensity)
+                        write.table(spectra_txt, file = paste(spectra_name_vector[s], ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                    }
                 }
             } else if (isMassSpectrum(spectra)) {
                 spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra@mass))
+                peaks_txt <- matrix(0, ncol = 2, nrow = length(peaks@mass))
                 spectra_txt[, 1] <- cbind(spectra@mass)
                 spectra_txt[, 2] <- cbind(spectra@intensity)
+                peaks_txt[, 1] <- cbind(peaks@mass)
+                peaks_txt[, 2] <- cbind(peaks@intensity)
                 write.table(spectra_txt, file = paste(spectra_name_vector, ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                write.table(peaks_txt, file = paste(spectra_name_vector, " - Peaks.txt", sep = ""), row.names = FALSE, col.names = FALSE)
             }
         }
         ### Messagebox
@@ -7222,7 +7259,7 @@ dump_spectra_files_function <- function() {
         
     } else {
         ### Messagebox
-        tkmessageBox(title = "Spectra not loaded", message = "No spectra have been imported yet!", icon = "warning")
+        tkmessageBox(title = "Spectra not loaded and Peaks not picked!", message = "No spectra have been imported yet or not peak picking has been performed!", icon = "warning")
     }
 }
 
@@ -7514,6 +7551,7 @@ tkgrid(dump_spectra_files_button, row = 8, column = 5)
 tkgrid(end_session_button, row = 8, column = 6)
 tkgrid(download_updates_button, row = 1, column = 5)
 tkgrid(check_for_updates_value_label, row = 1, column = 6)
+
 
 
 
