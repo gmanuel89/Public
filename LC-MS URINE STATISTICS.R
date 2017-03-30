@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.29.0"
+R_script_version <- "2017.03.30.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -50,20 +50,22 @@ check_internet_connection <- function(method = "getURL", website_to_ping = "www.
 }
 
 # Install and load required packages
-install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
+install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/", update_packages = FALSE) {
     ### Check internet connection
     there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     ########## Update all the packages (if there is internet connection)
-    if (there_is_internet == TRUE) {
-        ##### If a repository is specified
-        if (repository != "" || !is.null(repository)) {
-            update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+    if (update_packages == TRUE) {
+        if (there_is_internet == TRUE) {
+            ##### If a repository is specified
+            if (repository != "" || !is.null(repository)) {
+                update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            } else {
+                update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            }
+            print("Packages updated")
         } else {
-            update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            print("Packages cannot be updated due to internet connection problems")
         }
-        print("Packages updated")
-    } else {
-        print("Packages cannot be updated due to internet connection problems")
     }
     ##### Retrieve the installed packages
     installed_packages <- installed.packages()[,1]
@@ -104,7 +106,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
 }
 
 ########## INSTALL AND LOAD THE REQUIRED PACKAGES
-install_and_load_required_packages(c("rattle", "phia", "MASS", "ggplot2", "lawstat", "coin", "multcomp", "agricolae", "tcltk", "Hmisc")) # "Rcmdr", "RcmdrPlugin.coin"
+install_and_load_required_packages(c("rattle", "phia", "MASS", "ggplot2", "lawstat", "coin", "multcomp", "agricolae", "tcltk", "Hmisc"), update_packages = TRUE) # "Rcmdr", "RcmdrPlugin.coin"
 # The package lawstat is used for levene test for non parametric anova
 
 
@@ -291,7 +293,7 @@ download_updates_function <- function() {
         tkmessageBox(message = paste("The updated script file will be downloaded in:\n\n", download_folder, sep = ""))
         # Download the file
         try({
-            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ")", sep = ""), method = "auto")
+            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ").R", sep = ""), method = "auto")
             file_downloaded <- TRUE
         }, silent = TRUE)
         if (file_downloaded == TRUE) {
@@ -2380,8 +2382,8 @@ if (system_os == "Windows") {
 window <- tktoplevel()
 tktitle(window) <- "LC-MS URINE STATISTICS"
 #### Browse
-select_input_button <- tkbutton(window, text="Import file...", command = file_import_function, font = button_font)
-browse_output_button <- tkbutton(window, text="Browse\noutput folder", command = browse_output_function, font = button_font)
+select_input_button <- tkbutton(window, text="IMPORT FILE...", command = file_import_function, font = button_font)
+browse_output_button <- tkbutton(window, text="BROWSE\nOUTPUT FOLDER...", command = browse_output_function, font = button_font)
 #### Entries
 output_file_type_export_entry <- tkbutton(window, text="Output\nfile type", command = output_file_type_export_choice, font = button_font)
 image_file_type_export_entry <- tkbutton(window, text="Image\nfile type", command = image_file_type_export_choice, font = button_font)
