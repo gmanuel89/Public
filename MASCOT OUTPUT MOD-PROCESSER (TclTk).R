@@ -7,7 +7,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.29.0"
+R_script_version <- "2017.03.31.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MASCOT%20OUTPUT%20MOD-PROCESSER.R"
 ### Name of the file when downloaded
@@ -52,20 +52,22 @@ check_internet_connection <- function(method = "getURL", website_to_ping = "www.
 }
 
 # Install and load required packages
-install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/") {
+install_and_load_required_packages <- function(required_packages, repository = "http://cran.mirror.garr.it/mirrors/CRAN/", update_packages = FALSE) {
     ### Check internet connection
     there_is_internet <- check_internet_connection(method = "getURL", website_to_ping = "www.google.it")
     ########## Update all the packages (if there is internet connection)
-    if (there_is_internet == TRUE) {
-        ##### If a repository is specified
-        if (repository != "" || !is.null(repository)) {
-            update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+    if (update_packages == TRUE) {
+        if (there_is_internet == TRUE) {
+            ##### If a repository is specified
+            if (repository != "" || !is.null(repository)) {
+                update.packages(repos = repository, ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            } else {
+                update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            }
+            print("Packages updated")
         } else {
-            update.packages(ask = FALSE, checkBuilt = TRUE, quiet = TRUE, verbose = FALSE)
+            print("Packages cannot be updated due to internet connection problems")
         }
-        print("Packages updated")
-    } else {
-        print("Packages cannot be updated due to internet connection problems")
     }
     ##### Retrieve the installed packages
     installed_packages <- installed.packages()[,1]
@@ -105,7 +107,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
     }
 }
 
-install_and_load_required_packages(c("tcltk", "plyr"))
+install_and_load_required_packages(c("tcltk", "plyr"), update_packages = TRUE)
 
 
 
@@ -249,7 +251,7 @@ download_updates_function <- function() {
         tkmessageBox(message = paste("The updated script file will be downloaded in:\n\n", download_folder, sep = ""))
         # Download the file
         try({
-            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ")", sep = ""), method = "auto")
+            download.file(url = github_R_url, destfile = paste(script_file_name, " (", online_version_number, ").R", sep = ""), method = "auto")
             file_downloaded <- TRUE
         }, silent = TRUE)
         if (file_downloaded == TRUE) {
@@ -308,7 +310,7 @@ image_file_type_export_choice <- function() {
 ##### File import
 file_import_function <- function() {
     filepath_import_select <- tkmessageBox(title = "Input file", message = "Select the Mascot output file", icon = "info")
-    input_file <- tclvalue(tkgetOpenFile(filetypes = "{{Microsoft Excel files} {.xls .xlsx}} {{Comma Separated Value files} {.csv}}"))
+    input_file <- tclvalue(tkgetOpenFile(filetypes = "{{Comma Separated Value files} {.csv}}"))
     if (!nchar(input_file)) {
         tkmessageBox(message = "No file selected")
     } else {
@@ -482,7 +484,7 @@ run_mascot_output_modprocesser_function <- function() {
         non_modified_peptides_df <- ddply(.data = non_modified_peptides_df, .variables = c("prot_acc", "pep_seq"), .fun = head, n = 1)
         
         # Display the 'identity' forst
-        non_modified_peptides_df <- non_modified_peptides_df[order(non_modified_peptides_df$identity, decreasing = TRUE), ]
+        non_modified_peptides_df <- non_modified_peptides_df[order(non_modified_peptides_df$pep_score, non_modified_peptides_df$identity, non_modified_peptides_df$prot_acc, decreasing = TRUE), ]
         
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.40, title = NULL, label = "40 %")
@@ -499,7 +501,7 @@ run_mascot_output_modprocesser_function <- function() {
         modified_peptides_df <- ddply(.data = modified_peptides_df, .variables = c("prot_acc", "pep_seq", "pep_var_mod", "pep_var_mod_pos"), .fun = head, n = 1)
         
         # Display the 'identity' forst
-        modified_peptides_df <- modified_peptides_df[order(modified_peptides_df$identity, decreasing = TRUE), ]
+        modified_peptides_df <- modified_peptides_df[order(modified_peptides_df$pep_score, modified_peptides_df$identity, modified_peptides_df$prot_acc, decreasing = TRUE), ]
         
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.60, title = NULL, label = "60 %")
@@ -515,7 +517,7 @@ run_mascot_output_modprocesser_function <- function() {
         modified_peptides_df_sequences <- ddply(.data = modified_peptides_df_sequences, .variables = c("prot_acc", "pep_seq"), .fun = head, n = 1)
         
         # Display the 'identity' forst
-        modified_peptides_df_sequences <- modified_peptides_df_sequences[order(modified_peptides_df_sequences$identity, decreasing = TRUE), ]
+        modified_peptides_df_sequences <- modified_peptides_df_sequences[order(modified_peptides_df_sequences$pep_score, modified_peptides_df_sequences$identity, modified_peptides_df_sequences$prot_acc, decreasing = TRUE), ]
         
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.80, title = NULL, label = "80 %")
