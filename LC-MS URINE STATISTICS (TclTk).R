@@ -5,13 +5,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.30.0"
+R_script_version <- "2017.04.11.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS"
 # Change log
-change_log <- "1. It should be faster when no internet connection is present"
+change_log <- "1. Fixed a bug when only one signal is differently express"
 
 
 
@@ -1874,38 +1874,48 @@ run_statistics_function <- function() {
                 }
                 ### Extract the data according to the conditions
                 # Extract the normal and non-normal data
-                normal_data <- as.data.frame(pvalue_matrix_multi[rownames(pvalue_matrix_multi) %in% vector_of_normally_distributied_signals, ])
-                non_normal_data <- as.data.frame(pvalue_matrix_multi[rownames(pvalue_matrix_multi) %in% vector_of_non_normally_distributied_signals, ])
+                normal_data <- as.data.frame(rbind(pvalue_matrix_multi[rownames(pvalue_matrix_multi) %in% vector_of_normally_distributied_signals, ]))
+                rownames(normal_data) <- rownames(pvalue_matrix_multi)[rownames(pvalue_matrix_multi) %in% vector_of_normally_distributied_signals]
+                non_normal_data <- as.data.frame(rbind(pvalue_matrix_multi[rownames(pvalue_matrix_multi) %in% vector_of_non_normally_distributied_signals, ]))
+                rownames(non_normal_data) <- rownames(pvalue_matrix_multi)[rownames(pvalue_matrix_multi) %in% vector_of_non_normally_distributied_signals]
                 # Extract the normal homoschedastic data
-                normal_homoschedastic_data <- as.data.frame(subset(normal_data, vector_of_bartlett_pvalue > pvalue_tests))
+                normal_homoschedastic_data <- as.data.frame(rbind(subset(normal_data, vector_of_bartlett_pvalue > pvalue_tests)))
+                rownames(normal_homoschedastic_data) <- rownames(subset(normal_data, vector_of_bartlett_pvalue > pvalue_tests))
                 # Extract the normal heteroschedastic data
-                normal_heteroschedastic_data <- as.data.frame(subset(normal_data, vector_of_bartlett_pvalue <= pvalue_tests))
+                normal_heteroschedastic_data <- as.data.frame(rbind(subset(normal_data, vector_of_bartlett_pvalue <= pvalue_tests)))
+                rownames(normal_heteroschedastic_data) <- rownames(subset(normal_data, vector_of_bartlett_pvalue <= pvalue_tests))
                 # Extract the non-normal homoschedastic data
-                non_normal_homoschedastic_data <-    as.data.frame(subset(non_normal_data, vector_of_leven_pvalue > pvalue_tests))
+                non_normal_homoschedastic_data <- as.data.frame(rbind(subset(non_normal_data, vector_of_leven_pvalue > pvalue_tests)))
+                rownames(non_normal_homoschedastic_data) <- rownames(subset(non_normal_data, vector_of_leven_pvalue > pvalue_tests))
                 # Extract the non-normal heteroschedastic data
-                non_normal_heteroschedastic_data <- as.data.frame(subset(non_normal_data, vector_of_leven_pvalue <= pvalue_tests))
+                non_normal_heteroschedastic_data <- as.data.frame(rbind(subset(non_normal_data, vector_of_leven_pvalue <= pvalue_tests)))
+                rownames(non_normal_heteroschedastic_data) <- rownames(subset(non_normal_data, vector_of_leven_pvalue <= pvalue_tests))
                 # Differentially expressed signals: normal homoschedastic data
-                diff_normal_homoschedastic_data <- as.data.frame(subset(normal_homoschedastic_data, vector_of_anova_pvalue <= pvalue_expression))
+                diff_normal_homoschedastic_data <- as.data.frame(rbind(subset(normal_homoschedastic_data, vector_of_anova_pvalue <= pvalue_expression)))
+                rownames(diff_normal_homoschedastic_data) <- rownames(subset(normal_homoschedastic_data, vector_of_anova_pvalue <= pvalue_expression))
                 method_diff_norm_homo <- rep("ANOVA", nrow(diff_normal_homoschedastic_data))
-                matrix_diff_norm_homo <- as.data.frame(subset(diff_normal_homoschedastic_data, select = vector_of_anova_pvalue))
+                matrix_diff_norm_homo <- as.data.frame(rbind(subset(diff_normal_homoschedastic_data, select = vector_of_anova_pvalue)))
                 matrix_diff_norm_homo <- cbind(rownames(matrix_diff_norm_homo), matrix_diff_norm_homo, method_diff_norm_homo)
                 colnames(matrix_diff_norm_homo) <- c("Signal","pvalue","Test")
                 # Differentially expressed signals: normal heteroschedastic data
-                diff_normal_heteroschedastic_data <- as.data.frame(subset(normal_heteroschedastic_data, vector_of_welch_pvalue <= pvalue_expression))
+                diff_normal_heteroschedastic_data <- as.data.frame(rbind(subset(normal_heteroschedastic_data, vector_of_welch_pvalue <= pvalue_expression)))
+                rownames(diff_normal_heteroschedastic_data) <- rownames(subset(normal_heteroschedastic_data, vector_of_welch_pvalue <= pvalue_expression))
                 method_diff_norm_hetero <- rep("Welch", nrow(diff_normal_heteroschedastic_data))
-                matrix_diff_norm_hetero <- as.data.frame(subset(diff_normal_heteroschedastic_data, select = vector_of_welch_pvalue))
+                matrix_diff_norm_hetero <- as.data.frame(rbind(subset(diff_normal_heteroschedastic_data, select = vector_of_welch_pvalue)))
                 matrix_diff_norm_hetero <- cbind(rownames(matrix_diff_norm_hetero), matrix_diff_norm_hetero, method_diff_norm_hetero)
                 colnames(matrix_diff_norm_hetero) <- c("Signal","pvalue","Test")
                 # Differentially expressed signals: non_normal homoschedastic data
-                diff_non_normal_homoschedastic_data <- as.data.frame(subset(non_normal_homoschedastic_data, vector_of_kruskal_pvalue <= pvalue_expression))
+                diff_non_normal_homoschedastic_data <- as.data.frame(rbind(subset(non_normal_homoschedastic_data, vector_of_kruskal_pvalue <= pvalue_expression)))
+                rownames(diff_non_normal_homoschedastic_data) <- rownames(subset(non_normal_homoschedastic_data, vector_of_kruskal_pvalue <= pvalue_expression))
                 method_diff_non_norm_homo <- rep("Kruskal-Wallis", nrow(diff_non_normal_homoschedastic_data))
-                matrix_diff_non_norm_homo <- as.data.frame(subset(diff_non_normal_homoschedastic_data, select = vector_of_kruskal_pvalue))
+                matrix_diff_non_norm_homo <- as.data.frame(rbind(subset(diff_non_normal_homoschedastic_data, select = vector_of_kruskal_pvalue)))
                 matrix_diff_non_norm_homo <- cbind(rownames(matrix_diff_non_norm_homo), matrix_diff_non_norm_homo, method_diff_non_norm_homo)
                 colnames(matrix_diff_non_norm_homo) <- c("Signal","pvalue","Test")
                 # Differentially expressed signals: non-normal heteroschedastic data
-                diff_non_normal_heteroschedastic_data <- as.data.frame(subset(non_normal_heteroschedastic_data, vector_of_permutation_pvalue <= pvalue_expression))
+                diff_non_normal_heteroschedastic_data <- as.data.frame(rbind(subset(non_normal_heteroschedastic_data, vector_of_permutation_pvalue <= pvalue_expression)))
+                rownames(diff_non_normal_heteroschedastic_data) <- rownames(subset(non_normal_heteroschedastic_data, vector_of_permutation_pvalue <= pvalue_expression))
                 method_diff_non_norm_hetero <- rep("Permutation", nrow(diff_non_normal_heteroschedastic_data))
-                matrix_diff_non_norm_hetero <- as.data.frame(subset(diff_non_normal_heteroschedastic_data, select = vector_of_permutation_pvalue))
+                matrix_diff_non_norm_hetero <- as.data.frame(rbind(subset(diff_non_normal_heteroschedastic_data, select = vector_of_permutation_pvalue)))
                 matrix_diff_non_norm_hetero <- cbind(rownames(matrix_diff_non_norm_hetero), matrix_diff_non_norm_hetero, method_diff_non_norm_hetero)
                 colnames(matrix_diff_non_norm_hetero) <- c("Signal","pvalue","Test")
                 ########## POST-HOC TESTS
@@ -2184,7 +2194,7 @@ run_statistics_function <- function() {
         close(program_progress_bar)
 
         ##### FINISH
-        finish_message <- tkmessageBox(title = "Operation completed", message = "All the statistical operations have been performed and the files have been dumped", icon = "info")
+        tkmessageBox(title = "Operation completed", message = "All the statistical operations have been performed and the files have been dumped", icon = "info")
     } else {
         tkmessageBox(title = "No input file selected", message = "No input file has been selected!!!\nPlease, select a file to be imported", icon = "warning")
     }
