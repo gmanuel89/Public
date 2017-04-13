@@ -1332,30 +1332,4 @@ peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorit
 
 
 ################################################################ SPECTRA BINNING
-# The function performs the binning onto a selected spectra dataset (list of MALDIquant spectra objects)
-resample_spectra <- function(spectra, final_data_points = lowest_data_points, binning_method = "sum", allow_parallelization = FALSE) {
-    ####################################################### BINNING FUNCTION
-    binning_subfunction <- function(spectra, final_data_points, binning_method) {
-        # Create the new spectra_binned list
-        spectra_binned <- spectra
-        # Empty the mass and intensity values
-        for (s in 1:length(spectra_binned)) {
-            spectra_binned@mass <- numeric()
-            spectra_binned@intensity <- numeric()
-        }
-        # Calculate the number of datapoints per bin
-        data_points_per_bin <- floor(length(spectra@mass) / final_data_points)
-        # Define the indexes
-        index1 <- 1
-        index2 <- data_points_per_bin
-        # For each bin...
-        for (d in 1:final_data_points) {
-            # Create the (temporary) bin vectors (mass and intensity), where the data points will be stored for the binning
-            bin_mass <- numeric()
-            bin_intensity <- numeric()
-            # Scroll the data points, grouping them by bins
-            for (i in index1:index2) {
-                bin_mass <- append(bin_mass, spectra@mass[i])
-                bin_intensity <- append(bin_intensity, spectra@intensity[i])
-            }
-            #
+# The function performs the binning onto a selected spectra dataset (list of MALDIquant s
