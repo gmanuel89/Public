@@ -7,7 +7,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.31.0"
+R_script_version <- "2017.04.13.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MASCOT%20OUTPUT%20MOD-PROCESSER.R"
 ### Name of the file when downloaded
@@ -23,8 +23,27 @@ change_log <- "1. New software!"
 ########## FUNCTIONS
 # Check internet connection
 check_internet_connection <- function(method = "getURL", website_to_ping = "www.google.it") {
+    ##### Start with getURL...
+    there_is_internet <- FALSE
+    ##### GET URL
+    if (method == "getURL") {
+        try({
+            # Install the RCurl package if not installed
+            if ("RCurl" %in% installed.packages()[,1]) {
+                library(RCurl)
+            } else {
+                install.packages("RCurl", repos = "http://cran.mirror.garr.it/mirrors/CRAN/", quiet = TRUE, verbose = FALSE)
+                library(RCurl)
+            }
+        }, silent = TRUE)
+        there_is_internet <- FALSE
+        try({
+            there_is_internet <- is.character(getURL(u = website_to_ping, followLocation = TRUE, .opts = list(timeout = 1, maxredirs = 2, verbose = FALSE)))
+        }, silent = TRUE)
+    }
+    ##### If getURL failed... Go back to ping (which should never fail)
     ##### PING
-    if (method == "ping") {
+    if (method == "ping" || there_is_internet == FALSE) {
         if (Sys.info()[1] == "Linux") {
             # -c: number of packets sent/received (attempts) ; -W timeout in seconds
             there_is_internet <- !as.logical(system(command = paste("ping -c 1 -W 2", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
@@ -34,19 +53,6 @@ check_internet_connection <- function(method = "getURL", website_to_ping = "www.
         } else {
             there_is_internet <- !as.logical(system(command = paste("ping", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
         }
-    } else if (method == "getURL") {
-        ##### GET URL
-        # Install the RCurl package if not installed
-        if ("RCurl" %in% installed.packages()[,1]) {
-            library(RCurl)
-        } else {
-            install.packages("RCurl", repos = "http://cran.mirror.garr.it/mirrors/CRAN/", quiet = TRUE, verbose = FALSE)
-            library(RCurl)
-        }
-        there_is_internet <- FALSE
-        try({
-            there_is_internet <- is.character(getURL(u = website_to_ping, followLocation = TRUE, .opts = list(timeout = 1, maxredirs = 2, verbose = FALSE)))
-        }, silent = TRUE)
     }
     return(there_is_internet)
 }
@@ -95,7 +101,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
             print("Some packages cannot be installed due to internet connection problems")
         }
     } else {
-        print("All the packages are up-to-date")
+        print("All the required packages are installed")
     }
     ##### Load the packages (if there are all the packages)
     if ((length(missing_packages) > 0 && there_is_internet == TRUE) || length(missing_packages) == 0) {
@@ -103,7 +109,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
             library(required_packages[i], character.only = TRUE)
         }
     } else {
-        print("Packages cannot be loaded... Expect issues...")
+        print("Packages cannot be installed/loaded... Expect issues...")
     }
 }
 
@@ -255,7 +261,7 @@ download_updates_function <- function() {
             file_downloaded <- TRUE
         }, silent = TRUE)
         if (file_downloaded == TRUE) {
-            tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
+            tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", paste(script_file_name, " (", online_version_number, ").R", sep = ""), "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
             tkmessageBox(title = "Changelog", message = paste("The updated script contains the following changes:\n", online_change_log, sep = ""), icon = "info")
         } else {
             tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url, sep = ""), icon = "warning")
@@ -280,8 +286,8 @@ output_file_type_export_choice <- function() {
         install_and_load_required_packages("XLConnect")
     }
     # Set the value of the displaying label
-    output_file_type_export_value_label <- tklabel(window, text = output_format, font = label_font)
-    tkgrid(output_file_type_export_value_label, row = 2, column = 2)
+    output_file_type_export_value_label <- tklabel(window, text = output_format, font = label_font, bg = "white", width = 30)
+    tkgrid(output_file_type_export_value_label, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$output_format <- output_format
     .GlobalEnv$file_format <- file_format
@@ -300,8 +306,8 @@ image_file_type_export_choice <- function() {
         image_format <- ".tiff"
     }
     # Set the value of the displaying label
-    image_file_type_export_value_label <- tklabel(window, text = image_output_format, font = label_font)
-    tkgrid(image_file_type_export_value_label, row = 3, column = 2)
+    image_file_type_export_value_label <- tklabel(window, text = image_output_format, font = label_font, bg = "white", width = 20)
+    tkgrid(image_file_type_export_value_label, row = 3, column = 2, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$image_output_format <- image_output_format
     .GlobalEnv$image_format <- image_format
@@ -725,30 +731,32 @@ if (system_os == "Windows") {
 
 
 # The "area" where we will put our input lines
-window <- tktoplevel()
+window <- tktoplevel(bg = "white")
+tkpack.propagate(window, FALSE)
 tktitle(window) <- "MASCOT OUTPUT MOD-PROCESSER"
+# Title label
+title_label <- tklabel(window, text = "MASCOT\nOUTPUT\nMOD-PROCESSER", font = title_font, bg = "white")
 #### Browse
-select_input_button <- tkbutton(window, text="IMPORT FILE...", command = file_import_function, font = button_font)
-browse_output_button <- tkbutton(window, text="BROWSE\nOUTPUT FOLDER...", command = browse_output_function, font = button_font)
+select_input_button <- tkbutton(window, text="IMPORT FILE...", command = file_import_function, font = button_font, bg = "white", width = 20)
+browse_output_button <- tkbutton(window, text="BROWSE\nOUTPUT FOLDER...", command = browse_output_function, font = button_font, bg = "white", width = 20)
 #### Entries
-output_file_type_export_entry <- tkbutton(window, text="Output\nfile type", command = output_file_type_export_choice, font = button_font)
+output_file_type_export_entry <- tkbutton(window, text="Output\nfile type", command = output_file_type_export_choice, font = button_font, bg = "white", width = 20)
 # Buttons
-download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE...", command = download_updates_function, font = button_font)
-run_mascot_output_modprocesser_function_button <- tkbutton(window, text = "RUN MASCOT OUTPUT\nMOD-PROCESSER", command = run_mascot_output_modprocesser_function, font = button_font)
-end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
+download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE...", command = download_updates_function, font = button_font, bg = "white", width = 20)
+run_mascot_output_modprocesser_function_button <- tkbutton(window, text = "RUN MASCOT OUTPUT\nMOD-PROCESSER", command = run_mascot_output_modprocesser_function, font = button_font, bg = "white", width = 20)
+end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font, bg = "white", width = 20)
 #### Displaying labels
-title_label <- tklabel(window, text = "MASCOT OUTPUT\nMOD-PROCESSER", font = title_font)
-check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font)
-output_file_type_export_value_label <- tklabel(window, text = output_file_type_export_value, font = label_font)
+check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font, bg = "white", width = 20)
+output_file_type_export_value_label <- tklabel(window, text = output_file_type_export_value, font = label_font, bg = "white", width = 30)
 
 #### Geometry manager
-tkgrid(title_label, row = 1, column = 1)
-tkgrid(download_updates_button, row = 1, column = 2)
-tkgrid(check_for_updates_value_label, row = 1, column = 3)
-tkgrid(output_file_type_export_entry, row = 2, column = 1)
-tkgrid(output_file_type_export_value_label, row = 2, column = 2)
-tkgrid(browse_output_button, row = 3, column = 1)
-tkgrid(select_input_button, row = 3, column = 2)
-tkgrid(run_mascot_output_modprocesser_function_button, row = 3, column = 3)
-tkgrid(end_session_button, row = 4, column = 3)
+tkgrid(title_label, row = 1, column = 1, padx = c(20, 20), pady = c(20, 20))
+tkgrid(download_updates_button, row = 1, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(check_for_updates_value_label, row = 1, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(output_file_type_export_entry, row = 2, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(output_file_type_export_value_label, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(browse_output_button, row = 3, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(select_input_button, row = 3, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(run_mascot_output_modprocesser_function_button, row = 3, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(end_session_button, row = 4, column = 2, padx = c(10, 10), pady = c(10, 10))
 
