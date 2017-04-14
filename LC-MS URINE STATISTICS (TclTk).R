@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.14.2"
+R_script_version <- "2017.04.14.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -407,6 +407,8 @@ file_import_function <- function() {
         tkmessageBox(title = "Demographical data", message = "Select the demographic data (to be separated from the mass spectrometric data)", icon = "info")
         non_signals <- select.list(feature_vector, title = "Demographical features", multiple = TRUE)
         ##### Transform the data (transform directly the input_data and not the signals_data because it is the input_data variable that it is carried throughout the analysis, but transform only the signals data)
+        # Store the original before transforming
+        original_input_data <- input_data
         if (isTRUE(transform_data)) {
             if (transform_data_algorithm == "Square root") {
                 input_data[,!(names(input_data) %in% non_signals)] <- sqrt(input_data[,!(names(input_data) %in% non_signals)])
@@ -479,6 +481,7 @@ file_import_function <- function() {
         .GlobalEnv$input_file <- input_file
         .GlobalEnv$input_filename <- input_filename
         .GlobalEnv$input_data <- input_data
+        .GlobalEnv$original_input_data <- original_input_data
         .GlobalEnv$feature_vector <- feature_vector
         .GlobalEnv$non_signals <- non_signals
         .GlobalEnv$non_signals_data <- non_signals_data
@@ -1074,7 +1077,10 @@ run_statistics_function <- function() {
             }
             # Dump the original file
             if (is.null(input_filename)) {
-                input_filename <- "Original Input Data"
+                input_filename <- "Input Data"
+            }
+            if (transform_data == TRUE) {
+                write_file(file_name = "Original input data", data = original_input_data, file_format = file_format)
             }
             write_file(file_name = input_filename, data = input_data, file_format = file_format)
             # Go back to the original output folder
