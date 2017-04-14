@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.14.0"
+R_script_version <- "2017.04.14.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -535,21 +535,37 @@ correlation_analysis_choice <- function() {
     # Default
     if (correlation_analysis == "YES") {
         correlation_analysis <- TRUE
+        # Select the method
+        correlation_analysis_method <- select.list(c("Pearson", "Spearman"), title = "Correlation analysis method", preselect = "Spearman")
+        # Fix the values
+        if (correlation_analysis_method == "") {
+            correlation_analysis_method <- "spearman"
+            correlation_analysis_method_value <- "Spearman"
+        } else if (correlation_analysis_method == "Pearson") {
+            correlation_analysis_method <- "pearson"
+            correlation_analysis_method_value <- "Pearson"
+        } else if (correlation_analysis_method == "Spearman") {
+            correlation_analysis_method <- "spearman"
+            correlation_analysis_method_value <- "Spearman"
+        }
     }
     if (correlation_analysis == "NO" || correlation_analysis == "") {
         correlation_analysis <- FALSE
+        correlation_analysis_method_value <- ""
     }
     # Set the value of the displaying label
     if (correlation_analysis == TRUE) {
-        correlation_analysis_value <- "YES"
+        correlation_analysis_value <- paste("YES\n( ", correlation_analysis_method_value, " )", sep = "")
     } else {
         correlation_analysis_value <- "NO"
     }
-    correlation_analysis_value_label <- tklabel(window, text = correlation_analysis_value, font = label_font, bg = "white", width = 20)
+    correlation_analysis_value_label <- tklabel(window, text = correlation_analysis_value, font = label_font, bg = "white", width = 20, height = 2)
     tkgrid(correlation_analysis_value_label, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$correlation_analysis <- correlation_analysis
+    .GlobalEnv$correlation_analysis_method <- correlation_analysis_method
     .GlobalEnv$correlation_analysis_value <- correlation_analysis_value
+    .GlobalEnv$correlation_analysis_method_value <- correlation_analysis_method_value
 }
 
 ##### Remove outliers correlation analysis
@@ -750,29 +766,6 @@ transform_data_choice <- function() {
     .GlobalEnv$transform_data <- transform_data
     .GlobalEnv$transform_data_algorithm <- transform_data_algorithm
     .GlobalEnv$transform_data_value <- transform_data_value
-}
-
-##### Correlation analysis method
-correlation_analysis_method_choice <- function() {
-    # Catch the value from the menu
-    correlation_analysis_method <- select.list(c("Pearson", "Spearman"), title = "Correlation analysis method", preselect = "Spearman")
-    # Fix the values
-    if (correlation_analysis_method == "") {
-        correlation_analysis_method <- "spearman"
-        correlation_analysis_method_value <- "Spearman"
-    } else if (correlation_analysis_method == "Pearson") {
-        correlation_analysis_method <- "pearson"
-        correlation_analysis_method_value <- "Pearson"
-    } else if (correlation_analysis_method == "Spearman") {
-        correlation_analysis_method <- "spearman"
-        correlation_analysis_method_value <- "Spearman"
-    }
-    # Set the value of the displaying label
-    correlation_analysis_method_value_label <- tklabel(window, text = correlation_analysis_method_value, font = label_font, bg = "white", width = 20, height = 2)
-    tkgrid(correlation_analysis_method_value_label, row = 9, column = 4, padx = c(10, 10), pady = c(10, 10))
-    # Escape the function
-    .GlobalEnv$correlation_analysis_method <- correlation_analysis_method
-    .GlobalEnv$correlation_analysis_method_value <- correlation_analysis_method_value
 }
 
 ##### Run the statistics
@@ -2500,7 +2493,6 @@ tkinsert(pvalue_tests_entry, "end", "0.05")
 cumulative_class_in_two_level_effect_analysis_entry <- tkbutton(window, text="Cumulative class in the\ntwo-level effect analysis", command = cumulative_class_in_two_level_effect_analysis_choice, font = button_font, bg = "white", width = 20)
 plot_correlation_graphs_entry <- tkbutton(window, text = "Plot correlation\ngraphs", command = plot_correlation_graphs_choice, font = button_font, bg = "white", width = 20)
 transform_data_entry <- tkbutton(window, text = "Data transformation", command = transform_data_choice, font = button_font, bg = "white", width = 20)
-correlation_analysis_method_choice_entry <- tkbutton(window, text = "Correlation analysis\nmethod", command = correlation_analysis_method_choice, font = button_font, bg = "white", width = 20)
 #TestPer_Base_label <- tklabel(window, text="TestPer_Base", font = label_font)
 #TestPer_Base_entry <- tkentry(window, width = 10, textvariable = TestPer_Base, font = entry_font)
 #tkinsert(TestPer_Base_entry, "end", "0.17")
@@ -2517,7 +2509,7 @@ check_for_updates_value_label <- tklabel(window, text = check_for_updates_value,
 output_file_type_export_value_label <- tklabel(window, text = output_file_type_export_value, font = label_font, bg = "white", width = 30)
 image_file_type_export_value_label <- tklabel(window, text = image_file_type_export_value, font = label_font, bg = "white", width = 20)
 data_record_value_label <- tklabel(window, text = data_record_value, font = label_font, bg = "white", width = 20)
-correlation_analysis_value_label <- tklabel(window, text = correlation_analysis_value, font = label_font, bg = "white", width = 20)
+correlation_analysis_value_label <- tklabel(window, text = correlation_analysis_value, font = label_font, bg = "white", width = 20, height = 2)
 remove_outliers_correlation_analysis_value_label <- tklabel(window, text = remove_outliers_correlation_analysis_value, font = label_font, bg = "white", width = 20)
 two_level_effect_analysis_value_label <- tklabel(window, text = two_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
 remove_outliers_two_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_two_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
@@ -2526,7 +2518,6 @@ remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text 
 cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
 plot_correlation_graphs_value_label <- tklabel(window, text = plot_correlation_graphs_value, font = label_font, bg = "white", width = 20)
 transform_data_value_label <- tklabel(window, text = transform_data_value, font = label_font, bg = "white", width = 20, height = 2)
-correlation_analysis_method_value_label <- tklabel(window, text = correlation_analysis_method_value, font = label_font, bg = "white", width = 20, height = 2)
 
 ########## Geometry manager
 # Entries
@@ -2547,8 +2538,7 @@ tkgrid(output_file_type_export_entry, row = 7, column = 1, padx = c(10, 10), pad
 tkgrid(image_file_type_export_entry, row = 7, column = 3, padx = c(10, 10), pady = c(10, 10))
 tkgrid(pvalue_expression_entry, row = 8, column = 2, padx = c(10, 10), pady = c(10, 10))
 tkgrid(pvalue_tests_entry, row = 8, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(minimum_number_of_patients_entry, row = 9, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(correlation_analysis_method_choice_entry, row = 9, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(minimum_number_of_patients_entry, row = 9, column = 3, padx = c(10, 10), pady = c(10, 10))
 tkgrid(browse_output_button, row = 10, column = 1, padx = c(10, 10), pady = c(10, 10))
 tkgrid(select_input_button, row = 10, column = 2, padx = c(10, 10), pady = c(10, 10))
 tkgrid(run_statistics_function_button, row = 10, column = 3, padx = c(10, 10), pady = c(10, 10))
@@ -2569,8 +2559,7 @@ tkgrid(output_file_type_export_value_label, row = 7, column = 2, padx = c(10, 10
 tkgrid(image_file_type_export_value_label, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
 tkgrid(pvalue_expression_label, row = 8, column = 1, padx = c(10, 10), pady = c(10, 10))
 tkgrid(pvalue_tests_label, row = 8, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(minimum_number_of_patients_label, row = 9, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(correlation_analysis_method_value_label, row = 9, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(minimum_number_of_patients_label, row = 9, column = 2, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Base_label, row = 7, column = 3, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Base_entry, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Adv_label, row = 8, column = 3, padx = c(10, 10), pady = c(10, 10))
