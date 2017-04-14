@@ -5,13 +5,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.13.0"
+R_script_version <- "2017.04.14.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS"
 # Change log
-change_log <- "1. Fixed a bug when only one signal is differently express\n2. Fixed GUI"
+change_log <- "1. Fixed a bug when only one signal is differently expressed\n2. Fixed GUI\n3. Added the possibility to transform the data"
 
 
 
@@ -156,6 +156,8 @@ age_binning <- FALSE
 age_bins <- 6
 # Plot correlation graphs
 plot_correlation_graphs <- FALSE
+transform_data <- FALSE
+correlation_analysis_method <- "spearman"
 
 
 
@@ -174,6 +176,8 @@ multi_level_effect_analysis_value <- "YES"
 remove_outliers_multi_level_effect_analysis_value <- "NO"
 cumulative_class_in_two_level_effect_analysis_value <- "NO"
 plot_correlation_graphs_value <- "NO"
+transform_data_value <- "NO"
+correlation_analysis_method_value <- "Spearman"
 check_for_updates_value <- R_script_version
 
 
@@ -316,7 +320,7 @@ download_updates_function <- function() {
 ##### Output file type (export)
 output_file_type_export_choice <- function() {
     # Catch the value from the menu
-    output_format <- select.list(c("Comma Separated Values (.csv)", "Microsoft Excel (.xls)", "Microsoft Excel (.xlsx)"), title = "Choose output file format")
+    output_format <- select.list(c("Comma Separated Values (.csv)", "Microsoft Excel (.xls)", "Microsoft Excel (.xlsx)"), title = "Output file format", preselect = "Comma Separated Values (.csv)")
     # Fix the file format
     if (output_format == "Comma Separated Values (.csv)" || output_format == "") {
         file_format <- "csv"
@@ -329,7 +333,7 @@ output_file_type_export_choice <- function() {
     }
     # Set the value of the displaying label
     output_file_type_export_value_label <- tklabel(window, text = output_format, font = label_font, bg = "white", width = 30)
-    tkgrid(output_file_type_export_value_label, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(output_file_type_export_value_label, row = 7, column = 2, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$output_format <- output_format
     .GlobalEnv$file_format <- file_format
@@ -338,7 +342,7 @@ output_file_type_export_choice <- function() {
 ##### Image file type (export)
 image_file_type_export_choice <- function() {
     # Catch the value from the menu
-    image_output_format <- select.list(c("JPG (.jpg)", "PNG (.png)", "TIFF (.tiff)"), title = "Choose image format")
+    image_output_format <- select.list(c("JPG (.jpg)", "PNG (.png)", "TIFF (.tiff)"), title = "Image format", preselect = "PNG (.png)")
     # Fix the file format
     if (image_output_format == "JPG (.jpg)") {
         image_format <- ".jpg"
@@ -349,7 +353,7 @@ image_file_type_export_choice <- function() {
     }
     # Set the value of the displaying label
     image_file_type_export_value_label <- tklabel(window, text = image_output_format, font = label_font, bg = "white", width = 20)
-    tkgrid(image_file_type_export_value_label, row = 3, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(image_file_type_export_value_label, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$image_output_format <- image_output_format
     .GlobalEnv$image_format <- image_format
@@ -401,35 +405,54 @@ file_import_function <- function() {
         feature_vector <- colnames(input_data)
         # Non signals (columns)
         tkmessageBox(title = "Demographical data", message = "Select the demographic data (to be separated from the mass spectrometric data)", icon = "info")
-        non_signals <- select.list(feature_vector, title = "Choose the demographical features", multiple = TRUE)
+        non_signals <- select.list(feature_vector, title = "Demographical features", multiple = TRUE)
+        ##### Transform the data (transform directly the input_data and not the signals_data because it is the input_data variable that it is carried throughout the analysis, but transform only the signals data)
+        if (isTRUE(transform_data)) {
+            if (transform_data_algorithm == "Square root") {
+                input_data[,!(names(input_data) %in% non_signals)] <- sqrt(input_data[,!(names(input_data) %in% non_signals)])
+            } else if (transform_data_algorithm == "Natural logarithm") {
+                input_data[,!(names(input_data) %in% non_signals)] <- log(input_data[,!(names(input_data) %in% non_signals)])
+            } else if (transform_data_algorithm == "Decimal logarithm") {
+                input_data[,!(names(input_data) %in% non_signals)] <- log10(input_data[,!(names(input_data) %in% non_signals)])
+            } else if (transform_data_algorithm == "Absolute value") {
+                input_data[,!(names(input_data) %in% non_signals)] <- abs(input_data[,!(names(input_data) %in% non_signals)])
+            } else if (transform_data_algorithm == "Sine") {
+                input_data[,!(names(input_data) %in% non_signals)] <- sin(input_data[,!(names(input_data) %in% non_signals)])
+            } else if (transform_data_algorithm == "Cosine") {
+                input_data[,!(names(input_data) %in% non_signals)] <- cos(input_data[,!(names(input_data) %in% non_signals)])
+            } else if (transform_data_algorithm == "Exponential") {
+                input_data[,!(names(input_data) %in% non_signals)] <- exp(input_data[,!(names(input_data) %in% non_signals)])
+            }
+        }
+        ##### Isolate signal from non-signal data
         non_signals_data <- input_data[,(names(input_data) %in% non_signals)]
         signals_data <- input_data[,!(names(input_data) %in% non_signals)]
         number_of_signals <- ncol(signals_data)
-        # Matrix of signal names
+        ### Matrix of signal names
         signal_name <- data.matrix(colnames(signals_data))
         colnames(signal_name) <- "Signal Name"
         ##### Determine the features of interest
         # Discriminant column
         tkmessageBox(title = "Discriminant feature", message = "Select the discriminant feature", icon = "info")
-        discriminant_feature <- select.list(c(non_signals, "NONE"), title = "Choose the discriminant feature", preselect = ifelse("Class" %in% feature_vector, "Class", NULL))
+        discriminant_feature <- select.list(c(non_signals, "NONE"), title = "Discriminant feature", preselect = ifelse("Class" %in% feature_vector, "Class", NULL))
         # Features for correlation analysis
         if (correlation_analysis == TRUE) {
             tkmessageBox(title = "Correlation analysis data", message = "Select the demographic data for correlation analysis", icon = "info")
-            non_signals_for_correlation_analysis <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for correlation analysis", multiple = TRUE)
+            non_signals_for_correlation_analysis <- select.list(non_signals[non_signals != discriminant_feature], title = "Features for correlation analysis", multiple = TRUE)
         } else {
             non_signals_for_correlation_analysis <- character()
         }
         # Features for two-level effect analysis
         if (two_level_effect_analysis == TRUE) {
             tkmessageBox(title = "Two-level effect analysis data", message = "Select the demographic data for two-level effect analysis", icon = "info")
-            two_level_effect_analysis_non_features <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for two-level effect analysis", multiple = TRUE)
+            two_level_effect_analysis_non_features <- select.list(non_signals[non_signals != discriminant_feature], title = "Features for two-level effect analysis", multiple = TRUE)
         } else {
             two_level_effect_analysis_non_features <- character()
         }
         if (multi_level_effect_analysis == TRUE) {
             # Features for multi-level effect analysis
             tkmessageBox(title = "Multi-level effect analysis data", message = "Select the demographic data for multi-level effect analysis", icon = "info")
-            multi_level_effect_analysis_non_features <- select.list(non_signals[non_signals != discriminant_feature], title = "Choose the features for multi-level effect analysis", multiple = TRUE)
+            multi_level_effect_analysis_non_features <- select.list(non_signals[non_signals != discriminant_feature], title = "Features for multi-level effect analysis", multiple = TRUE)
         } else {
             multi_level_effect_analysis_non_features <- character()
         }
@@ -484,7 +507,7 @@ end_session_function <- function() {
 ##### Data Record
 data_record_choice <- function() {
     # Catch the value from the menu
-    data_record <- select.list(c("YES","NO"), title="Choose")
+    data_record <- select.list(c("YES","NO"), title = "Data record", preselect = "YES")
     # Default
     if (data_record == "YES" || data_record == "") {
         data_record <- TRUE
@@ -499,7 +522,7 @@ data_record_choice <- function() {
         data_record_value <- "NO"
     }
     data_record_value_label <- tklabel(window, text = data_record_value, font = label_font, bg = "white", width = 20)
-    tkgrid(data_record_value_label, row = 4, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(data_record_value_label, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$data_record <- data_record
     .GlobalEnv$data_record_value <- data_record_value
@@ -508,7 +531,7 @@ data_record_choice <- function() {
 ##### Correlation analysis
 correlation_analysis_choice <- function() {
     # Catch the value from the menu
-    correlation_analysis <- select.list(c("YES","NO"), title="Choose")
+    correlation_analysis <- select.list(c("YES","NO"), title = "Correlation analysis", preselect = "NO")
     # Default
     if (correlation_analysis == "YES") {
         correlation_analysis <- TRUE
@@ -523,7 +546,7 @@ correlation_analysis_choice <- function() {
         correlation_analysis_value <- "NO"
     }
     correlation_analysis_value_label <- tklabel(window, text = correlation_analysis_value, font = label_font, bg = "white", width = 20)
-    tkgrid(correlation_analysis_value_label, row = 5, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(correlation_analysis_value_label, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$correlation_analysis <- correlation_analysis
     .GlobalEnv$correlation_analysis_value <- correlation_analysis_value
@@ -532,7 +555,7 @@ correlation_analysis_choice <- function() {
 ##### Remove outliers correlation analysis
 remove_outliers_correlation_analysis_choice <- function() {
     # Catch the value from the menu
-    remove_outliers_correlation_analysis <- select.list(c("YES","NO"), title="Choose")
+    remove_outliers_correlation_analysis <- select.list(c("YES","NO"), title = "Outlier removal: correlation analysis", preselect = "NO")
     # Default
     if (remove_outliers_correlation_analysis == "YES") {
         remove_outliers_correlation_analysis <- TRUE
@@ -547,7 +570,7 @@ remove_outliers_correlation_analysis_choice <- function() {
         remove_outliers_correlation_analysis_value <- "NO"
     }
     remove_outliers_correlation_analysis_value_label <- tklabel(window, text = remove_outliers_correlation_analysis_value, font = label_font, bg = "white", width = 20)
-    tkgrid(remove_outliers_correlation_analysis_value_label, row = 6, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(remove_outliers_correlation_analysis_value_label, row = 2, column = 4, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$remove_outliers_correlation_analysis <- remove_outliers_correlation_analysis
     .GlobalEnv$remove_outliers_correlation_analysis_value <- remove_outliers_correlation_analysis_value
@@ -558,7 +581,7 @@ plot_correlation_graphs_choice <- function() {
     #### Messagebox
     tkmessageBox(title = "Plot correlation graphs is resource hungry", message = "The activity of computing, generating and saving correlation plots is resource hungry. By activating it, the overall computation speed becomes slower.", icon = "warning")
     # Catch the value from the menu
-    plot_correlation_graphs <- select.list(c("YES","NO"), title="Choose")
+    plot_correlation_graphs <- select.list(c("YES","NO"), title = "Plot correlation graphs", preselect = "NO")
     # Default
     if (plot_correlation_graphs == "YES") {
         plot_correlation_graphs <- TRUE
@@ -573,7 +596,7 @@ plot_correlation_graphs_choice <- function() {
         plot_correlation_graphs_value <- "NO"
     }
     plot_correlation_graphs_value_label <- tklabel(window, text = plot_correlation_graphs_value, font = label_font, bg = "white", width = 20)
-    tkgrid(plot_correlation_graphs_value_label, row = 8, column = 4, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(plot_correlation_graphs_value_label, row = 6, column = 4, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$plot_correlation_graphs <- plot_correlation_graphs
     .GlobalEnv$plot_correlation_graphs_value <- plot_correlation_graphs_value
@@ -582,7 +605,7 @@ plot_correlation_graphs_choice <- function() {
 ##### Two-level effect analysis
 two_level_effect_analysis_choice <- function() {
     # Catch the value from the menu
-    two_level_effect_analysis <- select.list(c("YES","NO"), title="Choose")
+    two_level_effect_analysis <- select.list(c("YES","NO"), title = "Two-level effect analysis", preselect = "YES")
     # Default
     if (two_level_effect_analysis == "YES" || two_level_effect_analysis == "") {
         two_level_effect_analysis <- TRUE
@@ -597,7 +620,7 @@ two_level_effect_analysis_choice <- function() {
         two_level_effect_analysis_value <- "NO"
     }
     two_level_effect_analysis_value_label <- tklabel(window, text = two_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
-    tkgrid(two_level_effect_analysis_value_label, row = 2, column = 4, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(two_level_effect_analysis_value_label, row = 3, column = 2, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$two_level_effect_analysis <- two_level_effect_analysis
     .GlobalEnv$two_level_effect_analysis_value <- two_level_effect_analysis_value
@@ -606,7 +629,7 @@ two_level_effect_analysis_choice <- function() {
 ##### Cumulative class in Two-level effect analysis
 cumulative_class_in_two_level_effect_analysis_choice <- function() {
     # Catch the value from the menu
-    cumulative_class_in_two_level_effect_analysis <- select.list(c("YES","NO"), title="Choose")
+    cumulative_class_in_two_level_effect_analysis <- select.list(c("YES","NO"), title = "Cumulative class", preselect = "YES")
     # Default
     if (cumulative_class_in_two_level_effect_analysis == "YES" || cumulative_class_in_two_level_effect_analysis == "") {
         cumulative_class_in_two_level_effect_analysis <- TRUE
@@ -621,7 +644,7 @@ cumulative_class_in_two_level_effect_analysis_choice <- function() {
         cumulative_class_in_two_level_effect_analysis_value <- "NO"
     }
     cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
-    tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 6, column = 2, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$cumulative_class_in_two_level_effect_analysis <- cumulative_class_in_two_level_effect_analysis
     .GlobalEnv$cumulative_class_in_two_level_effect_analysis_value <- cumulative_class_in_two_level_effect_analysis_value
@@ -630,7 +653,7 @@ cumulative_class_in_two_level_effect_analysis_choice <- function() {
 ##### Multi-level effect analysis
 multi_level_effect_analysis_choice <- function() {
     # Catch the value from the menu
-    multi_level_effect_analysis <- select.list(c("YES","NO"), title="Choose")
+    multi_level_effect_analysis <- select.list(c("YES","NO"), title = "Multi-level effect analysis", preselect = "YES")
     # Default
     if (multi_level_effect_analysis == "YES" || multi_level_effect_analysis == "") {
         multi_level_effect_analysis <- TRUE
@@ -645,7 +668,7 @@ multi_level_effect_analysis_choice <- function() {
         multi_level_effect_analysis_value <- "NO"
     }
     multi_level_effect_analysis_value_label <- tklabel(window, text = multi_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
-    tkgrid(multi_level_effect_analysis_value_label, row = 4, column = 4, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(multi_level_effect_analysis_value_label, row = 4, column = 2, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$multi_level_effect_analysis <- multi_level_effect_analysis
     .GlobalEnv$multi_level_effect_analysis_value <- multi_level_effect_analysis_value
@@ -654,7 +677,7 @@ multi_level_effect_analysis_choice <- function() {
 ##### Remove outliers two-level effect analysis
 remove_outliers_two_level_effect_analysis_choice <- function() {
     # Catch the value from the menu
-    remove_outliers_two_level_effect_analysis <- select.list(c("YES","NO"), title="Choose")
+    remove_outliers_two_level_effect_analysis <- select.list(c("YES","NO"), title = "Outlier removal: two-level effect analysis", preselect = "NO")
     # Default
     if (remove_outliers_two_level_effect_analysis == "YES") {
         remove_outliers_two_level_effect_analysis <- TRUE
@@ -678,7 +701,7 @@ remove_outliers_two_level_effect_analysis_choice <- function() {
 ##### Remove outliers multi-level effect analysis
 remove_outliers_multi_level_effect_analysis_choice <- function() {
     # Catch the value from the menu
-    remove_outliers_multi_level_effect_analysis <- select.list(c("YES","NO"), title="Choose")
+    remove_outliers_multi_level_effect_analysis <- select.list(c("YES","NO"), title = "Outlier removal: multi-level effect analysis", preselect = "NO")
     # Default
     if (remove_outliers_multi_level_effect_analysis == "YES") {
         remove_outliers_multi_level_effect_analysis <- TRUE
@@ -693,10 +716,63 @@ remove_outliers_multi_level_effect_analysis_choice <- function() {
         remove_outliers_multi_level_effect_analysis_value <- "NO"
     }
     remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_multi_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
-    tkgrid(remove_outliers_multi_level_effect_analysis_value_label, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(remove_outliers_multi_level_effect_analysis_value_label, row = 4, column = 4, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$remove_outliers_multi_level_effect_analysis <- remove_outliers_multi_level_effect_analysis
     .GlobalEnv$remove_outliers_multi_level_effect_analysis_value <- remove_outliers_multi_level_effect_analysis_value
+}
+
+##### Data transformation
+transform_data_choice <- function() {
+    # Catch the value from the menu
+    transform_data <- select.list(c("YES", "NO"), title = "Data transformation", preselect = "NO")
+    # Default
+    if (transform_data == "YES") {
+        transform_data <- TRUE
+        # Select the algorithm
+        transform_data_algorithm <- select.list(c("Square root", "Natural logarithm", "Decimal logarithm", "Absolute value", "Sine", "Cosine", "Exponential"), title = "Data transformation method", preselect = "Square root")
+        # Fix the values
+        if (transform_data_algorithm == "") {
+            transform_data_algorithm <- "Square root"
+        }
+    } else if (transform_data == "NO" || transform_data == "") {
+        transform_data <- FALSE
+    }
+    # Set the value of the displaying label
+    if (transform_data == TRUE) {
+        transform_data_value <- paste("YES\n( ", transform_data_algorithm, " )", sep = "")
+    } else {
+        transform_data_value <- "NO"
+    }
+    transform_data_value_label <- tklabel(window, text = transform_data_value, font = label_font, bg = "white", width = 20, height = 2)
+    tkgrid(transform_data_value_label, row = 5, column = 2, padx = c(10, 10), pady = c(10, 10))
+    # Escape the function
+    .GlobalEnv$transform_data <- transform_data
+    .GlobalEnv$transform_data_algorithm <- transform_data_algorithm
+    .GlobalEnv$transform_data_value <- transform_data_value
+}
+
+##### Correlation analysis method
+correlation_analysis_method_choice <- function() {
+    # Catch the value from the menu
+    correlation_analysis_method <- select.list(c("Pearson", "Spearman"), title = "Correlation analysis method", preselect = "Spearman")
+    # Fix the values
+    if (correlation_analysis_method == "") {
+        correlation_analysis_method <- "spearman"
+        correlation_analysis_method_value <- "Spearman"
+    } else if (correlation_analysis_method == "Pearson") {
+        correlation_analysis_method <- "pearson"
+        correlation_analysis_method_value <- "Pearson"
+    } else if (correlation_analysis_method == "Spearman") {
+        correlation_analysis_method <- "spearman"
+        correlation_analysis_method_value <- "Spearman"
+    }
+    # Set the value of the displaying label
+    correlation_analysis_method_value_label <- tklabel(window, text = correlation_analysis_method_value, font = label_font, bg = "white", width = 20, height = 2)
+    tkgrid(correlation_analysis_method_value_label, row = 9, column = 4, padx = c(10, 10), pady = c(10, 10))
+    # Escape the function
+    .GlobalEnv$correlation_analysis_method <- correlation_analysis_method
+    .GlobalEnv$correlation_analysis_method_value <- correlation_analysis_method_value
 }
 
 ##### Run the statistics
@@ -1105,7 +1181,7 @@ run_statistics_function <- function() {
                                 }
                             }
                             ### Compute the results
-                            correlation_result_vector <- c(cor.test(mass_x, as.numeric(non_signal_column), method = "spearman")$estimate, cor.test(mass_x, as.numeric(non_signal_column), method = "spearman")$p.value)
+                            correlation_result_vector <- c(cor.test(mass_x, as.numeric(non_signal_column), method = correlation_analysis_method)$estimate, cor.test(mass_x, as.numeric(non_signal_column), method = correlation_analysis_method)$p.value)
                             ### Correlation (signal m with the non-signal ns)
                             # Append to the final correlation list
                             correlation_list[[ns]][[m]] <- correlation_result_vector
@@ -2400,10 +2476,9 @@ tkpack.propagate(window, FALSE)
 tktitle(window) <- "LC-MS URINE STATISTICS"
 # Title label
 title_label <- tklabel(window, text = "LC-MS URINE\nSTATISTICS", font = title_font, bg = "white")
-#### Browse
+# Entries
 select_input_button <- tkbutton(window, text="IMPORT FILE...", command = file_import_function, font = button_font, bg = "white", width = 20)
 browse_output_button <- tkbutton(window, text="BROWSE\nOUTPUT FOLDER...", command = browse_output_function, font = button_font, bg = "white", width = 20)
-#### Entries
 output_file_type_export_entry <- tkbutton(window, text="Output\nfile type", command = output_file_type_export_choice, font = button_font, bg = "white", width = 20)
 image_file_type_export_entry <- tkbutton(window, text="Image\nfile type", command = image_file_type_export_choice, font = button_font, bg = "white", width = 20)
 data_record_entry <- tkbutton(window, text="Data REC", command = data_record_choice, font = button_font, bg = "white", width = 20)
@@ -2413,7 +2488,7 @@ two_level_effect_analysis_entry <- tkbutton(window, text="Two-level effect\nanal
 remove_outliers_two_level_effect_analysis_entry <- tkbutton(window, text="Remove outliers\nTwo-level effect\nanalysis", command = remove_outliers_two_level_effect_analysis_choice, font = button_font, bg = "white", width = 20)
 multi_level_effect_analysis_entry <- tkbutton(window, text="Multi-level effect\nanalysis", command = multi_level_effect_analysis_choice, font = button_font, bg = "white", width = 20)
 remove_outliers_multi_level_effect_analysis_entry <- tkbutton(window, text="Remove outliers\nMulti-level effect\nanalysis", command = remove_outliers_multi_level_effect_analysis_choice, font = button_font, bg = "white", width = 20)
-minimum_number_of_patients_label <- tklabel(window, text="Minimum number\nof patients", font = label_font, bg = "white", width = 20)
+minimum_number_of_patients_label <- tklabel(window, text="Minimum number\nof patients for tests", font = label_font, bg = "white", width = 20)
 minimum_number_of_patients_entry <- tkentry(window, width = 10, textvariable = minimum_number_of_patients, font = entry_font, bg = "white", width = 20)
 tkinsert(minimum_number_of_patients_entry, "end", "3")
 pvalue_expression_label <- tklabel(window, text="p-value for signal\nexpression difference", font = label_font, bg = "white", width = 20)
@@ -2424,6 +2499,8 @@ pvalue_tests_entry <- tkentry(window, width = 10, textvariable = pvalue_tests, f
 tkinsert(pvalue_tests_entry, "end", "0.05")
 cumulative_class_in_two_level_effect_analysis_entry <- tkbutton(window, text="Cumulative class in the\ntwo-level effect analysis", command = cumulative_class_in_two_level_effect_analysis_choice, font = button_font, bg = "white", width = 20)
 plot_correlation_graphs_entry <- tkbutton(window, text = "Plot correlation\ngraphs", command = plot_correlation_graphs_choice, font = button_font, bg = "white", width = 20)
+transform_data_entry <- tkbutton(window, text = "Data transformation", command = transform_data_choice, font = button_font, bg = "white", width = 20)
+correlation_analysis_method_choice_entry <- tkbutton(window, text = "Correlation analysis\nmethod", command = correlation_analysis_method_choice, font = button_font, bg = "white", width = 20)
 #TestPer_Base_label <- tklabel(window, text="TestPer_Base", font = label_font)
 #TestPer_Base_entry <- tkentry(window, width = 10, textvariable = TestPer_Base, font = entry_font)
 #tkinsert(TestPer_Base_entry, "end", "0.17")
@@ -2431,10 +2508,11 @@ plot_correlation_graphs_entry <- tkbutton(window, text = "Plot correlation\ngrap
 #TestPer_Adv_entry <- tkentry(window, width = 10, textvariable = TestPer_Adv, font = entry_font)
 #tkinsert(TestPer_Adv_entry, "end", "0.19")
 # Buttons
-download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE", command = download_updates_function, font = button_font, bg = "white", width = 20)
+download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE...", command = download_updates_function, font = button_font, bg = "white", width = 20)
 run_statistics_function_button <- tkbutton(window, text="RUN\nSTATISTICS", command = run_statistics_function, font = button_font, bg = "white", width = 20)
 end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font, bg = "white", width = 20)
-#### Displaying labels
+
+# Displaying labels
 check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font, bg = "white", width = 20)
 output_file_type_export_value_label <- tklabel(window, text = output_file_type_export_value, font = label_font, bg = "white", width = 30)
 image_file_type_export_value_label <- tklabel(window, text = image_file_type_export_value, font = label_font, bg = "white", width = 20)
@@ -2447,43 +2525,53 @@ multi_level_effect_analysis_value_label <- tklabel(window, text = multi_level_ef
 remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_multi_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
 cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
 plot_correlation_graphs_value_label <- tklabel(window, text = plot_correlation_graphs_value, font = label_font, bg = "white", width = 20)
-#### Geometry manager
-tkgrid(title_label, row = 1, column = 1, padx = c(20, 20), pady = c(20, 20))
-tkgrid(download_updates_button, row = 1, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(check_for_updates_value_label, row = 1, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(output_file_type_export_entry, row = 2, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(image_file_type_export_entry, row = 3, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(data_record_entry, row = 4, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(correlation_analysis_entry, row = 5, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(remove_outliers_correlation_analysis_entry, row = 6, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(two_level_effect_analysis_entry, row = 2, column = 3, padx = c(10, 10), pady = c(10, 10))
+transform_data_value_label <- tklabel(window, text = transform_data_value, font = label_font, bg = "white", width = 20, height = 2)
+correlation_analysis_method_value_label <- tklabel(window, text = correlation_analysis_method_value, font = label_font, bg = "white", width = 20, height = 2)
+
+########## Geometry manager
+# Entries
+tkgrid(title_label, row = 1, column = 1, columnspan = 2, padx = c(20, 20), pady = c(20, 20))
+tkgrid(download_updates_button, row = 1, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(check_for_updates_value_label, row = 1, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(correlation_analysis_entry, row = 2, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(remove_outliers_correlation_analysis_entry, row = 2, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(two_level_effect_analysis_entry, row = 3, column = 1, padx = c(10, 10), pady = c(10, 10))
 tkgrid(remove_outliers_two_level_effect_analysis_entry, row = 3, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(multi_level_effect_analysis_entry, row = 4, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(remove_outliers_multi_level_effect_analysis_entry, row = 5, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(output_file_type_export_value_label, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(image_file_type_export_value_label, row = 3, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(data_record_value_label, row = 4, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(correlation_analysis_value_label, row = 5, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(remove_outliers_correlation_analysis_value_label, row = 6, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(two_level_effect_analysis_value_label, row = 2, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(multi_level_effect_analysis_entry, row = 4, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(remove_outliers_multi_level_effect_analysis_entry, row = 4, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(transform_data_entry, row = 5, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(data_record_entry, row = 5, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(cumulative_class_in_two_level_effect_analysis_entry, row = 6, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(plot_correlation_graphs_entry, row = 6, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(output_file_type_export_entry, row = 7, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(image_file_type_export_entry, row = 7, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(pvalue_expression_entry, row = 8, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(pvalue_tests_entry, row = 8, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(minimum_number_of_patients_entry, row = 9, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(correlation_analysis_method_choice_entry, row = 9, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(browse_output_button, row = 10, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(select_input_button, row = 10, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(run_statistics_function_button, row = 10, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(end_session_button, row = 10, column = 4, padx = c(10, 10), pady = c(10, 10))
+
+# Displaying labels
+tkgrid(correlation_analysis_value_label, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(remove_outliers_correlation_analysis_value_label, row = 2, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(two_level_effect_analysis_value_label, row = 3, column = 2, padx = c(10, 10), pady = c(10, 10))
 tkgrid(remove_outliers_two_level_effect_analysis_value_label, row = 3, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(multi_level_effect_analysis_value_label, row = 4, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(remove_outliers_multi_level_effect_analysis_value_label, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(minimum_number_of_patients_label, row = 6, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(minimum_number_of_patients_entry, row = 6, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(pvalue_expression_label, row = 7, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(pvalue_expression_entry, row = 7, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(pvalue_tests_label, row = 8, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(pvalue_tests_entry, row = 8, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(cumulative_class_in_two_level_effect_analysis_entry, row = 7, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(plot_correlation_graphs_entry, row = 8, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(plot_correlation_graphs_value_label, row = 8, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(multi_level_effect_analysis_value_label, row = 4, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(remove_outliers_multi_level_effect_analysis_value_label, row = 4, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(transform_data_value_label, row = 5, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(data_record_value_label, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 6, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(plot_correlation_graphs_value_label, row = 6, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(output_file_type_export_value_label, row = 7, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(image_file_type_export_value_label, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(pvalue_expression_label, row = 8, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(pvalue_tests_label, row = 8, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(minimum_number_of_patients_label, row = 9, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(correlation_analysis_method_value_label, row = 9, column = 4, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Base_label, row = 7, column = 3, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Base_entry, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Adv_label, row = 8, column = 3, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Adv_entry, row = 8, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(browse_output_button, row = 9, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(select_input_button, row = 9, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(run_statistics_function_button, row = 9, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(end_session_button, row = 9, column = 4, padx = c(10, 10), pady = c(10, 10))
