@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.14.3"
+R_script_version <- "2017.04.14.4"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -1080,9 +1080,11 @@ run_statistics_function <- function() {
                 input_filename <- "Input Data"
             }
             if (transform_data == TRUE) {
-                write_file(file_name = "Original input data", data = original_input_data, file_format = file_format)
+                write_file(file_name = paste(input_filename, " - Transformed", sep = ""), data = input_data, file_format = file_format)
+                write_file(file_name = input_filename, data = original_input_data, file_format = file_format)
+            } else {
+                write_file(file_name = input_filename, data = input_data, file_format = file_format)
             }
-            write_file(file_name = input_filename, data = input_data, file_format = file_format)
             # Go back to the original output folder
             setwd(output_folder)
         }
