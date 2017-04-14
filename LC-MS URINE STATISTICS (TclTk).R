@@ -5,13 +5,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.14.1"
+R_script_version <- "2017.04.14.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS"
 # Change log
-change_log <- "1. Fixed a bug when only one signal is differently expressed\n2. Fixed GUI\n3. Added the possibility to transform the data"
+change_log <- "1. Fixed a bug when only one signal is differently expressed\n2. Fixed GUI\n3. Added the possibility to transform the data\n4. Dump the original data in 'Data'"
 
 
 
@@ -462,8 +462,22 @@ file_import_function <- function() {
         } else {
             class_list <- levels(as.factor(input_data[, discriminant_feature]))
         }
+        ### Retrieve the input file name
+        input_filename <- NULL
+        try({
+            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                input_filename <- unlist(strsplit(input_file, "/"))
+                input_filename <- input_filename[length(input_filename)]
+                input_filename <- unlist(strsplit(input_filename, ".", fixed = TRUE))[1]
+            } else if (Sys.info()[1] == "Windows") {
+                input_filename <- unlist(strsplit(input_file, "\\\\"))
+                input_filename <- input_filename[length(input_filename)]
+                input_filename <- unlist(strsplit(input_filename, ".", fixed = TRUE))[1]
+            }
+        }, silent = TRUE)
         # Escape the function
         .GlobalEnv$input_file <- input_file
+        .GlobalEnv$input_filename <- input_filename
         .GlobalEnv$input_data <- input_data
         .GlobalEnv$feature_vector <- feature_vector
         .GlobalEnv$non_signals <- non_signals
@@ -1058,6 +1072,11 @@ run_statistics_function <- function() {
             for (d in 1:length(list_of_dataframes)) {
                 write_file(file_name = list_of_filenames[d], data = list_of_dataframes[[d]], file_format = file_format)
             }
+            # Dump the original file
+            if (is.null(input_filename)) {
+                input_filename <- "Original Input Data"
+            }
+            write_file(file_name = input_filename, data = input_data, file_format = file_format)
             # Go back to the original output folder
             setwd(output_folder)
         }
@@ -1081,9 +1100,11 @@ run_statistics_function <- function() {
                 ##### Create the folder for the correlation scatter plots
                 correlation_plot_subfolder <- file.path(correlation_subfolder, "Plots")
                 dir.create(correlation_plot_subfolder)
-                ##### Create the folder for the correlation scatter plots (no outliers)
-                correlation_plot_subfolder_no_outliers <- file.path(correlation_subfolder, "Plots (without outliers)")
-                dir.create(correlation_plot_subfolder_no_outliers)
+                if (remove_outliers_correlation_analysis == TRUE) {
+                    ##### Create the folder for the correlation scatter plots (no outliers)
+                    correlation_plot_subfolder_no_outliers <- file.path(correlation_subfolder, "Plots (without outliers)")
+                    dir.create(correlation_plot_subfolder_no_outliers)
+                }
             }
             ##### Create the folder for the correlation data tables
             correlation_tables_subfolder <- file.path(correlation_subfolder, "Tables")
