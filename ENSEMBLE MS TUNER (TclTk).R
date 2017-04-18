@@ -6428,7 +6428,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.18.2"
+R_script_version <- "2017.04.18.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/ENSEMBLE%20MS%20TUNER.R"
 ### Name of the file when downloaded
@@ -6465,6 +6465,7 @@ k_fold_cv_control <- 3
 preprocessing = c("center", "scale")
 feature_reranking <- FALSE
 try_combination_of_parameters <- FALSE
+class_list <- NULL
 outcome_list <- NULL
 
 
@@ -6620,47 +6621,51 @@ download_updates_function <- function() {
 
 # Outcome list function
 outcome_list_function <- function() {
-    # Fix the values of the class list for the displaying label
-    class_list_values <- NULL
-    for (cl in 1:length(class_list)) {
-        if (is.null(class_list_values)) {
-            class_list_values <- class_list[cl]
-        } else {
-            class_list_values <- as.character(paste(class_list_values, "\n", class_list[cl], sep = ""))
+    if (!is.null(class_list)) {
+        # Fix the values of the class list for the displaying label
+        class_list_values <- NULL
+        for (cl in 1:length(class_list)) {
+            if (is.null(class_list_values)) {
+                class_list_values <- class_list[cl]
+            } else {
+                class_list_values <- as.character(paste(class_list_values, "\n", class_list[cl], sep = ""))
+            }
         }
+        ##### Function for the button in the GUI
+        submit_outcome_list_function <- function() {
+            # Take the input and split it at the comma
+            outcome_list_input <- as.character(tclvalue(outcome_list_input))
+            outcome_list <- unlist(strsplit(outcome_list_input, ",", fixed = TRUE))
+            # Set the displaying value
+            outcome_list_value <- "OUTCOME LIST\nSET"
+            outcome_list_value_label <- tklabel(window, text = outcome_list_value, font = label_font, bg = "white", width = 20)
+            tkgrid(outcome_list_value_label, row = 5, column = 5, padx = c(10, 10), pady = c(10, 10))
+            # Escape the function
+            .GlobalEnv$outcome_list <- outcome_list
+            .GlobalEnv$outcome_list_value <- outcome_list_value
+            # Destroy the window upon committing
+            tkdestroy(outcome_list_window)
+        }
+        ##### List of variables to get from the GUI
+        outcome_list_input <- tclVar("")
+        ##### Window
+        outcome_list_window <- tktoplevel(bg = "white")
+        tktitle(outcome_list_window) <- "Set outcome list"
+        tkpack.propagate(outcome_list_window, FALSE)
+        # GUI elements
+        class_list_label <- tklabel(outcome_list_window, text = "Class list", font = label_font, bg = "white", width = 20)
+        class_list_values_label <- tklabel(outcome_list_window, text = class_list_values, font = label_font, bg = "white", width = 20)
+        outcome_list_label <- tklabel(outcome_list_window, text = "Outcome list\n(separated by comma)", font = label_font, bg = "white", width = 20)
+        outcome_list_entry <- tkentry(outcome_list_window, width = 20, textvariable = outcome_list_input, font = entry_font, bg = "white", width = 20)
+        submit_outcome_list_button <- tkbutton(outcome_list_window, text="Submit outcome list", command = submit_outcome_list_function, font = button_font, bg = "white", width = 20)
+        tkgrid(class_list_label, row = 1, column = 1, padx = c(10, 10), pady = c(10, 10))
+        tkgrid(class_list_values_label, row = 2, column = 1, padx = c(10, 10), pady = c(10, 10))
+        tkgrid(outcome_list_label, row = 1, column = 2, padx = c(10, 10), pady = c(10, 10))
+        tkgrid(outcome_list_entry, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
+        tkgrid(submit_outcome_list_button, row = 3, column = 1, columnspan = 2, padx = c(10, 10), pady = c(10, 10))
+    } else {
+        tkmessageBox(title = "Class list not found", message = "The peaklist file has to be imported first, in order to determine the class list to be matched to a list of outcomes!", icon = "warning")
     }
-    ##### Function for the button in the GUI
-    submit_outcome_list_function <- function() {
-        # Take the input and split it at the comma
-        outcome_list_input <- as.character(tclvalue(outcome_list_input))
-        outcome_list <- unlist(strsplit(outcome_list_input, ",", fixed = TRUE))
-        # Set the displaying value
-        outcome_list_value <- "OUTCOME LIST\nSET"
-        outcome_list_value_label <- tklabel(window, text = outcome_list_value, font = label_font, bg = "white", width = 20)
-        tkgrid(outcome_list_value_label, row = 5, column = 5, padx = c(10, 10), pady = c(10, 10))
-        # Escape the function
-        .GlobalEnv$outcome_list <- outcome_list
-        .GlobalEnv$outcome_list_value <- outcome_list_value
-        # Destroy the window upon committing
-        tkdestroy(outcome_list_window)
-    }
-    ##### List of variables to get from the GUI
-    outcome_list_input <- tclVar("")
-    ##### Window
-    outcome_list_window <- tktoplevel(bg = "white")
-    tktitle(outcome_list_window) <- "Set outcome list"
-    tkpack.propagate(outcome_list_window, FALSE)
-    # GUI elements
-    class_list_label <- tklabel(outcome_list_window, text = "Class list", font = label_font, bg = "white", width = 20)
-    class_list_values_label <- tklabel(outcome_list_window, text = class_list_values, font = label_font, bg = "white", width = 20)
-    outcome_list_label <- tklabel(outcome_list_window, text = "Outcome list\n(separated by comma)", font = label_font, bg = "white", width = 20)
-    outcome_list_entry <- tkentry(outcome_list_window, width = 20, textvariable = outcome_list_input, font = entry_font, bg = "white", width = 20)
-    submit_outcome_list_button <- tkbutton(outcome_list_window, text="Submit outcome list", command = submit_outcome_list_function, font = button_font, bg = "white", width = 20)
-    tkgrid(class_list_label, row = 1, column = 1, padx = c(10, 10), pady = c(10, 10))
-    tkgrid(class_list_values_label, row = 2, column = 1, padx = c(10, 10), pady = c(10, 10))
-    tkgrid(outcome_list_label, row = 1, column = 2, padx = c(10, 10), pady = c(10, 10))
-    tkgrid(outcome_list_entry, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
-    tkgrid(submit_outcome_list_button, row = 3, column = 1, columnspan = 2, padx = c(10, 10), pady = c(10, 10))
 }
 
 ##### File type export MATRIX
