@@ -6957,6 +6957,7 @@ run_ensemble_ms_tuner_function <- function() {
     ######## Run only if all the elements needed are there
     if (!is.null(filepath_import) && !is.null(outcome_list)) {
         ##### Get the values from the entries
+        filename_export <- as.character(tclvalue(filename_export))
         features_to_select <- tclvalue(features_to_select)
         features_to_select <- as.integer(features_to_select)
         cv_repeats_control <- tclvalue(cv_repeats_control)
