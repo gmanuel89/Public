@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.18###################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.18 ##################
 
 ########################################################################## MISC
 
@@ -6428,7 +6428,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.18.0"
+R_script_version <- "2017.04.18.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/ENSEMBLE%20MS%20TUNER.R"
 ### Name of the file when downloaded
@@ -6465,6 +6465,7 @@ k_fold_cv_control <- 3
 preprocessing = c("center", "scale")
 feature_reranking <- FALSE
 try_combination_of_parameters <- FALSE
+outcome_list <- NULL
 
 
 
@@ -6476,9 +6477,10 @@ allow_parallelization_value <- "NO"
 model_tuning_value <- paste("YES\n( ", model_tuning_mode, " )", sep = "")
 automatically_select_features_value <- "NO"
 generate_plots_value <- "YES"
-preprocessing_value <- c("center", "scale")
+preprocessing_value <- "center + scale"
 feature_reranking_value <- "NO"
 try_combination_of_parameters_value <- "NO"
+outcome_list_value <- "OUTCOME LIST\nNOT SET"
 
 
 
@@ -6616,6 +6618,51 @@ download_updates_function <- function() {
     }
 }
 
+# Outcome list function
+outcome_list_function <- function() {
+    # Fix the values of the class list for the displaying label
+    class_list_values <- NULL
+    for (cl in 1:length(class_list)) {
+        if (is.null(class_list_values)) {
+            class_list_values <- class_list[cl]
+        } else {
+            class_list_values <- as.character(paste(class_list_values, "\n", class_list[cl], sep = ""))
+        }
+    }
+    ##### Function for the button in the GUI
+    submit_outcome_list_function <- function() {
+        # Take the input and split it at the comma
+        outcome_list_input <- as.character(tclvalue(outcome_list_input))
+        outcome_list <- unlist(strsplit(outcome_list_input, ",", fixed = TRUE))
+        # Set the displaying value
+        outcome_list_value <- "OUTCOME LIST\nSET"
+        outcome_list_value_label <- tklabel(window, text = outcome_list_value, font = label_font, bg = "white", width = 20)
+        tkgrid(outcome_list_value_label, row = 5, column = 5, padx = c(10, 10), pady = c(10, 10))
+        # Escape the function
+        .GlobalEnv$outcome_list <- outcome_list
+        .GlobalEnv$outcome_list_value <- outcome_list_value
+        # Destroy the window upon committing
+        tkdestroy(outcome_list_window)
+    }
+    ##### List of variables to get from the GUI
+    outcome_list_input <- tclVar("")
+    ##### Window
+    outcome_list_window <- tktoplevel(bg = "white")
+    tktitle(outcome_list_window) <- "Set outcome list"
+    tkpack.propagate(outcome_list_window, FALSE)
+    # GUI elements
+    class_list_label <- tklabel(outcome_list_window, text = "Class list", font = label_font, bg = "white", width = 20)
+    class_list_values_label <- tklabel(outcome_list_window, text = class_list_values, font = label_font, bg = "white", width = 20)
+    outcome_list_label <- tklabel(outcome_list_window, text = "Outcome list\n(separated by comma)", font = label_font, bg = "white", width = 20)
+    outcome_list_entry <- tkentry(outcome_list_window, width = 20, textvariable = outcome_list_input, font = entry_font, bg = "white", width = 20)
+    submit_outcome_list_button <- tkbutton(outcome_list_window, text="Submit outcome list", command = submit_outcome_list_function, font = button_font, bg = "white", width = 20)
+    tkgrid(class_list_label, row = 1, column = 1, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(class_list_values_label, row = 2, column = 1, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(outcome_list_label, row = 1, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(outcome_list_entry, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(submit_outcome_list_button, row = 3, column = 1, columnspan = 2, padx = c(10, 10), pady = c(10, 10))
+}
+
 ##### File type export MATRIX
 file_type_export_matrix_choice <- function() {
     # Catch the value from the menu
@@ -6631,7 +6678,7 @@ file_type_export_matrix_choice <- function() {
     .GlobalEnv$file_type_export_matrix <- file_type_export_matrix
     # Set the value of the displaying label
     file_type_export_matrix_value_label <- tklabel(window, text = file_type_export_matrix, font = label_font, bg = "white", width = 20)
-    tkgrid(file_type_export_matrix_value_label, row = 6, column = 2)
+    tkgrid(file_type_export_matrix_value_label, row = 6, column = 6)
 }
 
 ##### Preprocessing parameters
@@ -6654,7 +6701,7 @@ preprocessing_choice <- function() {
     .GlobalEnv$preprocessing_value <- preprocessing_value
     # Set the value of the displaying label
     preprocessing_value_label <- tklabel(window, text = preprocessing_value, font = label_font, bg = "white", width = 20)
-    tkgrid(preprocessing_value_label, row = 5, column = 2)
+    tkgrid(preprocessing_value_label, row = 4, column = 2)
 }
 
 ##### Peaklist file
@@ -6741,7 +6788,7 @@ end_session_function <- function () {
 }
 
 ##### Model tuning
-model_tuning_mode_choice <- function() {
+model_tuning_choice <- function() {
     # Catch the value from the menu
     model_tuning_mode <- select.list(c("None", "after", "embedded"), title = "Model tuning", multiple = FALSE, preselect = "after")
     # Default
@@ -6757,7 +6804,7 @@ model_tuning_mode_choice <- function() {
         model_tuning_value <- paste("YES\n( ", model_tuning_mode, " )", sep = "")
     }
     model_tuning_value_label <- tklabel(window, text = model_tuning_value, font = label_font, bg = "white", width = 20, height = 2)
-    tkgrid(model_tuning_value_label, row = 2, column = 2)
+    tkgrid(model_tuning_value_label, row = 2, column = 4)
     # Escape the function
     .GlobalEnv$model_tuning <- model_tuning
     .GlobalEnv$model_tuning_mode <- model_tuning_mode
@@ -6782,7 +6829,7 @@ automatically_select_features_choice <- function() {
         automatically_select_features_value <- "NO"
     }
     automatically_select_features_value_label <- tklabel(window, text = automatically_select_features_value, font = label_font, bg = "white", width = 20)
-    tkgrid(automatically_select_features_value_label, row = 2, column = 4)
+    tkgrid(automatically_select_features_value_label, row = 3, column = 2)
     # Escape the function
     .GlobalEnv$automatically_select_features <- automatically_select_features
     .GlobalEnv$automatically_select_features_value <- automatically_select_features_value
@@ -6830,7 +6877,7 @@ try_combination_of_parameters_choice <- function() {
         try_combination_of_parameters_value <- "NO"
     }
     try_combination_of_parameters_value_label <- tklabel(window, text = try_combination_of_parameters_value, font = label_font, bg = "white", width = 20)
-    tkgrid(try_combination_of_parameters_value_label, row = 2, column = 4)
+    tkgrid(try_combination_of_parameters_value_label, row = 4, column = 6)
     # Escape the function
     .GlobalEnv$try_combination_of_parameters <- try_combination_of_parameters
     .GlobalEnv$try_combination_of_parameters_value <- try_combination_of_parameters_value
@@ -6854,7 +6901,7 @@ feature_reranking_choice <- function() {
         feature_reranking_value <- "NO"
     }
     feature_reranking_value_label <- tklabel(window, text = feature_reranking_value, font = label_font, bg = "white", width = 20)
-    tkgrid(feature_reranking_value_label, row = 2, column = 4)
+    tkgrid(feature_reranking_value_label, row = 4, column = 4)
     # Escape the function
     .GlobalEnv$feature_reranking <- feature_reranking
     .GlobalEnv$feature_reranking_value <- feature_reranking_value
@@ -6869,7 +6916,7 @@ selection_metric_choice <- function() {
         selection_metric <- "Accuracy"
     }
     selection_metric_value_label <- tklabel(window, text = selection_metric, font = label_font, bg = "white", width = 20)
-    tkgrid(selection_metric_value_label, row = 3, column = 2)
+    tkgrid(selection_metric_value_label, row = 2, column = 6)
     # Escape the function
     .GlobalEnv$selection_metric <- selection_metric
 }
@@ -6894,7 +6941,7 @@ allow_parallelization_choice <- function() {
         allow_parallelization_value <- "  NO  "
     }
     allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font, bg = "white", width = 20)
-    tkgrid(allow_parallelization_value_label, row = 4, column = 2)
+    tkgrid(allow_parallelization_value_label, row = 5, column = 3)
     # Escape the function
     .GlobalEnv$allow_parallelization <- allow_parallelization
     .GlobalEnv$allow_parallelization_value <- allow_parallelization_value
@@ -6903,7 +6950,7 @@ allow_parallelization_choice <- function() {
 ##### Run the Ensemble MS Tuner function
 run_ensemble_ms_tuner_function <- function() {
     ######## Run only if all the elements needed are there
-    if (!is.null(filepath_import)) {
+    if (!is.null(filepath_import) && !is.null(outcome_list)) {
         ##### Get the values from the entries
         features_to_select <- tclvalue(features_to_select)
         features_to_select <- as.integer(features_to_select)
@@ -6917,8 +6964,49 @@ run_ensemble_ms_tuner_function <- function() {
         model_list <- model_ensemble_tuner$model_list
         feature_list <- model_ensemble_tuner$feature_list
         model_performance_matrix <- model_ensemble_tuner$model_performance_matrix
-        ### Dump the RData file
+        ##### DUMP THE FILES
+        # Create a folder with the filename export name
+        dumping_subfolder <- file.path(output_folder, filename_export)
+        dir.create(dumping_subfolder)
+        setwd(dumping_subfolder)
+        # Dump the RData file
         save("model_list", "feature_list", "model_performance_matrix", file = paste(filename_export, ".RData", sep = ""))
+        # Dump the model performance matrix file
+        if (file_type_export_matrix == "csv") {
+            write.csv(model_performance_matrix, file = paste("Model performance matrix", ".", file_type_export_matrix, sep = ""))
+        } else if (file_type_export_matrix == "xls" || file_type_export_matrix == "xlsx") {
+            wb <- loadWorkbook(filename = paste("Model performance matrix", ".", file_type_export_matrix, sep = ""), create = TRUE)
+            createSheet(wb, name = "Model performance")
+            writeWorksheet(wb, data = model_performance_matrix, sheet = "Model performance")
+            saveWorkbook(wb)
+        }
+        # Dump the model features matrix file
+        if (file_type_export_matrix == "csv") {
+            write.csv(feature_list$model_features_matrix, file = paste("Model features matrix", ".", file_type_export_matrix, sep = ""))
+        } else if (file_type_export_matrix == "xls" || file_type_export_matrix == "xlsx") {
+            wb <- loadWorkbook(filename = paste("Model features matrix", ".", file_type_export_matrix, sep = ""), create = TRUE)
+            createSheet(wb, name = "Model features")
+            writeWorksheet(wb, data = feature_list$model_features_matrix, sheet = "Model features")
+            saveWorkbook(wb)
+        }
+        # Dump the list of major features matrix file
+        if (file_type_export_matrix == "csv") {
+            write.csv(as.matrix(cbind(feature_list$model_features)), file = paste("Model features", ".", file_type_export_matrix, sep = ""))
+        } else if (file_type_export_matrix == "xls" || file_type_export_matrix == "xlsx") {
+            wb <- loadWorkbook(filename = paste("Model features", ".", file_type_export_matrix, sep = ""), create = TRUE)
+            createSheet(wb, name = "Model features")
+            writeWorksheet(wb, data = as.matrix(cbind(feature_list$model_features)), sheet = "Model features")
+            saveWorkbook(wb)
+        }
+        # Dump the list of models matrix file
+        if (file_type_export_matrix == "csv") {
+            write.csv(as.matrix(cbind(names(model_list))), file = paste("Model list", ".", file_type_export_matrix, sep = ""))
+        } else if (file_type_export_matrix == "xls" || file_type_export_matrix == "xlsx") {
+            wb <- loadWorkbook(filename = paste("Model list", ".", file_type_export_matrix, sep = ""), create = TRUE)
+            createSheet(wb, name = "Model list")
+            writeWorksheet(wb, data = as.matrix(cbind(names(model_list))), sheet = "Model list")
+            saveWorkbook(wb)
+        }
         ### Messagebox
         tkmessageBox(title = "Done!", message = paste("The feature selection has been performed and the model ensemble has been generated and tuned!\n\nThe RData file, named '", paste(filename_export, ".RData", sep = ""), "' has been dumped!", sep = ""), icon = "info")
     } else {
@@ -6926,7 +7014,7 @@ run_ensemble_ms_tuner_function <- function() {
         # Escape the function
         .GlobalEnv$model_ensemble_tuner <- model_ensemble_tuner
         ### Messagebox
-        tkmessageBox(title = "Something is wrong", message = "No peaklist file has provided!", icon = "warning")
+        tkmessageBox(title = "Something is wrong", message = "No peaklist file has provided or no outcomes have been specified!", icon = "warning")
     }
 }
 
@@ -7139,6 +7227,8 @@ allow_parallelization_button <- tkbutton(window, text = "ALLOW\nPARALLEL\nCOMPUT
 end_session_button <- tkbutton(window, text = "QUIT", command = end_session_function, font = button_font, bg = "white", width = 20)
 # Run the Ensemble MS Tuner
 run_ensemble_ms_tuner_function_button <- tkbutton(window, text = "RUN THE\nENSEMBLE MS\nTUNER", command = run_ensemble_ms_tuner_function, font = button_font, bg = "white", width = 20)
+# Outcome list
+outcome_list_entry <- tkbutton(window, text = "SET OUTCOME\nLIST...", command = outcome_list_function, font = button_font, bg = "white", width = 20)
 # Updates
 download_updates_button <- tkbutton(window, text = "DOWNLOAD\nUPDATE", command = download_updates_function, font = button_font, bg = "white", width = 20)
 # Features to select
@@ -7161,6 +7251,7 @@ automatically_select_features_value_label <- tklabel(window, text = automaticall
 model_tuning_value_label <- tklabel(window, text = model_tuning_value, font = label_font, bg = "white", width = 20, height = 2)
 generate_plots_value_label <- tklabel(window, text = generate_plots_value, font = label_font, bg = "white", width = 20)
 allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font, bg = "white", width = 20)
+outcome_list_value_label <- tklabel(window, text = outcome_list_value, font = label_font, bg = "white", width = 20)
 try_combination_of_parameters_value_label <- tklabel(window, text = try_combination_of_parameters_value, font = label_font, bg = "white", width = 20)
 feature_reranking_value_label <- tklabel(window, text = feature_reranking_value, font = label_font, bg = "white", width = 20)
 selection_metric_value_label <- tklabel(window, text = selection_metric, font = label_font, bg = "white", width = 20)
@@ -7195,6 +7286,8 @@ tkgrid(try_combination_of_parameters_entry, row = 4, column = 5, padx = c(10, 10
 tkgrid(try_combination_of_parameters_value_label, row = 4, column = 6, padx = c(10, 10), pady = c(10, 10))
 tkgrid(allow_parallelization_button, row = 5, column = 2, padx = c(10, 10), pady = c(10, 10))
 tkgrid(allow_parallelization_value_label, row = 5, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(outcome_list_entry, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(outcome_list_value_label, row = 5, column = 5, padx = c(10, 10), pady = c(10, 10))
 tkgrid(filename_export_entry, row = 6, column = 3, padx = c(10, 10), pady = c(10, 10))
 tkgrid(filename_export_label, row = 6, column = 4, padx = c(10, 10), pady = c(10, 10))
 tkgrid(file_type_export_matrix_entry, row = 6, column = 5, padx = c(10, 10), pady = c(10, 10))
