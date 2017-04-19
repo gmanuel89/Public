@@ -3142,7 +3142,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel classification, a matrix with the ensemble classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel ensemble classification and the plot of the average spectrum with red bars to indicate the signals used for classification.
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
-spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_method = NULL), tof_mode = "linear", allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name")) {
+spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_method = NULL), tof_mode = "linear", allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name"), progress_bar = NULL) {
     ### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda", "caret", "nnet"))
     ### Defaults
@@ -6413,7 +6413,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.0"
+R_script_version <- "2017.04.19.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/ENSEMBLE%20MS%20TUNER.R"
 ### Name of the file when downloaded
@@ -6635,8 +6635,9 @@ outcome_list_function <- function() {
         outcome_list_input <- tclVar("")
         ##### Window
         outcome_list_window <- tktoplevel(bg = "white")
+        tkwm.resizable(outcome_list_window, FALSE, FALSE)
         tktitle(outcome_list_window) <- "Set outcome list"
-        tkpack.propagate(outcome_list_window, FALSE)
+        #tkpack.propagate(outcome_list_window, FALSE)
         # GUI elements
         class_list_label <- tklabel(outcome_list_window, text = "Class list", font = label_font, bg = "white", width = 20)
         class_list_values_label <- tklabel(outcome_list_window, text = class_list_values, font = label_font, bg = "white", width = 20)
@@ -7183,7 +7184,8 @@ if (system_os == "Windows") {
 
 # The "area" where we will put our input lines
 window <- tktoplevel(bg = "white")
-tkpack.propagate(window, FALSE)
+tkwm.resizable(window, FALSE, FALSE)
+#tkpack.propagate(window, FALSE)
 tktitle(window) <- "ENSEMBLE MS TUNER"
 # Title label
 title_label <- tklabel(window, text = "ENSEMBLE MS TUNER", font = title_font, bg = "white")
