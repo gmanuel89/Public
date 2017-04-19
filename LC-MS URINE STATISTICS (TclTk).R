@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.1"
+R_script_version <- "2017.04.19.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -2386,7 +2386,8 @@ if (system_os == "Windows") {
 
 # The "area" where we will put our input lines
 window <- tktoplevel(bg = "white")
-tkpack.propagate(window, FALSE)
+tkwm.resizable(window, FALSE, FALSE)
+#tkpack.propagate(window, FALSE)
 tktitle(window) <- "LC-MS URINE STATISTICS"
 # Title label
 title_label <- tklabel(window, text = "LC-MS URINE STATISTICS", font = title_font, bg = "white")
