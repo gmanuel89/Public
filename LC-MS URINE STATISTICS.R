@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.0"
+R_script_version <- "2017.04.19.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -798,7 +798,13 @@ run_statistics_function <- function() {
                     # Split the name
                     STATISTICS_present_folder_split <- unlist(strsplit(list_of_directories[dr], "STATISTICS"))
                     # Add the number to the list of STATISTICS numbers
-                    try(STATISTICS_present_folder_numbers <- append(STATISTICS_present_folder_numbers, as.integer(STATISTICS_present_folder_split[2])))
+                    try({
+                        if (!is.na(as.integer(STATISTICS_present_folder_split[2]))) {
+                            STATISTICS_present_folder_numbers <- append(STATISTICS_present_folder_numbers, as.integer(STATISTICS_present_folder_split[2]))
+                        } else {
+                            STATISTICS_present_folder_numbers <- append(STATISTICS_present_folder_numbers, as.integer(0))
+                        }
+                    }, silent = TRUE)
                 }
             }
             # Sort the STATISTICS folder numbers
