@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.18 ##################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.19 ##################
 
 ########################################################################## MISC
 
@@ -2508,6 +2508,7 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
 # The pixel grouping cannot be 'graph', otherwise, when embedded in the pixel by pixel classification function, the graph segmentation is performed for each model before making the predictons.
 single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", preprocessing_parameters = NULL, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 1, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 5, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, number_of_spectra_partitions = 1, partitioning_method = "space", plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name")) {
+    print(paste("Computing predictions with model:", model_name))
     # Class list (from the custom model entry)
     class_list <- model_x$class_list
     # Outcome list (from the custom model entry)
@@ -3672,24 +3673,7 @@ feature_selection <- function(peaklist, feature_selection_method = "ANOVA", feat
 embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "pls", model_tuning = TRUE, model_tuning_mode = c("embedded", "after"), model_tune_grid = list(), selection_metric = "Accuracy", cv_repeats_control = 5, k_fold_cv_control = 10, discriminant_attribute = "Class", non_features = c("Sample", "Class"), seed = NULL, automatically_select_features = TRUE, generate_plots = TRUE, preprocessing = c("center","scale"), allow_parallelization = FALSE, feature_reranking = TRUE, external_peaklist = NULL, positive_class_cv = "HP") {
     # Load the required libraries
     install_and_load_required_packages(c("caret", "stats", "pROC", "nnet", "e1071", "kernlab", "randomForest", "klaR", "MASS", "pls", "iterators", "nnet", "SparseM", "stringi"))
-    ### Define better the (helper) functions to be used in rfe control
-    rfe_helper_functions <- list(summary = defaultSummary,
-                                 fit = function(x, y, ...) {
-                                     library("e1071")
-                                     svm(x, y, ...)
-                                 },
-                                 pred = function(object, x) predict.svm(object, nwdata = x),
-                                 rank = function(object, x, y) {
-                                     vimp <- varImp(object)
-                                     vimp <- vimp[order(vimp$Overall, decreasing = TRUE),, drop = FALSE]
-                                     vimp$var <- rownames(vimp)
-                                     vimp
-                                 },
-                                 selectSize = pickSizeBest,
-                                 selectVar = pickVars
-    )
-    # Store th helper functions in the control function
-    #rfe_ctrl$functions <- rfe_helper_functions
+    # Parallelization
     if (allow_parallelization == TRUE) {
         ### PARALLEL BACKEND
         # Detect the number of cores
@@ -3710,9 +3694,7 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
     feature_weights <- NULL
     variable_importance <- NULL
     fs_model_performance <- NULL
-    pie_chart_classification <- NULL
-    model_roc <- NULL
-    ### The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
+    ### The simulation will fit models with subset sizes: the subset size is the number of predictors to use
     if (automatically_select_features == TRUE) {
         # Define the feature subset sizes
         subset_sizes <- seq(2, features_to_select, by = 1)
@@ -3747,11 +3729,10 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         fs_model_performance <- as.numeric(max(rfe_model$fit$results$Accuracy, na.rm = TRUE))
         names(fs_model_performance) <- "Accuracy"
     }
+    # Output the best predictors after the RFE
     if (automatically_select_features == TRUE) {
-        # Output the best predictors after the RFE
         predictors_rfe <- predictors(rfe_model)
     } else {
-        # Output the best predictors after the RFE
         predictors_rfe <- predictors(rfe_model)[1:features_to_select]
     }
     # Predictors
@@ -3807,11 +3788,11 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         predicted_classes_model <- predict(fs_model, newdata = external_peaklist[,!(names(external_peaklist) %in% non_features)])
         # Create the outcomes dataframe
         classification_results_model <- data.frame(Sample = external_peaklist$Sample, Predicted = predicted_classes_model, True = external_peaklist$Class)
-        # Generate the confusion matrix to evaluate the performances
+        # Generate the confusion matrix to evaluate the performances (take the first class as positive if not specified)
         if (is.null(positive_class_cv) || !(positive_class_cv %in% levels(as.factor(peaklist[, discriminant_attribute])))) {
             positive_class_cv <- levels(as.factor(peaklist[, discriminant_attribute]))[1]
         }
-        test_performances_model <- confusionMatrix(data = predicted_classes_model, external_peaklist$Class, positive = positive_class_cv)
+        model_performance_confusion_matrix <- confusionMatrix(data = predicted_classes_model, reference = external_peaklist$Class, positive = positive_class_cv)
         ## ROC analysis
         model_roc <- list()
         roc_curve <- roc(response = as.numeric(classification_results_model$True), predictor = as.numeric(classification_results_model$Predicted))
@@ -3841,9 +3822,13 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         } else {
             pie_chart_classification <- NULL
         }
+    } else {
+        model_performance_confusion_matrix <- NULL
+        pie_chart_classification <- NULL
+        model_roc <- NULL
     }
     ### Return the values
-    return(list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance, feature_selection_model = fs_model, class_list = levels(as.factor(peaklist[, discriminant_attribute])), pie_chart_classification = pie_chart_classification, model_roc = model_roc))
+    return(list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance, feature_selection_model = fs_model, class_list = levels(as.factor(peaklist[, discriminant_attribute])), pie_chart_classification = pie_chart_classification, model_roc = model_roc, model_performance_confusion_matrix = model_performance_confusion_matrix))
 }
 
 
@@ -3937,9 +3922,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(pls_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine (with Radial Basis Kernel function)")
+        setTkProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine\n(with Radial Basis Kernel function)")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine (with Radial Basis Kernel function)")
+        setTxtProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine\n(with Radial Basis Kernel function)")
     }
     # Support Vector Machine (with Radial Basis Kernel function)
     svmRadial_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmRadial", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(sigma = 10^(-5:5), C = 10^(-5:5)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3953,9 +3938,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(svmRadial_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine (with Polynomial Kernel function)")
+        setTkProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine\n(with Polynomial Kernel function)")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine (with Polynomial Kernel function)")
+        setTxtProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine\n(with Polynomial Kernel function)")
     }
     # Support Vector Machine (with Polynomial Kernel function)
     svmPoly_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmPoly", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(C = 10^(-5:5), degree = 1:5, scale = 1), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3985,9 +3970,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(rf_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes Classifier")
+        setTkProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes\nClassifier")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes Classifier")
+        setTxtProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes\nClassifier")
     }
     # Naive Bayes Classifier
     nbc_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "nb", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = data.frame(fL = seq(0, 1, by = 0.2), usekernel = c(TRUE, FALSE), adjust = c(TRUE, FALSE)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -6428,7 +6413,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.18.3"
+R_script_version <- "2017.04.19.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/ENSEMBLE%20MS%20TUNER.R"
 ### Name of the file when downloaded
@@ -6958,12 +6943,9 @@ run_ensemble_ms_tuner_function <- function() {
     if (!is.null(filepath_import) && !is.null(outcome_list)) {
         ##### Get the values from the entries
         filename_export <- as.character(tclvalue(filename_export))
-        features_to_select <- tclvalue(features_to_select)
-        features_to_select <- as.integer(features_to_select)
-        cv_repeats_control <- tclvalue(cv_repeats_control)
-        cv_repeats_control <- as.integer(cv_repeats_control)
-        k_fold_cv_control <- tclvalue(k_fold_cv_control)
-        k_fold_cv_control <- as.integer(k_fold_cv_control)
+        features_to_select <- as.integer(tclvalue(features_to_select))
+        cv_repeats_control <- as.integer(tclvalue(cv_repeats_control))
+        k_fold_cv_control <- as.integer(tclvalue(k_fold_cv_control))
         ##### Run the feature selection function
         model_ensemble_tuner <- model_ensemble_embedded_fs(peaklist = peaklist, features_to_select = features_to_select, model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, selection_metric = selection_metric, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = 12345, automatically_select_features = automatically_select_features, generate_plots = generate_plots, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters, outcome_list = outcome_list, progress_bar = "tcltk")
         ### Extract the variables
@@ -7238,10 +7220,10 @@ outcome_list_entry <- tkbutton(window, text = "SET OUTCOME\nLIST...", command = 
 # Updates
 download_updates_button <- tkbutton(window, text = "DOWNLOAD\nUPDATE", command = download_updates_function, font = button_font, bg = "white", width = 20)
 # Features to select
-features_to_select_entry <- tkentry(window, width = 10, textvariable = features_to_select, font = entry_font, bg = "white", width = 20)
+features_to_select_entry <- tkentry(window, textvariable = features_to_select, font = entry_font, bg = "white", width = 20)
 tkinsert(features_to_select_entry, "end", "20")
 # CV repeats control
-cv_repeats_control_entry <- tkentry(window, width = 10, textvariable = cv_repeats_control, font = entry_font, bg = "white", width = 20)
+cv_repeats_control_entry <- tkentry(window, textvariable = cv_repeats_control, font = entry_font, bg = "white", width = 20)
 tkinsert(cv_repeats_control_entry, "end", "5")
 # k-fold CV control
 k_fold_cv_control_entry <- tkentry(window, width = 10, textvariable = k_fold_cv_control, font = entry_font, bg = "white", width = 20)
