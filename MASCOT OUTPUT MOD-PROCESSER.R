@@ -7,13 +7,13 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.13.0"
+R_script_version <- "2017.04.19.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MASCOT%20OUTPUT%20MOD-PROCESSER.R"
 ### Name of the file when downloaded
 script_file_name <- "MASCOT OUTPUT MOD-PROCESSER"
 # Change log
-change_log <- "1. New software!"
+change_log <- "1. New software!\n2. Bugfix"
 
 
 
@@ -396,8 +396,14 @@ run_mascot_output_modprocesser_function <- function() {
                 if (length(grep("MASCOT", list_of_directories[dr], fixed = TRUE)) > 0) {
                     # Split the name
                     MASCOT_present_folder_split <- unlist(strsplit(list_of_directories[dr], "MASCOT"))
-                    # Add the number to the list of MASCOT numbers
-                    try(MASCOT_present_folder_numbers <- append(MASCOT_present_folder_numbers, as.integer(MASCOT_present_folder_split[2])))
+                    # Add the number to the list of MASCOT numbers (if it is NA it means that what was following the MASCOT was not a number)
+                    try({
+                        if (!is.na(as.integer(MASCOT_present_folder_split[2]))) {
+                            MASCOT_present_folder_numbers <- append(MASCOT_present_folder_numbers, as.integer(MASCOT_present_folder_split[2]))
+                        } else {
+                            MASCOT_present_folder_numbers <- append(MASCOT_present_folder_numbers, as.integer(0))
+                        }
+                    }, silent = TRUE)
                 }
             }
             # Sort the STATISTICS folder numbers
