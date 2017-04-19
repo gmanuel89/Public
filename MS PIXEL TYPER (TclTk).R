@@ -6413,7 +6413,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.0"
+R_script_version <- "2017.04.19.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -7285,8 +7285,14 @@ ms_pixel_typer_data_dumper_function <- function() {
                 if (length(grep("CLASSIFICATION", list_of_directories[dr], fixed = TRUE)) > 0) {
                     # Split the name
                     CLASSIFICATION_present_folder_split <- unlist(strsplit(list_of_directories[dr], "CLASSIFICATION"))
-                    # Add the number to the list of CLASSIFICATION numbers
-                    try(CLASSIFICATION_present_folder_numbers <- append(CLASSIFICATION_present_folder_numbers, as.integer(CLASSIFICATION_present_folder_split[2])))
+                    # Add the number to the list of CLASSIFICATION numbers (if it is NA it means that what was following the CLASSIFICATION was not a number)
+                    try({
+                        if (!is.na(as.integer(CLASSIFICATION_present_folder_split[2]))) {
+                            CLASSIFICATION_present_folder_numbers <- append(CLASSIFICATION_present_folder_numbers, as.integer(CLASSIFICATION_present_folder_split[2]))
+                        } else {
+                            CLASSIFICATION_present_folder_numbers <- append(CLASSIFICATION_present_folder_numbers, as.integer(0))
+                        }
+                    }, silent = TRUE)
                 }
             }
             # Sort the STATISTICS folder numbers
