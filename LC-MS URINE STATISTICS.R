@@ -5,7 +5,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.14.5"
+R_script_version <- "2017.04.19.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
@@ -825,42 +825,24 @@ run_statistics_function <- function() {
 
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.05, title = NULL, label = "5 %")
-
-        ################################################################################
-
-
-        # Retrieve the values from the entries
+        
+        ########################################################################
+        
+        #################### Retrieve the values from the entries
         pvalue_expression <- tclvalue(pvalue_expression)
         pvalue_expression <- as.numeric(pvalue_expression)
         pvalue_expression_value <- as.character(pvalue_expression)
         pvalue_tests <- tclvalue(pvalue_tests)
         pvalue_tests <- as.numeric(pvalue_tests)
         pvalue_tests_value <- as.character(pvalue_tests)
-        #TestPer_Base <- tclvalue(TestPer_Base)
-        #TestPer_Base <- as.numeric(TestPer_Base)
-        #TestPer_Base_value <- as.character(TestPer_Base)
-        #TestPer_Adv <- tclvalue(TestPer_Adv)
-        #TestPer_Adv <- as.numeric(TestPer_Adv)
-        #TestPer_Adv_value <- as.character(TestPer_Adv)
         minimum_number_of_patients <- tclvalue(minimum_number_of_patients)
         minimum_number_of_patients <- as.integer(minimum_number_of_patients)
         minimum_number_of_patients_value <- as.character(minimum_number_of_patients)
-
-
-
-
-        ########## Exception handling
-        #if (isTRUE(two_level_effect_analysis)) {
-        #    ifelse(isTRUE(sampling), print("The Two-Level Effect analysis is performed with sampling for RM"), print("WARNING!!! The Two-Level Effect analysis is performed without sampling!"))
-        #}
-
-        ################################# FUNCTIONS
-
-
-        ########## General Statistic Function: definition ###############################
-
-        ################################ P-value extractor functions
-
+        
+        ########################################################################
+        
+        #################### FUNCTIONS
+        ## P-value extractor functions
         assumption_p <- function(objt) {
             ifelse(is.object(objt), return(objt$p.value), return(NA))
         }
@@ -870,9 +852,8 @@ run_statistics_function <- function() {
         assumption_permutation <- function(objt) {
             ifelse(is.object(objt), return(pvalue(objt)[1]), return(NA))
         }
-
-
-        #################  Post hoc tests
+        
+        ## Post hoc tests
         write_posthoc_file <- function(file_name, data, file_format = "xlsx"){
             # Store the original filename
             original_file_name <- file_name
@@ -916,20 +897,7 @@ run_statistics_function <- function() {
                 write.csv(output_matrix, file = file_name)
             }
         }
-
-        ###################################################
-
-        sammy <- function(pn, minpos, maxpos){
-            sam <- NULL
-            while (length(sam) < pn){
-                z <- round(runif(1,min=minpos,max=maxpos))
-                if (!(z %in% sam))
-                    sam <- append(sam, z)
-            }
-            return(sam)
-        }
-
-
+        
         ##### Split the dependent variable according to the factor variable
         group_dependent_variable <- function(dependent_variable, factor_variable) {
             # Extract the levels of the factor variable
@@ -946,13 +914,8 @@ run_statistics_function <- function() {
             # Return
             return(dependent_variable_split)
         }
-
-
-
-
-
-        ###################################################
-        # Function to export the data files
+        
+        ### Function to export the data files
         write_file <- function(file_name, data, file_format = "xlsx"){
             # Store the original filename
             original_file_name <- file_name
@@ -981,50 +944,22 @@ run_statistics_function <- function() {
                 write.csv(data, file = file_name)
             }
         }
-
-        SamplingForRM <- function(Per_Base , Per_Adv){
-            ##### sampling indexes from group 0
-            p <- Per_Base
-            minval <- 1
-            maxval <- dim(BaseTFD)[1]
-            print("numb. of base subj")
-            print(maxval)
-            pn <- round(p*maxval)
-            print("numb. of base subj to sample")
-            print(pn)
-            set.seed(123)
-            n1 <- sammy(pn,minval, maxval)
-            print("Selected base-group indeces for Sig.an.")
-            print(n1)
-            ##### sampling indexes from group 1
-            p <- Per_Adv
-            minval <- 1
-            maxval <- dim(AdvTFD)[1]
-            print("numb. of adv subj")
-            print(maxval)
-            pn <- round(p*maxval)
-            print("numb. of adv subj to sample")
-            print(pn)
-            n2 <- sammy(pn,minval, maxval)
-            print("Selected adv-group indeces for Sig.an.")
-            print(n2)
-            return (list(N1=n1,N2=n2))
-        }
-
-        ################################################################################
-
-
-
-
-
-
+        
+        
+        ########################################################################
         
         
         
-        ##### Transform the data (transform directly the input_data and not the signals_data because it is the input_data variable that it is carried throughout the analysis, but transform only the signals data)
+        
+        
+        #################### RUN THE STATISTICS
+        
+        ################ Transform the data (transform directly the input_data and not the signals_data because it is the input_data variable that it is carried throughout the analysis, but transform only the signals data)
         # Store the original before transforming
         original_input_data <- input_data
         if (isTRUE(transform_data)) {
+            # Progress bar
+            setTkProgressBar(program_progress_bar, value = 0.05, title = NULL, label = "Data transformation")
             if (transform_data_algorithm == "Square root") {
                 input_data[,!(names(input_data) %in% non_signals)] <- sqrt(input_data[,!(names(input_data) %in% non_signals)])
             } else if (transform_data_algorithm == "Natural logarithm") {
@@ -1041,13 +976,17 @@ run_statistics_function <- function() {
                 input_data[,!(names(input_data) %in% non_signals)] <- exp(input_data[,!(names(input_data) %in% non_signals)])
             }
         }
-
-
-
-
-        ################ Data from input_data #######################
+        # Progress bar
+        setTkProgressBar(program_progress_bar, value = 0.10, title = NULL, label = "10 %")
+        
+        
+        
+        
+        ################ Data REC
         if (isTRUE(data_record)) {
-            print("########## Data Management ##########")
+            # Progress bar
+            setTkProgressBar(program_progress_bar, value = 0.10, title = NULL, label = "Data REC")
+            print("########## Data REC ##########")
             # Generate a list of data frames and corresponding filenames to dump
             list_of_dataframes <- list()
             list_of_filenames <- character()
@@ -1090,14 +1029,17 @@ run_statistics_function <- function() {
             # Go back to the original output folder
             setwd(output_folder)
         }
-
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.15, title = NULL, label = "15 %")
-
-
-        ################################################################################
+        
+        
+        
+        
+        
         #################### CORRELATION ANALYSIS (Done only with patients affected by RCC, because controls do not have pT, grade, dimension, etc...)
         if (isTRUE(correlation_analysis)) {
+            # Progress bar
+            setTkProgressBar(program_progress_bar, value = 0.15, title = NULL, label = "Correlation analysis")
             # Features for correlation analysis (sorted for reproducibility reasons)
             non_signals_for_correlation_analysis <- sort(non_signals_for_correlation_analysis)
             features_for_correlation_analysis <- append(non_signals_for_correlation_analysis, names(signals_data))
@@ -1249,13 +1191,17 @@ run_statistics_function <- function() {
                 }
             }
         }
-
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.30, title = NULL, label = "30 %")
-
-        #################################################################################
+        
+        
+        
+        
+        
         #################### 2-LEVEL EFFECT ANALYSIS OVER SIGNAL INTENSITY
         if (isTRUE(two_level_effect_analysis)) {
+            # Progress bar
+            setTkProgressBar(program_progress_bar, value = 0.30, title = NULL, label = "Two-level effect analysis")
             # Establish the variables for the two-level effect analysis (Append the discriminant column to the previously selected variables)
             if (discriminant_feature != "NONE") {
                 two_level_effect_analysis_non_features <- sort(c(discriminant_feature, two_level_effect_analysis_non_features))
@@ -1331,19 +1277,6 @@ run_statistics_function <- function() {
                     temp_data_frame[temp_data_frame[, non_signal_variable] != l, non_signal_variable] <- "OTHERS"
                     # Generate a corresponding temp data frame but without outliers
                     temp_data_frame_no_outliers <- temp_data_frame
-                }
-                ##### Sampling
-                if (isTRUE(sampling)){
-
-                    base_sampling_df <- temp_data_frame[temp_data_frame[, non_signal_variable] == 0, ]
-                    adv_sampling_df <- temp_data_frame[temp_data_frame[, non_signal_variable] == 1, ]
-
-                    Samlist <- SamplingForRM(TestPer_Base,TestPer_Adv)
-                    n1 <- Samlist$N1
-                    n2 <- Samlist$N2
-
-                    TFD <- rbind(BaseTFD[n1,],AdvTFD[n2,])
-                    DIAGTFD <- rbind(BaseTFD[-n1,],AdvTFD[-n2,])
                 }
                 # List of outputs
                 outlier_list <- list()
@@ -1691,72 +1624,23 @@ run_statistics_function <- function() {
                 write_file(file_name = "Differentially expressed signals", data = selected_signals_for_inference_intensity_df, file_format = file_format)
                 write_file(file_name = "All signals", data = temp_data_frame_original, file_format = file_format)
                 write_file(file_name = "Test p-values", data = pvalue_matrix, file_format = file_format)
-                ### Sampling
-                if (isTRUE(sampling)) {
-                    filename <-  "RMdataTEST"
-                    dataname <- TEST
-                    WriteFile(filename,dataname, file_format)
-
-                    TFD_DIA <- as.data.frame(subset(input_data, input_data$Class == 3, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
-                    TFD_DIA <- TFD_DIA[c("No",SelectedSignsForEffect)]
-                    RowNumb <- dim(TFD_DIA)[1]
-                    Class <- rep(0,RowNumb)
-                    BaseClass <- rep(3,RowNumb)
-                    TFD_DIA <- cbind(BaseClass,Class,TFD_DIA)
-                    filename <-  "RMTESTDIABS"
-                    dataname <- TFD_DIA
-                    WriteFile(filename,dataname, file_format)
-
-                    TFD_DIAMA <- as.data.frame(subset(input_data, input_data$Class == 4, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
-                    TFD_DIAMA <- TFD_DIAMA[c("No",SelectedSignsForEffect)]
-                    RowNumb <- dim(TFD_DIAMA)[1]
-                    Class <- rep(0,RowNumb)
-                    BaseClass <- rep(4,RowNumb)
-                    TFD_DIAMA <- cbind(BaseClass,Class,TFD_DIAMA)
-                    filename <-  "RMTESTDIAMA.xlsx"
-                    dataname <- TFD_DIAMA
-                    WriteFile(filename,dataname)
-
-                    TFD_M <- as.data.frame(subset(input_data, input_data$Class == 5, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
-                    TFD_M <- TFD_M[c("No",SelectedSignsForEffect)]
-                    RowNumb <- dim(TFD_M)[1]
-                    Class <- rep(1,RowNumb)
-                    BaseClass <- rep(5,RowNumb)
-                    TFD_M <- cbind(BaseClass,Class,TFD_M)
-                    filename <-  "RMTESTMAL"
-                    dataname <- TFD_M
-                    WriteFile(filename,dataname, file_format)
-
-                    TFD_B <- as.data.frame(subset(input_data, input_data$Class == 6, select=-c(DIA_1_2,Centro,Age,Age_BINNED,pT_2009,pT,Dim,Grade,Class) ))
-                    TFD_B <- TFD_B[c("No",SelectedSignsForEffect)]
-                    RowNumb <- dim(TFD_B)[1]
-                    Class <- rep(0,RowNumb)
-                    BaseClass <- rep(6,RowNumb)
-                    TFD_B <- cbind(BaseClass,Class,TFD_B)
-                    filename <-  "RMTESTBEN"
-                    dataname <- TFD_B
-                    WriteFile(filename,dataname, file_format)
-
-                }
                 # Go back to the output folder
                 setwd(output_folder)
                 # Restore the original data frame
                 #temp_data_frame <- temp_data_frame_original
             }
         }
-
-
-
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 0.65, title = NULL, label = "65 %")
-
-
-
-
-
-        #################################################################################
+        
+        
+        
+        
+        
         #################### MULTI-LEVEL EFFECT ANALYSIS OVER SIGNAL INTENSITY
         if (isTRUE(multi_level_effect_analysis)) {
+            # Progress bar
+            setTkProgressBar(program_progress_bar, value = 0.65, title = NULL, label = "Multi-level effect analysis")
             # Establish the variables for the multi-level effect analysis (Append the discriminant column to the previously selected variables)
             if (discriminant_feature != "NONE") {
                 multi_level_effect_analysis_non_features <- sort(c(discriminant_feature, multi_level_effect_analysis_non_features))
@@ -2499,7 +2383,7 @@ window <- tktoplevel(bg = "white")
 tkpack.propagate(window, FALSE)
 tktitle(window) <- "LC-MS URINE STATISTICS"
 # Title label
-title_label <- tklabel(window, text = "LC-MS URINE\nSTATISTICS", font = title_font, bg = "white")
+title_label <- tklabel(window, text = "LC-MS URINE STATISTICS", font = title_font, bg = "white")
 # Entries
 select_input_button <- tkbutton(window, text="IMPORT FILE...", command = file_import_function, font = button_font, bg = "white", width = 20)
 browse_output_button <- tkbutton(window, text="BROWSE\nOUTPUT FOLDER...", command = browse_output_function, font = button_font, bg = "white", width = 20)
