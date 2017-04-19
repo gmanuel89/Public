@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.04 ####################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.19 ##################
 
 ########################################################################## MISC
 
@@ -2508,6 +2508,7 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
 # The pixel grouping cannot be 'graph', otherwise, when embedded in the pixel by pixel classification function, the graph segmentation is performed for each model before making the predictons.
 single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", preprocessing_parameters = NULL, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 1, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 5, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, number_of_spectra_partitions = 1, partitioning_method = "space", plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name")) {
+    print(paste("Computing predictions with model:", model_name))
     # Class list (from the custom model entry)
     class_list <- model_x$class_list
     # Outcome list (from the custom model entry)
@@ -3141,7 +3142,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel classification, a matrix with the ensemble classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel ensemble classification and the plot of the average spectrum with red bars to indicate the signals used for classification.
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
-spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_method = NULL), tof_mode = "linear", allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name")) {
+spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_method = NULL), tof_mode = "linear", allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name"), progress_bar = NULL) {
     ### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda", "caret", "nnet"))
     ### Defaults
@@ -3672,24 +3673,7 @@ feature_selection <- function(peaklist, feature_selection_method = "ANOVA", feat
 embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "pls", model_tuning = TRUE, model_tuning_mode = c("embedded", "after"), model_tune_grid = list(), selection_metric = "Accuracy", cv_repeats_control = 5, k_fold_cv_control = 10, discriminant_attribute = "Class", non_features = c("Sample", "Class"), seed = NULL, automatically_select_features = TRUE, generate_plots = TRUE, preprocessing = c("center","scale"), allow_parallelization = FALSE, feature_reranking = TRUE, external_peaklist = NULL, positive_class_cv = "HP") {
     # Load the required libraries
     install_and_load_required_packages(c("caret", "stats", "pROC", "nnet", "e1071", "kernlab", "randomForest", "klaR", "MASS", "pls", "iterators", "nnet", "SparseM", "stringi"))
-    ### Define better the (helper) functions to be used in rfe control
-    rfe_helper_functions <- list(summary = defaultSummary,
-                                 fit = function(x, y, ...) {
-                                     library("e1071")
-                                     svm(x, y, ...)
-                                 },
-                                 pred = function(object, x) predict.svm(object, nwdata = x),
-                                 rank = function(object, x, y) {
-                                     vimp <- varImp(object)
-                                     vimp <- vimp[order(vimp$Overall, decreasing = TRUE),, drop = FALSE]
-                                     vimp$var <- rownames(vimp)
-                                     vimp
-                                 },
-                                 selectSize = pickSizeBest,
-                                 selectVar = pickVars
-    )
-    # Store th helper functions in the control function
-    #rfe_ctrl$functions <- rfe_helper_functions
+    # Parallelization
     if (allow_parallelization == TRUE) {
         ### PARALLEL BACKEND
         # Detect the number of cores
@@ -3710,9 +3694,7 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
     feature_weights <- NULL
     variable_importance <- NULL
     fs_model_performance <- NULL
-    pie_chart_classification <- NULL
-    model_roc <- NULL
-    ### The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
+    ### The simulation will fit models with subset sizes: the subset size is the number of predictors to use
     if (automatically_select_features == TRUE) {
         # Define the feature subset sizes
         subset_sizes <- seq(2, features_to_select, by = 1)
@@ -3747,11 +3729,10 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         fs_model_performance <- as.numeric(max(rfe_model$fit$results$Accuracy, na.rm = TRUE))
         names(fs_model_performance) <- "Accuracy"
     }
+    # Output the best predictors after the RFE
     if (automatically_select_features == TRUE) {
-        # Output the best predictors after the RFE
         predictors_rfe <- predictors(rfe_model)
     } else {
-        # Output the best predictors after the RFE
         predictors_rfe <- predictors(rfe_model)[1:features_to_select]
     }
     # Predictors
@@ -3807,11 +3788,11 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         predicted_classes_model <- predict(fs_model, newdata = external_peaklist[,!(names(external_peaklist) %in% non_features)])
         # Create the outcomes dataframe
         classification_results_model <- data.frame(Sample = external_peaklist$Sample, Predicted = predicted_classes_model, True = external_peaklist$Class)
-        # Generate the confusion matrix to evaluate the performances
+        # Generate the confusion matrix to evaluate the performances (take the first class as positive if not specified)
         if (is.null(positive_class_cv) || !(positive_class_cv %in% levels(as.factor(peaklist[, discriminant_attribute])))) {
             positive_class_cv <- levels(as.factor(peaklist[, discriminant_attribute]))[1]
         }
-        test_performances_model <- confusionMatrix(data = predicted_classes_model, external_peaklist$Class, positive = positive_class_cv)
+        model_performance_confusion_matrix <- confusionMatrix(data = predicted_classes_model, reference = external_peaklist$Class, positive = positive_class_cv)
         ## ROC analysis
         model_roc <- list()
         roc_curve <- roc(response = as.numeric(classification_results_model$True), predictor = as.numeric(classification_results_model$Predicted))
@@ -3841,9 +3822,13 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         } else {
             pie_chart_classification <- NULL
         }
+    } else {
+        model_performance_confusion_matrix <- NULL
+        pie_chart_classification <- NULL
+        model_roc <- NULL
     }
     ### Return the values
-    return(list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance, feature_selection_model = fs_model, class_list = levels(as.factor(peaklist[, discriminant_attribute])), pie_chart_classification = pie_chart_classification, model_roc = model_roc))
+    return(list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance, feature_selection_model = fs_model, class_list = levels(as.factor(peaklist[, discriminant_attribute])), pie_chart_classification = pie_chart_classification, model_roc = model_roc, model_performance_confusion_matrix = model_performance_confusion_matrix))
 }
 
 
@@ -3910,8 +3895,21 @@ automated_embedded_rfe <- function(peaklist, features_to_select = 20, selection_
 # The function takes a peaklist as input (samples/spectra as rows and aligned peaks as columns) and performs feature selection coupled with model training and tuning according to the input parameters. It can automatically select the number of features according to the model performances in the tuning phase or select a fix number of features in the tuning phase: corss-validation is used to adjust the tuning parameters. The best model is selected and returned.
 # Several models undergo training/tuning with a selected number of features (each model selects its own).
 # The function returns a list of models (with the model object, the model ID, the performances, the outcome list, the class list and the features), a matrix listing the cross-validation performances for each model and the feature list (common and for each model).
-model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_tuning = TRUE, model_tuning_mode = "after", selection_metric = "Accuracy", discriminant_attribute = "Class", non_features = c("Sample", "Class"), seed = 12345, automatically_select_features = FALSE, generate_plots = TRUE, cv_repeats_control = 5, k_fold_cv_control = 3, preprocessing = c("center", "scale"), allow_parallelization = TRUE, feature_reranking = FALSE, try_combination_of_parameters = FALSE, outcome_list = c("benign", "malignant")) {
+model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_tuning = TRUE, model_tuning_mode = "after", selection_metric = "Accuracy", discriminant_attribute = "Class", non_features = c("Sample", "Class"), seed = 12345, automatically_select_features = FALSE, generate_plots = TRUE, cv_repeats_control = 5, k_fold_cv_control = 3, preprocessing = c("center", "scale"), allow_parallelization = TRUE, feature_reranking = FALSE, try_combination_of_parameters = FALSE, outcome_list = c("benign", "malignant"), progress_bar = NULL) {
+    # Progress bar (from 0 to 90 % is the feature selection and model tuning, the last 10% is the generation of the model list for the RData file: round the percentage values manually!)
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        install_and_load_required_packages("tcltk")
+        fs_progress_bar <- tkProgressBar(title = "Computing...", label = "", min = 0, max = 1, initial = 0, width = 300)
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        fs_progress_bar <- txtProgressBar(title = "Computing...", label = "", min = 0, max = 1, initial = 0, char = "=", style = 3)
+    }
     ##### Feature selection (embedded method)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0, title = NULL, label = "Partial Least Squares")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0, title = NULL, label = "Partial Least Squares")
+    }
     # Partial Least Squares
     pls_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "pls", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = data.frame(ncomp = 1:5), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
     pls_model <- pls_model_rfe$feature_selection_model
@@ -3922,6 +3920,12 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print("Partial Least Squares")
     print(pls_model_features)
     print(pls_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine\n(with Radial Basis Kernel function)")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine\n(with Radial Basis Kernel function)")
+    }
     # Support Vector Machine (with Radial Basis Kernel function)
     svmRadial_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmRadial", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(sigma = 10^(-5:5), C = 10^(-5:5)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
     svmRadial_model <- svmRadial_model_rfe$feature_selection_model
@@ -3932,6 +3936,12 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print("Support Vector Machine (with Radial Basis Kernel function)")
     print(svmRadial_model_features)
     print(svmRadial_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine\n(with Polynomial Kernel function)")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine\n(with Polynomial Kernel function)")
+    }
     # Support Vector Machine (with Polynomial Kernel function)
     svmPoly_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmPoly", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(C = 10^(-5:5), degree = 1:5, scale = 1), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
     svmPoly_model <- svmPoly_model_rfe$feature_selection_model
@@ -3942,6 +3952,12 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print("Support Vector Machine (with Polynomial Kernel function)")
     print(svmPoly_model_features)
     print(svmPoly_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.36, title = NULL, label = "Random Forest")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.36, title = NULL, label = "Random Forest")
+    }
     # Random Forest
     rf_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "rf", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(mtry = seq(1,5, by = 1)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
     rf_model <- rf_model_rfe$feature_selection_model
@@ -3952,6 +3968,12 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print("Random Forest")
     print(rf_model_features)
     print(rf_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes\nClassifier")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes\nClassifier")
+    }
     # Naive Bayes Classifier
     nbc_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "nb", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = data.frame(fL = seq(0, 1, by = 0.2), usekernel = c(TRUE, FALSE), adjust = c(TRUE, FALSE)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
     nbc_model <- nbc_model_rfe$feature_selection_model
@@ -3962,6 +3984,12 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print("Naive Bayes Classifier")
     print(nbc_model_features)
     print(nbc_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "K-Nearest Neighbor")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "K-Nearest Neighbor")
+    }
     # K-Nearest Neighbor
     knn_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "knn", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(k = seq(1,15, by = 1)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
     knn_model <- knn_model_rfe$feature_selection_model
@@ -3972,6 +4000,12 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print("K-Nearest Neighbor")
     print(knn_model_features)
     print(knn_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.72, title = NULL, label = "Neural Network")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.72, title = NULL, label = "Neural Network")
+    }
     # Neural Network
     nnet_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "nnet", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(size = seq(1,5, by = 1), decay = seq(0,2,by = 1)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
     nnet_model <- nnet_model_rfe$feature_selection_model
@@ -3983,6 +4017,12 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(nnet_model_features)
     print(nnet_model_performance)
     ##### Elements for the RData
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.90, title = NULL, label = "Building model list...")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.90, title = NULL, label = "Building model list...")
+    }
     ### Each model contains: the model object, the class list, the outcome list, the list of features, the model ID and the model performances
     # Partial Least Squares
     PLS_model_list <- list(model = pls_model, class_list = pls_model_class_list, outcome_list = outcome_list, features_model = pls_model_features, model_ID = pls_model_ID, model_performance = pls_model_performance)
@@ -3998,12 +4038,22 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     KNN_model_list <- list(model = knn_model, class_list = knn_model_class_list, outcome_list = outcome_list, features_model = knn_model_features, model_ID = knn_model_ID, model_performance = knn_model_performance)
     # Neural Network
     NNET_model_list <- list(model = nnet_model, class_list = nnet_model_class_list, outcome_list = outcome_list, features_model = nnet_model_features, model_ID = nnet_model_ID, model_performance = nnet_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.95, title = NULL, label = NULL)
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.95, title = NULL, label = NULL)
+    }
     ### Build the final model list (to be exported) (each element has the proper name of the model)
     model_list <- list("SVM Radial Basis" = RSVM_model_list, "SVM Polynomial" = PSVM_model_list, "Partial Least Squares" = PLS_model_list, "Random Forest" = RF_model_list, "Naive Bayes Classifier" = NBC_model_list, "K-Nearest Neighbor" = KNN_model_list, "Neural Network" = NNET_model_list)
     ### Build the final feature vector
     feature_list <- extract_feature_list_from_model_list(filepath_R = model_list, model_list_object = "model_list", features_to_return = features_to_select)
     ### Build the matrix with the model performances
     model_performance_matrix <- extract_performance_matrix_from_model_list(filepath_R = model_list, model_list_object = "model_list")
+    # Progress bar
+    if (!is.null(progress_bar)) {
+        close(fs_progress_bar)
+    }
     ##### Return
     return(list(model_list = model_list, feature_list = feature_list, model_performance_matrix = model_performance_matrix))
 }
@@ -6366,7 +6416,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.13.1"
+R_script_version <- "2017.04.19.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -6567,7 +6617,7 @@ download_updates_function <- function() {
             file_downloaded <- TRUE
         }, silent = TRUE)
         if (file_downloaded == TRUE) {
-            tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
+            tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", paste(script_file_name, " (", online_version_number, ").R", sep = ""), "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
             tkmessageBox(title = "Changelog", message = paste("The updated script contains the following changes:\n", online_change_log, sep = ""), icon = "info")
         } else {
             tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url, sep = ""), icon = "warning")
@@ -6819,8 +6869,9 @@ preprocessing_window_function <- function() {
     normalization_mass_range2 <- tclVar("")
     ##### Window
     preproc_window <- tktoplevel(bg = "white")
+    tkwm.resizable(preproc_window, FALSE, FALSE)
     tktitle(preproc_window) <- "Spectral preprocessing parameters"
-    tkpack.propagate(preproc_window, FALSE)
+    #tkpack.propagate(preproc_window, FALSE)
     # Mass range
     mass_range_label <- tklabel(preproc_window, text = "Mass range", font = label_font, bg = "white", width = 20)
     mass_range_entry <- tkentry(preproc_window, width = 15, textvariable = mass_range2, font = entry_font, bg = "white", width = 20)
@@ -7001,7 +7052,7 @@ peak_picking_mode_choice <- function() {
     # Set the value of the displaying label
     peak_picking_mode_value <- peak_picking_mode
     if (peak_picking_mode_value == "all") {
-        peak_picking_mode_value <- "        all        "
+        peak_picking_mode_value <- "all"
     }
     peak_picking_mode_value_label <- tklabel(window, text = peak_picking_mode_value, font = label_font, bg = "white", width = 20)
     tkgrid(peak_picking_mode_value_label, row = 3, column = 2, padx = c(10, 10), pady = c(10, 10))
@@ -7021,7 +7072,7 @@ peak_picking_algorithm_choice <- function() {
     # Set the value of the displaying label
     peak_picking_algorithm_value <- peak_picking_algorithm
     if (peak_picking_algorithm_value == "MAD") {
-        peak_picking_algorithm_value <- "          MAD          "
+        peak_picking_algorithm_value <- "MAD"
     } else if (peak_picking_algorithm_value == "SuperSmoother") {
         peak_picking_algorithm_value <- "Super Smoother"
     }
@@ -7047,7 +7098,7 @@ peaks_deisotoping_choice <- function() {
     if (peaks_deisotoping == TRUE) {
         peaks_deisotoping_value <- "YES"
     } else {
-        peaks_deisotoping_value <- "  NO  "
+        peaks_deisotoping_value <- "NO"
     }
     peaks_deisotoping_value_label <- tklabel(window, text = peaks_deisotoping_value, font = label_font, bg = "white", width = 20)
     tkgrid(peaks_deisotoping_value_label, row = 5, column = 6, padx = c(10, 10), pady = c(10, 10))
@@ -7073,7 +7124,7 @@ allow_parallelization_choice <- function() {
     if (allow_parallelization == TRUE) {
         allow_parallelization_value <- "YES"
     } else {
-        allow_parallelization_value <- "  NO  "
+        allow_parallelization_value <- "NO"
     }
     allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font, bg = "white", width = 20)
     tkgrid(allow_parallelization_value_label, row = 6, column = 4, padx = c(10, 10), pady = c(10, 10))
@@ -7097,7 +7148,7 @@ average_replicates_choice <- function() {
     if (average_replicates == TRUE) {
         average_replicates_value <- "YES"
     } else {
-        average_replicates_value <- "  NO  "
+        average_replicates_value <- "NO"
     }
     average_replicates_value_label <- tklabel(window, text = average_replicates_value, font = label_font, bg = "white", width = 20)
     tkgrid(average_replicates_value_label, row = 6, column = 2, padx = c(10, 10), pady = c(10, 10))
@@ -7117,7 +7168,7 @@ low_intensity_peak_removal_threshold_method_choice <- function() {
     # Set the value of the displaying label
     low_intensity_peak_removal_threshold_method_value <- low_intensity_peak_removal_threshold_method
     if (low_intensity_peak_removal_threshold_method_value == "whole") {
-        low_intensity_peak_removal_threshold_method <- "              whole               "
+        low_intensity_peak_removal_threshold_method <- "whole"
     }
     low_intensity_peak_removal_threshold_method_value_label <- tklabel(window, text = low_intensity_peak_removal_threshold_method_value, font = label_font, bg = "white", width = 20)
     tkgrid(low_intensity_peak_removal_threshold_method_value_label, row = 4, column = 6, padx = c(10, 10), pady = c(10, 10))
@@ -7641,9 +7692,10 @@ if (system_os == "Windows") {
 
 
 
-# The "area" where we will put our input lines
+# The "area" where we will put our input lines (not resizable)
 window <- tktoplevel(bg = "white")
-tkpack.propagate(window, FALSE)
+#tkpack.propagate(window, FALSE)
+tkwm.resizable(window, FALSE, FALSE)
 tktitle(window) <- "PEAKLIST EXPORT"
 #### Browse
 # Title label
