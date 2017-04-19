@@ -6413,7 +6413,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.1"
+R_script_version <- "2017.04.19.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -6876,8 +6876,9 @@ preprocessing_window_function <- function() {
     normalization_mass_range2 <- tclVar("")
     ##### Window
     preproc_window <- tktoplevel(bg = "white")
+    tkwm.resizable(preproc_window, FALSE, FALSE)
     tktitle(preproc_window) <- "Spectral preprocessing parameters"
-    tkpack.propagate(preproc_window, FALSE)
+    #tkpack.propagate(preproc_window, FALSE)
     # Mass range
     mass_range_label <- tklabel(preproc_window, text = "Mass range", font = label_font, bg = "white", width = 20)
     mass_range_entry <- tkentry(preproc_window, width = 15, textvariable = mass_range2, font = entry_font, bg = "white", width = 20)
@@ -7675,7 +7676,8 @@ if (system_os == "Windows") {
 
 # The "area" where we will put our input lines
 window <- tktoplevel(bg = "white")
-tkpack.propagate(window, FALSE)
+tkwm.resizable(window, FALSE, FALSE)
+#tkpack.propagate(window, FALSE)
 tktitle(window) <- "MS PIXEL TYPER"
 # Title label
 title_label <- tklabel(window, text = "MS PIXEL TYPER", font = title_font, bg = "white")
