@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.19 ##################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.20 ##################
 
 ########################################################################## MISC
 
@@ -3922,9 +3922,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(pls_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine\n(with Radial Basis Kernel function)")
+        setTkProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "RBF Support Vector Machines")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine\n(with Radial Basis Kernel function)")
+        setTxtProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "RBF Support Vector Machines")
     }
     # Support Vector Machine (with Radial Basis Kernel function)
     svmRadial_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmRadial", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(sigma = 10^(-5:5), C = 10^(-5:5)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3938,9 +3938,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(svmRadial_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine\n(with Polynomial Kernel function)")
+        setTkProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Polynomial Support Vector Machines")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine\n(with Polynomial Kernel function)")
+        setTxtProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Polynomial Support Vector Machines")
     }
     # Support Vector Machine (with Polynomial Kernel function)
     svmPoly_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmPoly", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(C = 10^(-5:5), degree = 1:5, scale = 1), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3970,9 +3970,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(rf_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes\nClassifier")
+        setTkProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes Classifier")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes\nClassifier")
+        setTxtProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes Classifier")
     }
     # Naive Bayes Classifier
     nbc_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "nb", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = data.frame(fL = seq(0, 1, by = 0.2), usekernel = c(TRUE, FALSE), adjust = c(TRUE, FALSE)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3986,9 +3986,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(nbc_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "K-Nearest Neighbor")
+        setTkProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "k-Nearest Neighbor")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "K-Nearest Neighbor")
+        setTxtProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "k-Nearest Neighbor")
     }
     # K-Nearest Neighbor
     knn_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "knn", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(k = seq(1,15, by = 1)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3997,7 +3997,7 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     knn_model_class_list <- knn_model_rfe$class_list
     knn_model_ID <- "knn"
     knn_model_performance <- knn_model_rfe$fs_model_performance
-    print("K-Nearest Neighbor")
+    print("k-Nearest Neighbor")
     print(knn_model_features)
     print(knn_model_performance)
     # Progress bar
@@ -4045,7 +4045,7 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
         setTxtProgressBar(fs_progress_bar, value = 0.95, title = NULL, label = NULL)
     }
     ### Build the final model list (to be exported) (each element has the proper name of the model)
-    model_list <- list("SVM Radial Basis" = RSVM_model_list, "SVM Polynomial" = PSVM_model_list, "Partial Least Squares" = PLS_model_list, "Random Forest" = RF_model_list, "Naive Bayes Classifier" = NBC_model_list, "K-Nearest Neighbor" = KNN_model_list, "Neural Network" = NNET_model_list)
+    model_list <- list("SVM Radial Basis" = RSVM_model_list, "SVM Polynomial" = PSVM_model_list, "Partial Least Squares" = PLS_model_list, "Random Forest" = RF_model_list, "Naive Bayes Classifier" = NBC_model_list, "k-Nearest Neighbor" = KNN_model_list, "Neural Network" = NNET_model_list)
     ### Build the final feature vector
     feature_list <- extract_feature_list_from_model_list(filepath_R = model_list, model_list_object = "model_list", features_to_return = features_to_select)
     ### Build the matrix with the model performances
@@ -6413,13 +6413,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.1"
+R_script_version <- "2017.04.20.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/ENSEMBLE%20MS%20TUNER.R"
 ### Name of the file when downloaded
 script_file_name <- "ENSEMBLE MS TUNER"
 # Change log
-change_log <- "1. New software"
+change_log <- "1. New software\n2. GUI fixes"
 
 
 
@@ -6552,7 +6552,7 @@ check_for_updates_function <- function() {
             } else {
                 if (update_available == TRUE) {
                     # Update the label
-                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
+                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available:\n", online_version_number, sep = "")
                 } else {
                     # Update the label
                     check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
@@ -7222,16 +7222,16 @@ outcome_list_entry <- tkbutton(window, text = "SET OUTCOME\nLIST...", command = 
 # Updates
 download_updates_button <- tkbutton(window, text = "DOWNLOAD\nUPDATE", command = download_updates_function, font = button_font, bg = "white", width = 20)
 # Features to select
-features_to_select_entry <- tkentry(window, textvariable = features_to_select, font = entry_font, bg = "white", width = 20)
+features_to_select_entry <- tkentry(window, textvariable = features_to_select, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(features_to_select_entry, "end", "20")
 # CV repeats control
-cv_repeats_control_entry <- tkentry(window, textvariable = cv_repeats_control, font = entry_font, bg = "white", width = 20)
+cv_repeats_control_entry <- tkentry(window, textvariable = cv_repeats_control, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(cv_repeats_control_entry, "end", "5")
 # k-fold CV control
-k_fold_cv_control_entry <- tkentry(window, width = 10, textvariable = k_fold_cv_control, font = entry_font, bg = "white", width = 20)
+k_fold_cv_control_entry <- tkentry(window, textvariable = k_fold_cv_control, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(k_fold_cv_control_entry, "end", "10")
 # Filename export
-filename_export_entry <- tkentry(window, width = 10, textvariable = filename_export, font = entry_font, bg = "white", width = 20)
+filename_export_entry <- tkentry(window, textvariable = filename_export, font = entry_font, bg = "white", width = 50, justify = "center")
 tkinsert(filename_export_entry, "end", "Model list MS")
 
 #### Displaying labels
@@ -7278,7 +7278,7 @@ tkgrid(allow_parallelization_button, row = 5, column = 2, padx = c(10, 10), pady
 tkgrid(allow_parallelization_value_label, row = 5, column = 3, padx = c(10, 10), pady = c(10, 10))
 tkgrid(outcome_list_entry, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
 tkgrid(outcome_list_value_label, row = 5, column = 5, padx = c(10, 10), pady = c(10, 10))
-tkgrid(filename_export_entry, row = 6, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(filename_export_entry, row = 6, column = 2, columnspan = 2, padx = c(10, 10), pady = c(10, 10))
 tkgrid(filename_export_label, row = 6, column = 4, padx = c(10, 10), pady = c(10, 10))
 tkgrid(file_type_export_matrix_entry, row = 6, column = 5, padx = c(10, 10), pady = c(10, 10))
 tkgrid(file_type_export_matrix_value_label, row = 6, column = 6, padx = c(10, 10), pady = c(10, 10))
