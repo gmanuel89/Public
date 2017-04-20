@@ -6413,7 +6413,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.2"
+R_script_version <- "2017.04.20.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MS%20PIXEL%20TYPER.R"
 ### Name of the file when downloaded
@@ -6582,7 +6582,7 @@ check_for_updates_function <- function() {
             } else {
                 if (update_available == TRUE) {
                     # Update the label
-                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
+                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available:\n", online_version_number, sep = "")
                 } else {
                     # Update the label
                     check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
@@ -7226,6 +7226,8 @@ run_ms_pixel_typer_function <- function() {
         setTkProgressBar(program_progress_bar, value = 0.25, title = NULL, label = "25 %")
         ########## Run the classification function
         classification_of_patients <- spectral_classification(spectra_path = filepath_import, filepath_R = filepath_R, model_list_object = "model_list", classification_mode = classification_mode, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = peaks_deisotoping, preprocessing_parameters = preprocessing_parameters, tof_mode = tof_mode, allow_parallelization = allow_parallelization, decision_method_ensemble = decision_method_ensemble, vote_weights_ensemble = vote_weights_ensemble, pixel_grouping = pixel_grouping, moving_window_size = moving_window_size, number_of_hca_nodes = number_of_hca_nodes, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 50, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = plot_legends)
+        # Escape the function
+        .GlobalEnv$classification_of_patients <- classification_of_patients
         setTkProgressBar(program_progress_bar, value = 0.75, title = NULL, label = "75 %")
         if (files_dumped == FALSE) {
             # Dump the files
@@ -7233,7 +7235,6 @@ run_ms_pixel_typer_function <- function() {
             files_dumped <- TRUE
         }
         # Escape the function
-        .GlobalEnv$classification_of_patients <- classification_of_patients
         .GlobalEnv$files_dumped <- files_dumped
         # Progress bar
         setTkProgressBar(program_progress_bar, value = 1.00, title = NULL, label = "100 %")
