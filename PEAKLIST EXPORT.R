@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.19 ##################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.20 ##################
 
 ########################################################################## MISC
 
@@ -3922,9 +3922,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(pls_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine\n(with Radial Basis Kernel function)")
+        setTkProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "RBF Support Vector Machines")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "Support Vector Machine\n(with Radial Basis Kernel function)")
+        setTxtProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "RBF Support Vector Machines")
     }
     # Support Vector Machine (with Radial Basis Kernel function)
     svmRadial_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmRadial", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(sigma = 10^(-5:5), C = 10^(-5:5)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3938,9 +3938,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(svmRadial_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine\n(with Polynomial Kernel function)")
+        setTkProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Polynomial Support Vector Machines")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Support Vector Machine\n(with Polynomial Kernel function)")
+        setTxtProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Polynomial Support Vector Machines")
     }
     # Support Vector Machine (with Polynomial Kernel function)
     svmPoly_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmPoly", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(C = 10^(-5:5), degree = 1:5, scale = 1), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3970,9 +3970,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(rf_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes\nClassifier")
+        setTkProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes Classifier")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes\nClassifier")
+        setTxtProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes Classifier")
     }
     # Naive Bayes Classifier
     nbc_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "nb", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = data.frame(fL = seq(0, 1, by = 0.2), usekernel = c(TRUE, FALSE), adjust = c(TRUE, FALSE)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3986,9 +3986,9 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     print(nbc_model_performance)
     # Progress bar
     if (!is.null(progress_bar) && progress_bar == "tcltk") {
-        setTkProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "K-Nearest Neighbor")
+        setTkProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "k-Nearest Neighbor")
     } else if (!is.null(progress_bar) && progress_bar == "txt") {
-        setTxtProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "K-Nearest Neighbor")
+        setTxtProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "k-Nearest Neighbor")
     }
     # K-Nearest Neighbor
     knn_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "knn", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(k = seq(1,15, by = 1)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
@@ -3997,7 +3997,7 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
     knn_model_class_list <- knn_model_rfe$class_list
     knn_model_ID <- "knn"
     knn_model_performance <- knn_model_rfe$fs_model_performance
-    print("K-Nearest Neighbor")
+    print("k-Nearest Neighbor")
     print(knn_model_features)
     print(knn_model_performance)
     # Progress bar
@@ -4045,7 +4045,7 @@ model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_
         setTxtProgressBar(fs_progress_bar, value = 0.95, title = NULL, label = NULL)
     }
     ### Build the final model list (to be exported) (each element has the proper name of the model)
-    model_list <- list("SVM Radial Basis" = RSVM_model_list, "SVM Polynomial" = PSVM_model_list, "Partial Least Squares" = PLS_model_list, "Random Forest" = RF_model_list, "Naive Bayes Classifier" = NBC_model_list, "K-Nearest Neighbor" = KNN_model_list, "Neural Network" = NNET_model_list)
+    model_list <- list("SVM Radial Basis" = RSVM_model_list, "SVM Polynomial" = PSVM_model_list, "Partial Least Squares" = PLS_model_list, "Random Forest" = RF_model_list, "Naive Bayes Classifier" = NBC_model_list, "k-Nearest Neighbor" = KNN_model_list, "Neural Network" = NNET_model_list)
     ### Build the final feature vector
     feature_list <- extract_feature_list_from_model_list(filepath_R = model_list, model_list_object = "model_list", features_to_return = features_to_select)
     ### Build the matrix with the model performances
@@ -6416,13 +6416,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.0"
+R_script_version <- "2017.04.21.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
 script_file_name <- "PEAKLIST EXPORT"
 # Change log
-change_log <- "1. Preselection of entries\n2. Fixed GUI"
+change_log <- "1. Fixed GUI"
 
 
 
@@ -6575,7 +6575,7 @@ check_for_updates_function <- function() {
             } else {
                 if (update_available == TRUE) {
                     # Update the label
-                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
+                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available:\n", online_version_number, sep = "")
                 } else {
                     # Update the label
                     check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
@@ -6724,7 +6724,7 @@ preprocessing_window_function <- function() {
         if (baseline_subtraction == TRUE && baseline_subtraction_algorithm != "SNIP") {
             baseline_subtraction_value <- paste("YES", "\n( ", baseline_subtraction_algorithm, " )\n", sep = "")
         } else if (baseline_subtraction == TRUE && baseline_subtraction_algorithm == "SNIP") {
-            baseline_subtraction_value <- paste("YES", "\n( ", baseline_subtraction_algorithm, ",\niterations:", baseline_subtraction_iterations, " )", sep = "")
+            baseline_subtraction_value <- paste("YES", "\n( ", baseline_subtraction_algorithm, ",\niterations: ", baseline_subtraction_iterations, " )", sep = "")
         } else {
             baseline_subtraction_value <- "NO"
         }
@@ -6874,11 +6874,11 @@ preprocessing_window_function <- function() {
     #tkpack.propagate(preproc_window, FALSE)
     # Mass range
     mass_range_label <- tklabel(preproc_window, text = "Mass range", font = label_font, bg = "white", width = 20)
-    mass_range_entry <- tkentry(preproc_window, width = 15, textvariable = mass_range2, font = entry_font, bg = "white", width = 20)
+    mass_range_entry <- tkentry(preproc_window, textvariable = mass_range2, font = entry_font, bg = "white", width = 20, justify = "center")
     tkinsert(mass_range_entry, "end", as.character(paste(mass_range[1],",",mass_range[2])))
     # Preprocessing (in packages of)
     preprocess_spectra_in_packages_of_label <- tklabel(preproc_window, text="Preprocess spectra\nin packages of", font = label_font, bg = "white", width = 20)
-    preprocess_spectra_in_packages_of_entry <- tkentry(preproc_window, width = 10, textvariable = preprocess_spectra_in_packages_of2, font = entry_font, bg = "white", width = 20)
+    preprocess_spectra_in_packages_of_entry <- tkentry(preproc_window, textvariable = preprocess_spectra_in_packages_of2, font = entry_font, bg = "white", width = 10, justify = "center")
     tkinsert(preprocess_spectra_in_packages_of_entry, "end", as.character(preprocess_spectra_in_packages_of))
     # Tof mode
     tof_mode_label <- tklabel(preproc_window, text="Select the TOF mode", font = label_font, bg = "white", width = 20)
@@ -6889,11 +6889,11 @@ preprocessing_window_function <- function() {
     smoothing_button <- tkbutton(preproc_window, text="Smoothing", command = smoothing_choice, font = button_font, bg = "white", width = 20)
     # Baseline subtraction
     baseline_subtraction_button <- tkbutton(preproc_window, text="Baseline subtraction", command = baseline_subtraction_choice, font = button_font, bg = "white", width = 20)
-    baseline_subtraction_iterations_entry <- tkentry(preproc_window, width = 15, textvariable = baseline_subtraction_iterations2, font = entry_font, bg = "white", width = 20)
+    baseline_subtraction_iterations_entry <- tkentry(preproc_window, textvariable = baseline_subtraction_iterations2, font = entry_font, bg = "white", width = 10, justify = "center")
     tkinsert(baseline_subtraction_iterations_entry, "end", as.character(baseline_subtraction_iterations))
     # Normalization
     normalization_button <- tkbutton(preproc_window, text="Normalization", command = normalization_choice, font = button_font, bg = "white", width = 20)
-    normalization_mass_range_entry <- tkentry(preproc_window, width = 15, textvariable = normalization_mass_range2, font = entry_font, bg = "white", width = 20)
+    normalization_mass_range_entry <- tkentry(preproc_window, textvariable = normalization_mass_range2, font = entry_font, bg = "white", width = 20, justify = "center")
     tkinsert(normalization_mass_range_entry, "end", as.character(normalization_mass_range))
     # Spectral alignment
     spectral_alignment_button <- tkbutton(preproc_window, text="Align spectra", command = spectral_alignment_choice, font = button_font, bg = "white", width = 20)
@@ -7101,7 +7101,7 @@ peaks_deisotoping_choice <- function() {
         peaks_deisotoping_value <- "NO"
     }
     peaks_deisotoping_value_label <- tklabel(window, text = peaks_deisotoping_value, font = label_font, bg = "white", width = 20)
-    tkgrid(peaks_deisotoping_value_label, row = 5, column = 6, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(peaks_deisotoping_value_label, row = 3, column = 6, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$peaks_deisotoping <- peaks_deisotoping
     .GlobalEnv$peaks_deisotoping_value <- peaks_deisotoping_value
@@ -7522,6 +7522,11 @@ dump_spectra_files_function <- function() {
     }
 }
 
+##### Show info function
+show_info_function <- function() {
+    tkmessageBox(title = "Info", message = "No spectra have been imported yet or not peak picking has been performed!", icon = "info")
+}
+
 
 
 
@@ -7699,7 +7704,7 @@ tkwm.resizable(window, FALSE, FALSE)
 tktitle(window) <- "PEAKLIST EXPORT"
 #### Browse
 # Title label
-title_label <- tklabel(window, text="PEAKLIST EXPORT", font = title_font, bg = "white")
+title_label <- tkbutton(window, text = "PEAKLIST EXPORT", command = show_info_function, font = title_font, bg = "white", relief = "flat")
 # Library
 select_samples_button <- tkbutton(window, text="BROWSE\nSPECTRA...", command = select_samples_function, font = button_font, bg = "white", width = 20)
 # Output
@@ -7711,21 +7716,21 @@ peak_picking_mode_entry <- tkbutton(window, text="PEAK PICKING\nMODE", command =
 peak_picking_algorithm_entry <- tkbutton(window, text="PEAK PICKING\nALGORITHM", command = peak_picking_algorithm_choice, font = button_font, bg = "white", width = 20)
 # Signals to take
 signals_to_take_label <- tklabel(window, text="Most intense signals\nto take\n(if 'most intense'\nis selected)", font = button_font, bg = "white", width = 20)
-signals_to_take_entry <- tkentry(window, width = 10, textvariable = signals_to_take, font = entry_font, bg = "white", width = 20)
+signals_to_take_entry <- tkentry(window, textvariable = signals_to_take, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(signals_to_take_entry, "end", "25")
 # SNR
 SNR_label <- tklabel(window, text="Signal-to-noise\nratio", font = button_font, bg = "white", width = 20)
-SNR_entry <- tkentry(window, width = 10, textvariable = SNR, font = entry_font, bg = "white", width = 20)
+SNR_entry <- tkentry(window, textvariable = SNR, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(SNR_entry, "end", "3")
 # Peaks filtering threshold
 peaks_filtering_threshold_percent_label <- tklabel(window, text="Peak filtering\nthreshold\nfrequency percentage", font = button_font, bg = "white", width = 20)
-peaks_filtering_threshold_percent_entry <- tkentry(window, width = 10, textvariable = peaks_filtering_threshold_percent, font = entry_font, bg = "white", width = 20)
+peaks_filtering_threshold_percent_entry <- tkentry(window, textvariable = peaks_filtering_threshold_percent, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(peaks_filtering_threshold_percent_entry, "end", "5")
 # Peaks deisotoping
 peaks_deisotoping_entry <- tkbutton(window, text="PEAK\nDEISOTOPING", command = peaks_deisotoping_choice, font = button_font, bg = "white", width = 20)
 # Intensity percentage threshold
 low_intensity_peak_removal_threshold_percent_label <- tklabel(window, text="Low-intensity peak\nremoval\npercentage threshold", font = button_font, bg = "white", width = 20)
-low_intensity_peak_removal_threshold_percent_entry <- tkentry(window, width = 10, textvariable = low_intensity_peak_removal_threshold_percent, font = entry_font, bg = "white", width = 20)
+low_intensity_peak_removal_threshold_percent_entry <- tkentry(window, textvariable = low_intensity_peak_removal_threshold_percent, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(low_intensity_peak_removal_threshold_percent_entry, "end", "0")
 # Intensiry percentage theshold method
 low_intensity_peak_removal_threshold_method_entry <- tkbutton(window, text="INTENSITY\nTHRESHOLD\nMETHOD", command = low_intensity_peak_removal_threshold_method_choice, font = button_font, bg = "white", width = 20)
@@ -7754,7 +7759,7 @@ allow_parallelization_button <- tkbutton(window, text="ALLOW\nPARALLEL\nCOMPUTIN
 spectra_preprocessing_button <- tkbutton(window, text="SPECTRA\nPREPROCESSING\nPARAMETERS...", command = preprocessing_window_function, font = button_font, bg = "white", width = 20)
 # Set the file name
 set_file_name_label <- tklabel(window, text="<--- Set the file name", font = label_font, bg = "white", width = 20)
-set_file_name_entry <- tkentry(window, textvariable = file_name, font = entry_font, bg = "white", width = 20)
+set_file_name_entry <- tkentry(window, textvariable = file_name, font = entry_font, bg = "white", width = 40, justify = "center")
 tkinsert(set_file_name_entry, "end", "Peaklist")
 # Updates
 download_updates_button <- tkbutton(window, text="DOWNLOAD\nUPDATE...", command = download_updates_function, font = button_font, bg = "white", width = 20)
@@ -7785,10 +7790,10 @@ tkgrid(signals_to_take_label, row = 3, column = 3, padx = c(10, 10), pady = c(10
 tkgrid(signals_to_take_entry, row = 3, column = 4, padx = c(10, 10), pady = c(10, 10))
 tkgrid(SNR_label, row = 2, column = 5, padx = c(10, 10), pady = c(10, 10))
 tkgrid(SNR_entry, row = 2, column = 6, padx = c(10, 10), pady = c(10, 10))
-tkgrid(peaks_filtering_threshold_percent_label, row = 5, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(peaks_filtering_threshold_percent_entry, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(peaks_deisotoping_entry, row = 5, column = 5, padx = c(10, 10), pady = c(10, 10))
-tkgrid(peaks_deisotoping_value_label, row = 5, column = 6, padx = c(10, 10), pady = c(10, 10))
+tkgrid(peaks_filtering_threshold_percent_label, row = 4, column = 1, padx = c(10, 10), pady = c(10, 10))
+tkgrid(peaks_filtering_threshold_percent_entry, row = 4, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(peaks_deisotoping_entry, row = 3, column = 5, padx = c(10, 10), pady = c(10, 10))
+tkgrid(peaks_deisotoping_value_label, row = 3, column = 6, padx = c(10, 10), pady = c(10, 10))
 tkgrid(low_intensity_peak_removal_threshold_percent_label, row = 4, column = 3, padx = c(10, 10), pady = c(10, 10))
 tkgrid(low_intensity_peak_removal_threshold_percent_entry, row = 4, column = 4, padx = c(10, 10), pady = c(10, 10))
 tkgrid(low_intensity_peak_removal_threshold_method_entry, row = 4, column = 5, padx = c(10, 10), pady = c(10, 10))
@@ -7812,6 +7817,7 @@ tkgrid(dump_spectra_files_button, row = 8, column = 5, padx = c(10, 10), pady = 
 tkgrid(end_session_button, row = 8, column = 6, padx = c(10, 10), pady = c(10, 10))
 tkgrid(download_updates_button, row = 1, column = 5, padx = c(10, 10), pady = c(10, 10))
 tkgrid(check_for_updates_value_label, row = 1, column = 6, padx = c(10, 10), pady = c(10, 10))
+
 
 
 
