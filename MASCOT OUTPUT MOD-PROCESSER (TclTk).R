@@ -7,7 +7,7 @@
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.0"
+R_script_version <- "2017.04.27.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MASCOT%20OUTPUT%20MOD-PROCESSER.R"
 ### Name of the file when downloaded
@@ -219,7 +219,7 @@ check_for_updates_function <- function() {
             } else {
                 if (update_available == TRUE) {
                     # Update the label
-                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
+                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available:\n", online_version_number, sep = "")
                 } else {
                     # Update the label
                     check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
@@ -320,7 +320,7 @@ file_import_function <- function() {
     if (!nchar(input_file)) {
         tkmessageBox(message = "No file selected")
     } else {
-        tkmessageBox(message = paste("The following file will be read:", input_file))
+        tkmessageBox(message = paste("The following file will be read:\n\n", input_file))
     }
     if (input_file != "") {
         #################### IMPORT THE DATA FROM THE FILE
@@ -332,13 +332,29 @@ file_import_function <- function() {
             ##### CSV
             input_data <- read.csv(input_file, header = TRUE, sep = ",")
         }
+        ### Retrieve the input file name
+        input_filename <- NULL
+        try({
+            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                input_filename <- unlist(strsplit(input_file, "/"))
+                input_filename <- input_filename[length(input_filename)]
+                input_filename <- unlist(strsplit(input_filename, ".", fixed = TRUE))[1]
+            } else if (Sys.info()[1] == "Windows") {
+                input_filename <- unlist(strsplit(input_file, "\\\\"))
+                input_filename <- input_filename[length(input_filename)]
+                input_filename <- unlist(strsplit(input_filename, ".", fixed = TRUE))[1]
+            }
+        }, silent = TRUE)
         # Escape the function
         .GlobalEnv$input_file <- input_file
+        .GlobalEnv$input_filename <- input_filename
         .GlobalEnv$input_data <- input_data
         tkmessageBox(title = "File imported", message = "The file has been successfully imported!", icon = "info")
     } else {
         # Escape the function
         .GlobalEnv$input_file <- input_file
+        .GlobalEnv$input_filename <- NULL
+        .GlobalEnv$input_data <- NULL
         tkmessageBox(title = "No input file selected", message = "No input file has been selected!!!\nPlease, select a file to be imported", icon = "warning")
     }
 }
@@ -536,11 +552,20 @@ run_mascot_output_modprocesser_function <- function() {
         
         
         ########## SAVE FILES
+        if (is.null(input_filename)) {
+            input_filename <- "Input Data"
+        }
         if (file_format == "csv") {
+            write.csv(input_data, file = paste(input_filename, ".", file_format, sep = ""), row.names = FALSE)
             write.csv(non_modified_peptides_df, file = paste("Non-modified peptides.", file_format, sep = ""), row.names = FALSE)
             write.csv(modified_peptides_df, file = paste("Modified peptides.", file_format, sep = ""), row.names = FALSE)
             write.csv(modified_peptides_df_sequences, file = paste("Modified peptides (unique sequences).", file_format, sep = ""), row.names = FALSE)
         } else if (file_format == "xlsx" || file_format == "xls") {
+            wb = loadWorkbook(filename = paste(input_filename, ".", file_format, sep = ""), create = TRUE)
+            createSheet(wb, name = "Input data")
+            writeWorksheet(wb, data = input_data, sheet = "Input data", header = TRUE)
+            saveWorkbook(wb)
+            
             wb = loadWorkbook(filename = paste("Non-modified peptides.", file_format, sep = ""), create = TRUE)
             createSheet(wb, name = "Non-modified peptides")
             writeWorksheet(wb, data = non_modified_peptides_df, sheet = "Non-modified peptides", header = TRUE)
