@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.03.29 ####################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.04.28 ##################
 
 ########################################################################## MISC
 
@@ -6,8 +6,27 @@
 # This function checks if there is internet connection, by pinging a website. It returns TRUE or FALSE.
 # Two methods are available: 'ping' tries to ping the website, while 'getURL' connects to it directly. The default is 'getURL', since it is more reliable than ping.
 check_internet_connection <- function(method = "getURL", website_to_ping = "www.google.it") {
+    ##### Start with getURL...
+    there_is_internet <- FALSE
+    ##### GET URL
+    if (method == "getURL") {
+        try({
+            # Install the RCurl package if not installed
+            if ("RCurl" %in% installed.packages()[,1]) {
+                library(RCurl)
+            } else {
+                install.packages("RCurl", repos = "http://cran.mirror.garr.it/mirrors/CRAN/", quiet = TRUE, verbose = FALSE)
+                library(RCurl)
+            }
+        }, silent = TRUE)
+        there_is_internet <- FALSE
+        try({
+            there_is_internet <- is.character(getURL(u = website_to_ping, followLocation = TRUE, .opts = list(timeout = 1, maxredirs = 2, verbose = FALSE)))
+            }, silent = TRUE)
+    }
+    ##### If getURL failed... Go back to ping (which should never fail)
     ##### PING
-    if (method == "ping") {
+    if (method == "ping" || there_is_internet == FALSE) {
         if (Sys.info()[1] == "Linux") {
             # -c: number of packets sent/received (attempts) ; -W timeout in seconds
             there_is_internet <- !as.logical(system(command = paste("ping -c 1 -W 2", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
@@ -17,19 +36,6 @@ check_internet_connection <- function(method = "getURL", website_to_ping = "www.
         } else {
             there_is_internet <- !as.logical(system(command = paste("ping", website_to_ping), intern = FALSE, ignore.stdout = TRUE, ignore.stderr = TRUE))
         }
-    } else if (method == "getURL") {
-        ##### GET URL
-        # Install the RCurl package if not installed
-        if ("RCurl" %in% installed.packages()[,1]) {
-            library(RCurl)
-        } else {
-            install.packages("RCurl", repos = "http://cran.mirror.garr.it/mirrors/CRAN/", quiet = TRUE, verbose = FALSE)
-            library(RCurl)
-        }
-        there_is_internet <- FALSE
-        try({
-            there_is_internet <- is.character(getURL(u = website_to_ping, followLocation = TRUE, .opts = list(timeout = 1, maxredirs = 2, verbose = FALSE)))
-            }, silent = TRUE)
     }
     return(there_is_internet)
 }
@@ -171,7 +177,6 @@ ensemble_vote_classification <- function(classification_matrix, class_list = NUL
         # Extract the levels
         class_list <- levels(class_vector)
     }
-    
     ########## Vote
     ##### Majority vote
     if (decision_method == "majority" && vote_weights == "equal") {
@@ -444,6 +449,9 @@ outcome_and_class_to_MS <- function(class_list = c("HP", "PTC"), outcome_list = 
     class_outcome_matrix[,4] <- cbind(outcome_list_as_color)
     ### Convert the class vector (if not null)
     if (!is.null(class_vector)) {
+        # Store the vector names
+        class_vector_names <- names(class_vector)
+        # Replace the character with a number
         for (cv in 1:length(class_vector)) {
             for (ou in 1:length(class_outcome_matrix[, "Class"])) {
                 if (is.na(class_vector[cv])) {
@@ -453,10 +461,13 @@ outcome_and_class_to_MS <- function(class_list = c("HP", "PTC"), outcome_list = 
                 }
             }
         }
+        # Convert the final vector into numeric
+        class_vector <- as.numeric(class_vector)
+        # Fix the names
+        if (!is.null(class_vector_names)) {
+            names(class_vector) <- class_vector_names
+        }
     }
-    # Convert the final vector into numeric
-    class_vector <- as.numeric(class_vector)
-    ### 
     ### Return
     return(list(class_outcome_matrix = class_outcome_matrix, class_vector_as_numeric = class_vector, legend_text = class_list, legend_fill = outcome_list_as_color))
 }
@@ -1540,7 +1551,142 @@ replace_sample_name <- function(spectra, spectra_format = "imzml", allow_paralle
 
 
 
-#########################################################################
+################################################################################
+
+
+
+
+
+#################################################### SPECTRA GROUPING (CLASSES)
+# The functions takes a list of already preprocessed spectra (MALDIquant) and generates a list of representative spectra, averaging spectra according to the class they belong to, generating one average spectrum per class.
+group_spectra_class <- function (spectra, class_list, method = "mean", spectra_format = "imzml", class_in_file_name = TRUE) {
+    class_list <- sort(class_list)
+    ####### IMZML
+    if (spectra_format == "imzml" || spectra_format == "imzML") {
+        ## REPLACE THE filepath PARAMETER FOR EACH SPECTRUM WITH THE CLASS
+        spectra <- replace_class_name(spectra, class_list = class_list, spectra_format = spectra_format, class_in_file_name = class_in_file_name)
+        # Put the filenames/classes in a vector
+        # Create the empty vector
+        class_vector <- character()
+        # Add the file names recursively, scrolling the whole spectral dataset
+        if (isMassSpectrumList(spectra)) {
+            for (i in 1:length(spectra)) {
+                class_vector <- append(class_vector, spectra[[i]]@metaData$file[1])
+            }
+        } else {
+            class_vector <- spectra@metaData$file[1]
+        }
+    }
+    ####### XMASS
+    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+        # Replace the names in the spectra with the class
+        for (cl in 1:length(class_list)) {
+            if (isMassSpectrumList(spectra)) {
+                for (s in 1:length(spectra)) {
+                    if (length(grep(class_list[cl], spectra[[s]]@metaData$file[1], fixed = TRUE)) > 0) {
+                        spectra[[s]]@metaData$file <- class_list[cl]
+                    }
+                }
+            } else {
+                if (length(grep(class_list[cl], spectra@metaData$file[1], fixed = TRUE)) > 0) {
+                    spectra@metaData$file <- class_list[cl]
+                }
+            }
+        }
+        # Create the empty vector
+        class_vector <- character()
+        # Add the file names recursively, scrolling the whole spectral dataset
+        if (isMassSpectrumList(spectra)) {
+            for (i in 1:length(spectra)) {
+                class_vector <- append(class_vector, spectra[[i]]@metaData$file[1])
+            }
+        } else {
+            class_vector <- spectra@metaData$file[1]
+        }
+    }
+    # Average
+    if (method == "mean") {
+        class_spectra_grouped <- averageMassSpectra(spectra, labels = class_vector, method = "mean")
+    }
+    # Skyline
+    if (method == "skyline") {
+        class_spectra_grouped <- list()
+        # For each class
+        for (class in class_list) {
+            # Add the spectra for each class to a list
+            for (spectrum in spectra) {
+                if (spectrum@metaData$file[1] == class) {
+                    class_spectra <- append(class_spectra, spetrum)
+                }
+            }
+            # Skyline spectrum
+            class_spectra_skyline <- generate_skyline_spectrum(class_spectra)
+            # Add this to the final list
+            class_spectra_grouped <- append(class_spectra_grouped, class_spectra_skyline)
+        }
+    }
+    return (class_spectra_grouped)
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+################################################# SAMPLE NAME REPLACING
+# This function replaces the sample name field in the spectrum (if it is NULL) with the actual sample name (keeping only the last part of the file path and discarding the folder tree) and puts the sample name as the name of the list element, so that names(spectra) is not NULL and a better identification of the spectra is obtained (through a unique name)
+# The input can be both spectra or peaks (MALDIquant)
+replace_sample_name_list <- function(spectra, spectra_format = "imzml", type = "number") {
+    ##### Replace the list names only if NULL
+    if (is.null(names(spectra))) {
+        ########## SAMPLE NAME
+        if (type == "name") {
+            ##### Replace the metaData$file with the name with the replace_sample_name() function
+            spectra <- replace_sample_name(spectra, spectra_format = spectra_format, allow_parallelization = FALSE)
+            ##### More spectra
+            if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+                # Generate a vector with all the spectra names
+                spectra_names_vector <- character()
+                for (s in 1:length(spectra)) {
+                    spectra_names_vector <- append(spectra_names_vector, spectra[[s]]@metaData$file)
+                }
+                # Extract the unique values
+                if (length(spectra_names_vector) != length(unique(spectra_names_vector))) {
+                    spectra_names_vector <- make.names(spectra_names_vector, unique = TRUE)
+                }
+                # Fix the spectral list names
+                names(spectra) <- spectra_names_vector
+            } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
+                ##### One spectrum
+                spectra <- spectra
+            }
+        } else if (type == "number") {
+            ########## NUMBER
+            ##### More spectra
+            if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+                # Generate a vector with all the spectra names
+                spectra_names_vector <- seq(1, length(spectra), by = 1)
+                # Fix the spectral list names
+                names(spectra) <- as.character(spectra_names_vector)
+            } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
+                ##### One spectrum
+                spectra <- spectra
+            }
+        }
+    }
+    ### Return
+    return(spectra)
+}
+
+
+
+
+################################################################################
 
 
 
@@ -1788,11 +1934,15 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
     if (!is.null(spectral_alignment_algorithm)) {
         if (isMassSpectrumList(preprocessed_spectra)) {
             spectral_alignment_performed <- FALSE
+            spectral_list_names <- names(preprocessed_spectra)
             try({
-                # Perform the alignment
+                # Perform the alignment (and restore the list names that is lost after alignment)
                 preprocessed_spectra <- align_spectra(preprocessed_spectra, spectral_alignment_algorithm = spectral_alignment_algorithm, spectral_alignment_reference = spectral_alignment_reference, tof_mode = tof_mode)
                 spectral_alignment_performed <- TRUE
-            })
+                if (!is.null(spectral_list_names)) {
+                    names(preprocessed_spectra) <- spectral_list_names
+                }
+            }, silent = TRUE)
             # Return message
             if (spectral_alignment_performed == TRUE) {
                 print("The spectral aligment has been performed successfully!")
@@ -1830,7 +1980,7 @@ align_spectra <- function(spectra, spectral_alignment_algorithm = "cubic", spect
             }
             ##### Perform the alignment: Automatic computation of the reference peaklist
             if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "auto") {
-                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm)
+                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 2, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm)
             } else if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "average spectrum") {
                 ##### Perform the alignment: Average spectrum
                 # Ganerate the average spectrum
@@ -1843,13 +1993,13 @@ align_spectra <- function(spectra, spectral_alignment_algorithm = "cubic", spect
                 }
                 average_spectrum <- preprocess_spectra(average_spectrum, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = smoothing_algorithm_avg, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"))
                 # Detect peaks onto the average spectrum: refference peaklist
-                average_spectrum_peaks <- detectPeaks(average_spectrum, halfWindowSize = half_window_alignment, method = "SuperSmoother", SNR = 3)
+                average_spectrum_peaks <- detectPeaks(average_spectrum, halfWindowSize = half_window_alignment, method = "SuperSmoother", SNR = 2)
                 # Deisotope peaklist
                 if (deisotope_peaklist == TRUE) {
                     average_spectrum_peaks <- deisotope_peaks(average_spectrum_peaks)
                 }
                 # Align the spectra
-                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm, reference = average_spectrum_peaks)
+                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 2, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm, reference = average_spectrum_peaks)
             } else if (!is.null(spectral_alignment_reference) && spectral_alignment_reference == "skyline spectrum") {
                 ##### Perform the alignment: Skyline spectrum
                 # Ganerate the skyline spectrum
@@ -1862,13 +2012,13 @@ align_spectra <- function(spectra, spectral_alignment_algorithm = "cubic", spect
                 }
                 skyline_spectrum <- preprocess_spectra(skyline_spectrum, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = smoothing_algorithm_avg, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"))
                 # Detect peaks onto the skyline spectrum: refference peaklist
-                skyline_spectrum_peaks <- detectPeaks(skyline_spectrum, halfWindowSize = half_window_alignment, method = "SuperSmoother", SNR = 3)
+                skyline_spectrum_peaks <- detectPeaks(skyline_spectrum, halfWindowSize = half_window_alignment, method = "SuperSmoother", SNR = 2)
                 # Deisotope peaklist
                 if (deisotope_peaklist == TRUE) {
                     skyline_spectrum_peaks <- deisotope_peaks(skyline_spectrum_peaks)
                 }
                 # Align the spectra
-                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 3, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm, reference = skyline_spectrum_peaks)
+                aligned_spectra <- alignSpectra(spectra, noiseMethod = "SuperSmoother", halfWindowSize = half_window_alignment, SNR = 2, tolerance = (tolerance_ppm/10^6), warpingMethod = spectral_alignment_algorithm, reference = skyline_spectrum_peaks)
             }
             ### Return the aligned spectra
             return(aligned_spectra)
@@ -2465,7 +2615,8 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
 # The pixel grouping cannot be 'graph', otherwise, when embedded in the pixel by pixel classification function, the graph segmentation is performed for each model before making the predictons.
-single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", preprocessing_parameters = NULL, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 1, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 5, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, number_of_spectra_partitions = 1, partitioning_method = "space", plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE) {
+single_model_classification_of_spectra <- function(spectra, model_x, model_name = "model", preprocessing_parameters = NULL, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 1, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = "linear", allow_parallelization = FALSE, pixel_grouping = c("single", "hca", "moving window average", "graph"), number_of_hca_nodes = 5, moving_window_size = 5, final_result_matrix = NULL, seed = 12345, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change = 5, number_of_spectra_partitions = 1, partitioning_method = "space", classification_mode_graph = c("average spectra", "single spectra clique"), plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name"), features_to_use_for_graph = c("all", "model")) {
+    print(paste("Computing predictions with model:", model_name))
     # Class list (from the custom model entry)
     class_list <- model_x$class_list
     # Outcome list (from the custom model entry)
@@ -2482,8 +2633,6 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
     if (isMassSpectrumList(spectra)) {
         ########## SINGLE PIXEL CLASSIFICATION
         if (pixel_grouping == "single" || number_of_hca_nodes == 1 || moving_window_size >= length(spectra)) {
-            ##### Rearrange the spectra according to the space coordinates (for reproducibility purposes)
-            spectra <- rearrange_spectral_dataset(spectra, rearranging_method = "space")
             ### Generate the intensity matrix with the features from the model
             final_sample_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
             ### Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
@@ -2495,40 +2644,58 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 ##### Predictions (spectra by spectra) (class, no probabilities)
                 if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
                     predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "raw"))
+                    names(predicted_classes) <- rownames(final_sample_matrix)
                 } else {
                     predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix))
+                    names(predicted_classes) <- rownames(final_sample_matrix)
                     #predicted_classes <- as.character(apply(X = final_sample_matrix, MARGIN = 1, FUN = function(x) predict(model_object, as.matrix(rbind(x)))))
                 }
                 # Generate a matrix with the results
                 result_matrix_model <- matrix(nrow = length(predicted_classes), ncol = 1)
                 sample_name <- spectra[[1]]@metaData$file[1]
-                rownames(result_matrix_model) <- cbind(rep(sample_name, length(spectra)))
+                if(is.null(names(spectra))) {
+                    rownames(result_matrix_model) <- cbind(rep(sample_name, length(spectra)))
+                } else {
+                    rownames(result_matrix_model) <- names(spectra)
+                }
                 result_matrix_model[,1] <- cbind(predicted_classes)
                 colnames(result_matrix_model) <- paste("Predicted Class '", model_name, "'", sep = "")
                 ##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
                 if (is.null(final_result_matrix)) {
-                    final_result_matrix <- result_matrix_model
+                    final_result_matrix <- as.data.frame(result_matrix_model)
                 } else {
-                    final_result_matrix <- cbind(final_result_matrix, result_matrix_model)
+                    final_result_matrix <- merge(final_result_matrix, as.data.frame(result_matrix_model), by = "row.names", all = TRUE)
+                    rownames(final_result_matrix) <- final_result_matrix[,1]
+                    final_result_matrix <- final_result_matrix[, 2:ncol(final_result_matrix)]
                 }
                 ########## Generate a molecular image of the classification
                 # Define the class as number depending on the outcome
                 outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_classes)
-                # Replace the spectra intensities with the class number for plotting purposes
+                # Replace the spectra intensities with the class number for plotting purposes (more unique correspondence between spectra and pixels with the vector and list names)
                 class_as_number <- outcome_and_class$class_vector_as_numeric
                 spectra_for_plotting <- spectra
-                for (s in 1:length(spectra_for_plotting)) {
-                    spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+                if (is.null(names(spectra_for_plotting)) || is.null(names(class_as_number))) {
+                    for (s in 1:length(spectra_for_plotting)) {
+                        spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+                    }
+                } else {
+                    for (s in 1:length(spectra_for_plotting)) {
+                        spectra_for_plotting[[s]]@intensity <- rep(class_as_number[names(spectra_for_plotting)[s]], length(spectra_for_plotting[[s]]@intensity))
+                    }
                 }
                 # Generate the MS image
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                if (isTRUE(plot_legends)) {
+                if ("legend" %in% plot_legends) {
                     # Define the legend
                     legend_text <- outcome_and_class$legend_text
                     legend_fill <- outcome_and_class$legend_fill
                     legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                }
+                if ("sample name" %in% plot_legends) {
                     legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
+                }
+                if ("plot name" %in% plot_legends) {
                     legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
                 }
                 # Store the plot into the list of images (for model)
@@ -2568,6 +2735,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 average_spectrum_bin <- preprocess_spectra(average_spectrum_bin, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
                 ### Peak picking on the AVG spectrum
                 sample_bin_matrix <- generate_custom_intensity_matrix(average_spectrum_bin, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                ### Fix the spectrum name (for identification purposes) (with the name of th single pixel to be classified)
+                rownames(sample_bin_matrix) <- names(spectra)[s]
                 ### Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
                 if (!is.null(sample_bin_matrix)) {
                     ### Put the X at the beginning of the peak names
@@ -2576,14 +2745,15 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     }
                     ##### Predictions (AVG spectrum) (class, no probabilities)
                     if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
-                        predicted_classes <- as.character(predict(model_object, newdata = final_sample_matrix, type = "raw"))
+                        predicted_class_avg <- as.character(predict(model_object, newdata = sample_bin_matrix, type = "raw"))
+                        names(predicted_class_avg) <- rownames(sample_bin_matrix)
                     } else {
                         predicted_class_avg <- as.character(predict(model_object, newdata = sample_bin_matrix))
+                        names(predicted_class_avg) <- rownames(sample_bin_matrix)
                     }
                     # Generate a matrix with the results
                     result_matrix_model_bin <- matrix(nrow = 1, ncol = 1)
-                    sample_name <- average_spectrum_bin@metaData$file[1]
-                    rownames(result_matrix_model_bin) <- sample_name
+                    rownames(result_matrix_model_bin) <- names(spectra)[s]
                     result_matrix_model_bin[1,1] <- as.character(predicted_class_avg)
                     colnames(result_matrix_model_bin) <- paste("Predicted Class '", model_name, "'", sep = "")
                 } else {
@@ -2599,32 +2769,45 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             }
             ### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
             if (is.null(final_result_matrix)) {
-                final_result_matrix <- result_matrix_model
+                final_result_matrix <- as.data.frame(result_matrix_model)
             } else {
-                final_result_matrix <- cbind(final_result_matrix, result_matrix_model)
+                final_result_matrix <- merge(final_result_matrix, as.data.frame(result_matrix_model), by = "row.names", all = TRUE)
+                rownames(final_result_matrix) <- final_result_matrix[,1]
+                final_result_matrix <- final_result_matrix[, 2:ncol(final_result_matrix)]
             }
             ########## Generate a molecular image of the classification
             ### Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
             if (!is.null(result_matrix_model)) {
                 # Replace the spectra intensities with the class number for plotting purposes
                 predicted_classes <- as.character(result_matrix_model[,1])
+                names(predicted_classes) <- rownames(result_matrix_model)
                 # Define the class as number depending on the outcome
                 outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_classes)
                 # Replace the spectra intensities with the class number for plotting purposes
                 class_as_number <- outcome_and_class$class_vector_as_numeric
                 spectra_for_plotting <- spectra
-                for (s in 1:length(spectra_for_plotting)) {
-                    spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+                if (is.null(names(spectra_for_plotting)) || is.null(names(class_as_number))) {
+                    for (s in 1:length(spectra_for_plotting)) {
+                        spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+                    }
+                } else {
+                    for (s in 1:length(spectra_for_plotting)) {
+                        spectra_for_plotting[[s]]@intensity <- rep(class_as_number[names(spectra_for_plotting)[s]], length(spectra_for_plotting[[s]]@intensity))
+                    }
                 }
                 # Generate the MS images
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                if (isTRUE(plot_legends)) {
+                if ("legend" %in% plot_legends) {
                     # Define the legend
                     legend_text <- outcome_and_class$legend_text
                     legend_fill <- outcome_and_class$legend_fill
                     legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                }
+                if ("sample name" %in% plot_legends) {
                     legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
+                }
+                if ("plot name" %in% plot_legends) {
                     legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
                 }
                 # Store the plot into the list of images (for model)
@@ -2634,14 +2817,16 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 classification_msi_model <- NULL
             }
         } else if (pixel_grouping == "hca") {
-            ##### Rearrange the spectra according to the space coordinates (for reproducibility purposes)
-            spectra <- rearrange_spectral_dataset(spectra, rearranging_method = "space")
             ########## HCA
             ### Initialize the model result matrix
             result_matrix_model <- matrix("class", nrow = length(spectra), ncol = 1)
             colnames(result_matrix_model) <- paste("Predicted Class '", model_name, "'", sep = "")
             sample_name <- spectra[[1]]@metaData$file[1]
-            rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
+            if (is.null(names(spectra))) {
+                rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
+            } else {
+                rownames(result_matrix_model) <- names(spectra)
+            }
             ### Detect and align peaks
             peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, SNR = peak_picking_SNR, allow_parallelization = allow_parallelization)
             peaks <- align_and_filter_peaks(peaks, tof_mode = tof_mode, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent)
@@ -2660,6 +2845,8 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 # Index the spectra under in the selected subgroup of the HCA
                 index <- which(hca_groups == n)
                 spectra_hca <- spectra[index]
+                # Retrieve the names
+                spectra_hca_names <- names(spectra_hca)
                 # Generate the average spectrum for these spectra under the node
                 average_spectrum_hca <- averageMassSpectra(spectra_hca)
                 ### Preprocessing the AVG spectrum
@@ -2679,7 +2866,11 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                         predicted_class_avg <- as.character(predict(model_object, newdata = sample_hca_matrix))
                     }
                     # Fill the model matrix with the results
-                    result_matrix_model[index,1] <- as.character(predicted_class_avg)
+                    if (is.null(spectra_hca_names)) {
+                        result_matrix_model[index,1] <- as.character(predicted_class_avg)
+                    } else {
+                        result_matrix_model[spectra_hca_names,1] <- as.character(predicted_class_avg)
+                    }
                 } else {
                     ### It is NULL if there are incompatibilities between the model features and the spectral features
                     result_matrix_model <- NULL
@@ -2689,24 +2880,35 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             if (!is.null(result_matrix_model)) {
                 # Replace the spectra intensities with the class number for plotting purposes
                 predicted_classes <- as.character(result_matrix_model[,1])
+                names(predicted_classes) <- rownames(result_matrix_model)
                 # Define the class as number depending on the outcome
                 outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_classes)
                 # Replace the spectra intensities with the class number for plotting purposes
                 class_as_number <- outcome_and_class$class_vector_as_numeric
                 ### Fix the spectra for plotting list (edit the intensity values)
                 spectra_for_plotting <- spectra
-                for (s in 1:length(spectra_for_plotting)) {
-                    spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+                if (is.null(names(spectra_for_plotting)) || is.null(names(class_as_number))) {
+                    for (s in 1:length(spectra_for_plotting)) {
+                        spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+                    }
+                } else {
+                    for (s in 1:length(spectra_for_plotting)) {
+                        spectra_for_plotting[[s]]@intensity <- rep(class_as_number[names(spectra_for_plotting)[s]], length(spectra_for_plotting[[s]]@intensity))
+                    }
                 }
                 # Generate the MS images
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                if (isTRUE(plot_legends)) {
+                if ("legend" %in% plot_legends) {
                     # Define the legend
                     legend_text <- outcome_and_class$legend_text
                     legend_fill <- outcome_and_class$legend_fill
                     legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                }
+                if ("sample name" %in% plot_legends) {
                     legend(x = "topright", legend = sample_name, xjust = 0.5, yjust = 0.5)
+                }
+                if ("plot name" %in% plot_legends) {
                     legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
                 }
                 # Store the plot into the list of images (for SVM)
@@ -2717,249 +2919,356 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             }
             ##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
             if (is.null(final_result_matrix)) {
-                final_result_matrix <- result_matrix_model
+                final_result_matrix <- as.data.frame(result_matrix_model)
             } else {
-                final_result_matrix <- cbind(final_result_matrix, result_matrix_model)
+                final_result_matrix <- merge(final_result_matrix, as.data.frame(result_matrix_model), by = "row.names", all = TRUE)
+                rownames(final_result_matrix) <- final_result_matrix[,1]
+                final_result_matrix <- final_result_matrix[, 2:ncol(final_result_matrix)]
             }
         } else if (pixel_grouping == "graph") {
-            ##### Rearrange the spectra according to the space coordinates (for reproducibility purposes)
-            spectra <- rearrange_spectral_dataset(spectra, rearranging_method = "space")
             # Initialize output
             spectra_for_plotting <- list()
             ### Initialize the model result matrix
             result_matrix_model <- matrix("class", nrow = length(spectra), ncol = 1)
             colnames(result_matrix_model) <- paste("Predicted Class '", model_name, "'", sep = "")
             sample_name <- spectra[[1]]@metaData$file[1]
-            rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
+            if (is.null(names(spectra))) {
+                rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
+            } else {
+                rownames(result_matrix_model) <- names(spectra)
+            }
             ########## GRAPH SEGMENTATION
-            graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, preprocessing_parameters = NULL, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, SNR = peak_picking_SNR, tof_mode = tof_mode, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, custom_feature_vector = features_model, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = "independent", max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed, plot_legends = plot_legends)
+            if (features_to_use_for_graph == "model") {
+                custom_feature_vector_graph <- features_model
+            } else if (features_to_use_for_graph == "all") {
+                custom_feature_vector_graph <- NULL
+            }
+            graph_segmentation <- graph_MSI_segmentation(filepath_imzml = spectra, custom_feature_vector = custom_feature_vector_graph, preprocessing_parameters = NULL, allow_parallelization = allow_parallelization, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, SNR = peak_picking_SNR, tof_mode = tof_mode, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = "independent", max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change, plot_figures = plot_figures, plot_graphs = plot_graphs, number_of_spectra_partitions = number_of_spectra_partitions, partitioning_method = partitioning_method, seed = seed, plot_legends = plot_legends)
             ### Extract the spectra from the clique and from the independent set (mind that they are two lists if the spectra are taken all at the same time or they are two lists of lists if the spectra are partitioned)
             if (number_of_spectra_partitions > 1) {
                 spectra_clique <- graph_segmentation$spectra_clique
                 spectra_independent <- graph_segmentation$spectra_independent
-                # Generate the average of the clique and the independent set
-                spectra_clique_avg <- list()
-                spectra_independent_avg <- list()
-                for (l in 1:length(spectra_independent)) {
-                    spectra_independent_avg <- append(spectra_independent_avg, averageMassSpectra(spectra_independent[[l]]))
-                }
-                for (l in 1:length(spectra_clique)) {
-                    spectra_clique_avg <- append(spectra_clique_avg, averageMassSpectra(spectra_clique[[l]]))
-                }
-                # Preprocess the average spectra
-                spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
-                spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
-                # Peak picking on the AVG spectrum
-                sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
-                sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
-                ## Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
-                if (!is.null(sample_clique_matrix)) {
-                    ### Put the X at the beginning of the peak names
-                    for (x in 1:length(colnames(sample_clique_matrix))) {
-                        colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
-                    }
-                    ##### Predictions (AVG spectrum) (class, no probabilities)
-                    if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
-                        predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "raw"))
-                    } else {
-                        predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix))
-                    }
-                    # Fill the model matrix with the results
-                    #result_matrix_svm_clique[index,1] <- as.character(predicted_class_avg)
-                    ### Fix the spectra for plotting list (edit the intensity values)
-                    # Define the class as number depending on the outcome
-                    outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_class_avg)
-                    # Replace the spectra intensities with the class number for plotting purposes
-                    class_as_number <- outcome_and_class$class_vector_as_numeric
-                    for (l in 1:length(spectra_clique)) {
-                        spectra_for_plotting_clique <- spectra_clique[[l]]
-                        for (s in 1:length(spectra_for_plotting_clique)) {
-                            spectra_for_plotting_clique[[s]]@intensity <- rep(class_as_number[l], length(spectra_for_plotting_clique[[s]]@intensity))
-                        }
-                        # Append to the final list of spectra for plotting
-                        spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_clique)
-                    }
-                } else {
-                    ### It is NULL if there are incompatibilities between the model features and the spectral features
-                    spectra_for_plotting_clique <- list()
-                    spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_clique)
-                    #result_matrix_svm <- NULL
-                }
-                if (!is.null(sample_independent_matrix)) {
-                    ### Put the X at the beginning of the peak names
-                    for (x in 1:length(colnames(sample_independent_matrix))) {
-                        colnames(sample_independent_matrix)[x] <- paste("X", colnames(sample_independent_matrix)[x], sep = "")
-                    }
-                    ##### Predictions (AVG spectrum) (class, no probabilities)
-                    if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
-                        predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "raw"))
-                    } else {
-                        predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix))
-                    }
-                    # Fill the model matrix with the results
-                    #result_matrix_svm_clique[index,1] <- as.character(predicted_class_avg)
-                    ### Fix the spectra for plotting list (edit the intensity values)
-                    # Define the class as number depending on the outcome
-                    outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_class_avg)
-                    # Replace the spectra intensities with the class number for plotting purposes
-                    class_as_number <- outcome_and_class$class_vector_as_numeric
+                ##### Classify the average spectra of clique/independent
+                if (classification_mode_graph == "average spectra") {
+                    # Generate the average of the clique and the independent set
+                    spectra_clique_avg <- list()
+                    spectra_independent_avg <- list()
                     for (l in 1:length(spectra_independent)) {
-                        spectra_for_plotting_independent <- spectra_independent[[l]]
-                        for (s in 1:length(spectra_for_plotting_independent)) {
-                            spectra_for_plotting_independent[[s]]@intensity <- rep(class_as_number[l], length(spectra_for_plotting_independent[[s]]@intensity))
+                        spectra_independent_avg <- append(spectra_independent_avg, averageMassSpectra(spectra_independent[[l]]))
+                    }
+                    for (l in 1:length(spectra_clique)) {
+                        spectra_clique_avg <- append(spectra_clique_avg, averageMassSpectra(spectra_clique[[l]]))
+                    }
+                    # Preprocess the average spectra
+                    spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
+                    spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
+                    # Peak picking on the AVG spectrum
+                    sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                    sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                    ## Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
+                    if (!is.null(sample_clique_matrix)) {
+                        ### Put the X at the beginning of the peak names
+                        for (x in 1:length(colnames(sample_clique_matrix))) {
+                            colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
                         }
-                        # Append to the final list of spectra for plotting
+                        ##### Predictions (AVG spectrum) (class, no probabilities)
+                        if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                            predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "raw"))
+                        } else {
+                            predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix))
+                        }
+                        # Fill the model matrix with the results
+                        #result_matrix_svm_clique[index,1] <- as.character(predicted_class_avg)
+                        ### Fix the spectra for plotting list (edit the intensity values)
+                        # Define the class as number depending on the outcome
+                        outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_class_avg)
+                        # Replace the spectra intensities with the class number for plotting purposes
+                        class_as_number <- outcome_and_class$class_vector_as_numeric
+                        for (l in 1:length(spectra_clique)) {
+                            spectra_for_plotting_clique <- spectra_clique[[l]]
+                            for (s in 1:length(spectra_for_plotting_clique)) {
+                                spectra_for_plotting_clique[[s]]@intensity <- rep(class_as_number[l], length(spectra_for_plotting_clique[[s]]@intensity))
+                            }
+                            # Append to the final list of spectra for plotting
+                            spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_clique)
+                        }
+                    } else {
+                        ### It is NULL if there are incompatibilities between the model features and the spectral features
+                        spectra_for_plotting_clique <- list()
+                        spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_clique)
+                        #result_matrix_svm <- NULL
+                    }
+                    if (!is.null(sample_independent_matrix)) {
+                        ### Put the X at the beginning of the peak names
+                        for (x in 1:length(colnames(sample_independent_matrix))) {
+                            colnames(sample_independent_matrix)[x] <- paste("X", colnames(sample_independent_matrix)[x], sep = "")
+                        }
+                        ##### Predictions (AVG spectrum) (class, no probabilities)
+                        if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                            predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "raw"))
+                        } else {
+                            predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix))
+                        }
+                        # Fill the model matrix with the results
+                        #result_matrix_svm_clique[index,1] <- as.character(predicted_class_avg)
+                        ### Fix the spectra for plotting list (edit the intensity values)
+                        # Define the class as number depending on the outcome
+                        outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_class_avg)
+                        # Replace the spectra intensities with the class number for plotting purposes
+                        class_as_number <- outcome_and_class$class_vector_as_numeric
+                        for (l in 1:length(spectra_independent)) {
+                            spectra_for_plotting_independent <- spectra_independent[[l]]
+                            for (s in 1:length(spectra_for_plotting_independent)) {
+                                spectra_for_plotting_independent[[s]]@intensity <- rep(class_as_number[l], length(spectra_for_plotting_independent[[s]]@intensity))
+                            }
+                            # Append to the final list of spectra for plotting
+                            spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_independent)
+                        }
+                    } else {
+                        ### It is NULL if there are incompatibilities between the model features and the spectral features
+                        spectra_for_plotting_independent <- list()
                         spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_independent)
+                        #result_matrix_svm <- NULL
                     }
-                } else {
-                    ### It is NULL if there are incompatibilities between the model features and the spectral features
-                    spectra_for_plotting_independent <- list()
-                    spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_independent)
-                    #result_matrix_svm <- NULL
-                }
-                ### Run only if there are some spectra classified
-                if (length(spectra_for_plotting) > 0) {
-                    # Generate the MS images
-                    slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
-                    plotMsiSlice(slices, legend = FALSE, scale = F)
-                    if (isTRUE(plot_legends)) {
-                        # Define the legend
-                        legend_text <- outcome_and_class$legend_text
-                        legend_fill <- outcome_and_class$legend_fill
-                        legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
-                        legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
-                        legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
-                    }
-                    # Store the plot into the list of images (for SVM)
-                    classification_msi_model <- recordPlot()
-                    # Generate the result matrix from the rearranged spectra (so that it is reproducible, because the spectra of the clique mught not be always the same) according to the intensity value
-                    spectra_for_plotting <- rearrange_spectral_dataset(spectra_for_plotting, rearranging_method = "space")
-                    outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list)
-                    predicted_classes <- character()
-                    for (s in 1:length(spectra_for_plotting)) {
-                        for (ou in 1:length(outcome_and_class$class_outcome_matrix$Number)) {
-                            if (spectra_for_plotting[[s]]@intensity[1] == outcome_and_class$class_outcome_matrix$Number[ou]) {
-                                predicted_classes <- append(predicted_classes, outcome_and_class$class_outcome_matrix$Class[ou])
+                    ### Run only if there are some spectra classified
+                    if (length(spectra_for_plotting) > 0) {
+                        # Generate the MS images
+                        slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
+                        plotMsiSlice(slices, legend = FALSE, scale = F)
+                        if ("legend" %in% plot_legends) {
+                            # Define the legend
+                            legend_text <- outcome_and_class$legend_text
+                            legend_fill <- outcome_and_class$legend_fill
+                            legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                        }
+                        if ("sample name" %in% plot_legends) {
+                            legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                        }
+                        if ("plot name" %in% plot_legends) {
+                            legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                        }
+                        # Store the plot into the list of images (for SVM)
+                        classification_msi_model <- recordPlot()
+                        # Generate the result matrix from the rearranged spectra (so that it is reproducible, because the spectra of the clique mught not be always the same) according to the intensity value
+                        spectra_for_plotting <- rearrange_spectral_dataset(spectra_for_plotting, rearranging_method = "space")
+                        outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list)
+                        predicted_classes <- character()
+                        for (s in 1:length(spectra_for_plotting)) {
+                            for (ou in 1:length(outcome_and_class$class_outcome_matrix$Number)) {
+                                if (spectra_for_plotting[[s]]@intensity[1] == outcome_and_class$class_outcome_matrix$Number[ou]) {
+                                    predicted_classes <- append(predicted_classes, outcome_and_class$class_outcome_matrix$Class[ou])
+                                }
                             }
                         }
-                    }
-                    result_matrix_model[,1] <- cbind(as.character(predicted_classes))
-                    ##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
-                    if (is.null(final_result_matrix)) {
-                        final_result_matrix <- result_matrix_model
+                        result_matrix_model[,1] <- cbind(as.character(predicted_classes))
+                        ##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
+                        if (is.null(final_result_matrix)) {
+                            final_result_matrix <- as.data.frame(result_matrix_model)
+                        } else {
+                            final_result_matrix <- merge(final_result_matrix, as.data.frame(result_matrix_model), by = "row.names", all = TRUE)
+                            rownames(final_result_matrix) <- final_result_matrix[,1]
+                            final_result_matrix <- final_result_matrix[, 2:ncol(final_result_matrix)]
+                        }
                     } else {
-                        final_result_matrix <- cbind(final_result_matrix, result_matrix_model)
+                        ### It is NULL if there are incompatibilities between the model features and the spectral features
+                        result_matrix_model <- NULL
+                        classification_msi_model <- NULL
                     }
-                } else {
-                    ### It is NULL if there are incompatibilities between the model features and the spectral features
-                    result_matrix_model <- NULL
-                    classification_msi_model <- NULL
+                } else if (classification_mode_graph == "single spectra clique") {
+                    ##### Classify the average spectra of clique/independent
                 }
             } else if (number_of_spectra_partitions <= 1) {
                 ######### NO PARTITION SPECTRA
                 spectra_clique <- graph_segmentation$spectra_clique
                 spectra_independent <- graph_segmentation$spectra_independent
-                # Generate the average of the clique and the independent set
-                spectra_clique_avg <- averageMassSpectra(spectra_clique)
-                spectra_independent_avg <- averageMassSpectra(spectra_independent)
-                # Preprocess the average spectrum
-                spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
-                spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
-                # Peak picking on the AVG spectrum
-                sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
-                sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
-                ## Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
-                if (!is.null(sample_clique_matrix)) {
-                    ### Put the X at the beginning of the peak names
-                    for (x in 1:length(colnames(sample_clique_matrix))) {
-                        colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
-                    }
-                    ##### Predictions (AVG spectrum) (class, no probabilities)
-                    if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
-                        predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "raw"))
+                ##### Classify the average spectra of clique/independent
+                if (classification_mode_graph == "average spectra") {
+                    # Generate the average of the clique and the independent set
+                    spectra_clique_avg <- averageMassSpectra(spectra_clique)
+                    spectra_independent_avg <- averageMassSpectra(spectra_independent)
+                    # Preprocess the average spectrum
+                    spectra_clique_avg <- preprocess_spectra(spectra_clique_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
+                    spectra_independent_avg <- preprocess_spectra(spectra_independent_avg, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
+                    # Peak picking on the AVG spectrum
+                    sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                    sample_independent_matrix <- generate_custom_intensity_matrix(spectra_independent_avg, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                    ## Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
+                    if (!is.null(sample_clique_matrix)) {
+                        ### Put the X at the beginning of the peak names
+                        for (x in 1:length(colnames(sample_clique_matrix))) {
+                            colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
+                        }
+                        ##### Predictions (AVG spectrum) (class, no probabilities)
+                        if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                            predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "raw"))
+                        } else {
+                            predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix))
+                        }
+                        ### Fix the spectra for plotting list (edit the intensity values)
+                        # Define the class as number depending on the outcome
+                        outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_class_avg)
+                        # Replace the spectra intensities with the class number for plotting purposes
+                        class_as_number <- outcome_and_class$class_vector_as_numeric
+                        spectra_for_plotting_clique <- spectra_clique
+                        for (s in 1:length(spectra_for_plotting_clique)) {
+                            spectra_for_plotting_clique[[s]]@intensity <- rep(class_as_number, length(spectra_for_plotting_clique[[s]]@intensity))
+                        }
+                        # Append to the final list of spectra for plotting
+                        spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_clique)
                     } else {
-                        predicted_class_avg <- as.character(predict(model_object, newdata = sample_clique_matrix))
+                        ### It is NULL if there are incompatibilities between the model features and the spectral features
+                        spectra_for_plotting_clique <- list()
+                        spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_clique)
                     }
-                    ### Fix the spectra for plotting list (edit the intensity values)
-                    # Define the class as number depending on the outcome
-                    outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_class_avg)
-                    # Replace the spectra intensities with the class number for plotting purposes
-                    class_as_number <- outcome_and_class$class_vector_as_numeric
-                    spectra_for_plotting_clique <- spectra_clique
-                    for (s in 1:length(spectra_for_plotting_clique)) {
-                        spectra_for_plotting_clique[[s]]@intensity <- rep(class_as_number, length(spectra_for_plotting_clique[[s]]@intensity))
-                    }
-                    # Append to the final list of spectra for plotting
-                    spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_clique)
-                } else {
-                    ### It is NULL if there are incompatibilities between the model features and the spectral features
-                    spectra_for_plotting_clique <- list()
-                    spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_clique)
-                }
-                if (!is.null(sample_independent_matrix)) {
-                    ### Put the X at the beginning of the peak names
-                    for (x in 1:length(colnames(sample_independent_matrix))) {
-                        colnames(sample_independent_matrix)[x] <- paste("X", colnames(sample_independent_matrix)[x], sep = "")
-                    }
-                    ##### Predictions (AVG spectrum) (class, no probabilities)
-                    if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
-                        predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "raw"))
+                    if (!is.null(sample_independent_matrix)) {
+                        ### Put the X at the beginning of the peak names
+                        for (x in 1:length(colnames(sample_independent_matrix))) {
+                            colnames(sample_independent_matrix)[x] <- paste("X", colnames(sample_independent_matrix)[x], sep = "")
+                        }
+                        ##### Predictions (AVG spectrum) (class, no probabilities)
+                        if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                            predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix, type = "raw"))
+                        } else {
+                            predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix))
+                        }
+                        ### Fix the spectra for plotting list (edit the intensity values)
+                        # Define the class as number depending on the outcome
+                        outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_class_avg)
+                        # Replace the spectra intensities with the class number for plotting purposes
+                        class_as_number <- outcome_and_class$class_vector_as_numeric
+                        spectra_for_plotting_independent <- spectra_independent
+                        for (s in 1:length(spectra_for_plotting_independent)) {
+                            spectra_for_plotting_independent[[s]]@intensity <- rep(class_as_number, length(spectra_for_plotting_independent[[s]]@intensity))
+                        }
+                        # Append to the final list of spectra for plotting
+                        spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_independent)
                     } else {
-                        predicted_class_avg <- as.character(predict(model_object, newdata = sample_independent_matrix))
+                        ### It is NULL if there are incompatibilities between the model features and the spectral features
+                        spectra_for_plotting_independent <- list()
+                        spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_independent)
                     }
-                    ### Fix the spectra for plotting list (edit the intensity values)
-                    # Define the class as number depending on the outcome
-                    outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_class_avg)
-                    # Replace the spectra intensities with the class number for plotting purposes
-                    class_as_number <- outcome_and_class$class_vector_as_numeric
-                    spectra_for_plotting_independent <- spectra_independent
-                    for (s in 1:length(spectra_for_plotting_independent)) {
-                        spectra_for_plotting_independent[[s]]@intensity <- rep(class_as_number, length(spectra_for_plotting_independent[[s]]@intensity))
-                    }
-                    # Append to the final list of spectra for plotting
-                    spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_independent)
-                } else {
-                    ### It is NULL if there are incompatibilities between the model features and the spectral features
-                    spectra_for_plotting_independent <- list()
-                    spectra_for_plotting <- append(spectra_for_plotting, spectra_for_plotting_independent)
-                }
-                ### Run only if there are some spectra classified
-                if (length(spectra_for_plotting) > 0) {
-                    # Generate the MS images
-                    slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
-                    plotMsiSlice(slices, legend = FALSE, scale = F)
-                    if (isTRUE(plot_legends)) {
-                        # Define the legend
-                        legend_text <- outcome_and_class$legend_text
-                        legend_fill <- outcome_and_class$legend_fill
-                        legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
-                        legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
-                        legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
-                    }
-                    # Store the plot into the list of images
-                    classification_msi_model <- recordPlot()
-                    # Generate the result matrix from the rearranged spectra (so that it is reproducible, because the spectra of the clique mught not be always the same) according to the intensity value
-                    spectra_for_plotting <- rearrange_spectral_dataset(spectra_for_plotting, rearranging_method = "space")
-                    outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list)
-                    predicted_classes <- character()
-                    for (s in 1:length(spectra_for_plotting)) {
-                        for (ou in 1:length(outcome_and_class$class_outcome_matrix$Number)) {
-                            if (spectra_for_plotting[[s]]@intensity[1] == outcome_and_class$class_outcome_matrix$Number[ou]) {
-                                predicted_classes <- append(predicted_classes, outcome_and_class$class_outcome_matrix$Class[ou])
+                    ### Run only if there are some spectra classified
+                    if (length(spectra_for_plotting) > 0) {
+                        # Generate the MS images
+                        slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
+                        plotMsiSlice(slices, legend = FALSE, scale = F)
+                        if ("legend" %in% plot_legends) {
+                            # Define the legend
+                            legend_text <- outcome_and_class$legend_text
+                            legend_fill <- outcome_and_class$legend_fill
+                            legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                        }
+                        if ("sample name" %in% plot_legends) {
+                            legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                        }
+                        if ("plot name" %in% plot_legends) {
+                            legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                        }
+                        # Store the plot into the list of images
+                        classification_msi_model <- recordPlot()
+                        # Generate the result matrix from the rearranged spectra (so that it is reproducible, because the spectra of the clique mught not be always the same) according to the intensity value
+                        outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list)
+                        predicted_classes <- character()
+                        for (s in 1:length(spectra_for_plotting)) {
+                            for (ou in 1:length(outcome_and_class$class_outcome_matrix[, "Number"])) {
+                                if (spectra_for_plotting[[s]]@intensity[1] == outcome_and_class$class_outcome_matrix[, "Number"][ou]) {
+                                    predicted_classes <- append(predicted_classes, outcome_and_class$class_outcome_matrix[, "Class"][ou])
+                                }
                             }
                         }
-                    }
-                    result_matrix_model[,1] <- cbind(as.character(predicted_classes))
-                    ##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
-                    if (is.null(final_result_matrix)) {
-                        final_result_matrix <- result_matrix_model
+                        names(predicted_classes) <- names(spectra_for_plotting)
+                        result_matrix_model[,1] <- cbind(as.character(predicted_classes))
+                        rownames(result_matrix_model) <- names(spectra_for_plotting)
+                        ##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
+                        if (is.null(final_result_matrix)) {
+                            final_result_matrix <- as.data.frame(result_matrix_model)
+                        } else {
+                            final_result_matrix <- merge(final_result_matrix, as.data.frame(result_matrix_model), by = "row.names", all = TRUE)
+                            rownames(final_result_matrix) <- final_result_matrix[,1]
+                            final_result_matrix <- final_result_matrix[, 2:ncol(final_result_matrix)]
+                        }
                     } else {
-                        final_result_matrix <- cbind(final_result_matrix, result_matrix_model)
+                        ### It is NULL if there are incompatibilities between the model features and the spectral features
+                        result_matrix_model <- NULL
+                        classification_msi_model <- NULL
                     }
-                } else {
-                    ### It is NULL if there are incompatibilities between the model features and the spectral features
-                    result_matrix_model <- NULL
-                    classification_msi_model <- NULL
+                } else if (classification_mode_graph == "single spectra clique") {
+                    ##### Classify only the single spectra from the clique
+                    # Peak picking (custom)
+                    sample_clique_matrix <- generate_custom_intensity_matrix(spectra_clique, custom_feature_vector = features_model, tof_mode = tof_mode, preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, peak_picking_SNR = peak_picking_SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization, deisotope_peaklist = deisotope_peaklist)
+                    ## Run only if the sample matrix is not NULL: it is NULL if there are incompatibilities between the model features and the spectral features
+                    if (!is.null(sample_clique_matrix)) {
+                        ### Put the X at the beginning of the peak names
+                        for (x in 1:length(colnames(sample_clique_matrix))) {
+                            colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
+                        }
+                        ##### Predictions (class, no probabilities)
+                        if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
+                            predicted_classes <- as.character(predict(model_object, newdata = sample_clique_matrix, type = "raw"))
+                            names(predicted_classes) <- rownames(sample_clique_matrix)
+                        } else {
+                            predicted_classes <- as.character(predict(model_object, newdata = sample_clique_matrix))
+                            names(predicted_classes) <- rownames(sample_clique_matrix)
+                        }
+                        ### Fix the spectra for plotting list (edit the intensity values)
+                        # Define the class as number depending on the outcome
+                        outcome_and_class <- outcome_and_class_to_MS(class_list = class_list, outcome_list = outcome_list, class_vector = predicted_classes)
+                        # Replace the spectra intensities with the class number for plotting purposes
+                        class_as_number <- outcome_and_class$class_vector_as_numeric
+                        spectra_for_plotting_clique <- spectra_clique
+                        for (s in 1:length(spectra_for_plotting_clique)) {
+                            spectra_for_plotting_clique[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting_clique[[s]]@intensity))
+                        }
+                        spectra_for_plotting_independent <- spectra_independent
+                        for (s in 1:length(spectra_for_plotting_independent)) {
+                            spectra_for_plotting_independent[[s]]@intensity <- rep(0.000001, length(spectra_for_plotting_independent[[s]]@intensity))
+                        }
+                        # Append to the final list of spectra for plotting
+                        spectra_for_plotting <- append(spectra_for_plotting_independent, spectra_for_plotting_clique)
+                    } else {
+                        ### It is NULL if there are incompatibilities between the model features and the spectral features
+                        spectra_for_plotting_clique <- list()
+                        spectra_for_plotting_independent <- list()
+                        spectra_for_plotting <- append(spectra_for_plotting_independent, spectra_for_plotting_clique)
+                    }
+                    ### Run only if there are some spectra classified
+                    if (length(spectra_for_plotting) > 0) {
+                        # Generate the MS images
+                        slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
+                        plotMsiSlice(slices, legend = FALSE, scale = F)
+                        if ("legend" %in% plot_legends) {
+                            # Define the legend
+                            legend_text <- outcome_and_class$legend_text
+                            legend_fill <- outcome_and_class$legend_fill
+                            legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                        }
+                        if ("sample name" %in% plot_legends) {
+                            legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                        }
+                        if ("plot name" %in% plot_legends) {
+                            legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
+                        }
+                        # Store the plot into the list of images
+                        classification_msi_model <- recordPlot()
+                        # Generate the result matrix from the rearranged spectra (so that it is reproducible, because the spectra of the clique mught not be always the same) according to the intensity value
+                        result_matrix_model_independent <- cbind(as.character(rep("independent", length(spectra_independent))))
+                        names(result_matrix_model_independent) <- names(spectra_independent)
+                        result_matrix_model_clique <- cbind(as.character(predicted_classes))
+                        names(result_matrix_model_clique) <- names(spectra_clique)
+                        result_matrix_model[,1] <- rbind(result_matrix_model_clique, result_matrix_model_independent)
+                        ##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
+                        if (is.null(final_result_matrix)) {
+                            final_result_matrix <- as.data.frame(result_matrix_model)
+                        } else {
+                            final_result_matrix <- merge(final_result_matrix, as.data.frame(result_matrix_model), by = "row.names", all = TRUE)
+                            rownames(final_result_matrix) <- final_result_matrix[,1]
+                            final_result_matrix <- final_result_matrix[, 2:ncol(final_result_matrix)]
+                        }
+                    } else {
+                        ### It is NULL if there are incompatibilities between the model features and the spectral features
+                        result_matrix_model <- NULL
+                        classification_msi_model <- NULL
+                    }
                 }
             }
         }
@@ -2992,9 +3301,11 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             colnames(result_matrix) <- paste("Predicted Class", model_name)
             #### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
             if (is.null(final_result_matrix)) {
-                final_result_matrix <- result_matrix
+                final_result_matrix <- as.data.frame(result_matrix)
             } else {
-                final_result_matrix <- cbind(final_result_matrix, result_matrix)
+                final_result_matrix <- merge(final_result_matrix, as.data.frame(result_matrix), by = "row.names", all = TRUE)
+                rownames(final_result_matrix) <- final_result_matrix[,1]
+                final_result_matrix <- final_result_matrix[, 2:ncol(final_result_matrix)]
             }
             ################# Average spectrum with bars onto the signals used by the model
             for (f in 1:length(features_model)) {
@@ -3042,8 +3353,10 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             }
             if (plot_figures == TRUE) {
                 plot(spectra, xlab = "m/z", ylab = "Intensity (a.i.)")
-                if (isTRUE(plot_legends)) {
+                if ("sample name" %in% plot_legends) {
                     legend(x = "topright", legend = spectra@metaData$file[[1]], xjust = 0.5, yjust = 0.5)
+                }
+                if ("plot name" %in% plot_legends) {
                     legend(x = "topleft", legend = model_name, xjust = 0.5, yjust = 0.5)
                 }
                 # Draw the bars
@@ -3083,7 +3396,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
 # The function outputs a list containing: a matrix with the classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel classification, a matrix with the ensemble classification (pixel-by-pixel and/or profile), MS images with the pixel-by-pixel ensemble classification and the plot of the average spectrum with red bars to indicate the signals used for classification.
 # Parallel computation implemented.
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
-spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_method = NULL), tof_mode = "linear", allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE) {
+spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL), tof_mode = "linear", allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, classification_mode_graph = c("average spectra", "single spectra clique"), features_to_use_for_graph = c("all", "model"), plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name"), progress_bar = NULL) {
     ### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda", "caret", "nnet"))
     ### Defaults
@@ -3091,7 +3404,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
         pixel_grouping <- "single"
     }
     if (length(classification_mode) == 1 && classification_mode == "") {
-        classification_mode <- "profile"
+        classification_mode <- "pixel"
     }
     ### Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
@@ -3145,8 +3458,8 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
                 sample_spectra <- importImzMl(filepath_test_imzml[p])
             }
         }
-        ### Rearrange the spectra according to the space coordinates (for reproducibility purposes)
-        sample_spectra <- rearrange_spectral_dataset(sample_spectra, rearranging_method = "space")
+        ### Replace the names of the spectra list with a unique name (for reproducibility purposes, for better identification of spectra)
+        sample_spectra <- replace_sample_name_list(sample_spectra, spectra_format = "imzml", type = "number")
         ### Replace the sample name (path) with the actual sample name
         sample_spectra <- replace_sample_name(sample_spectra, spectra_format = "imzml", allow_parallelization = allow_parallelization)
         ### Retrieve the sample name
@@ -3182,7 +3495,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
             ### Pixel by pixel
             if ("pixel" %in% classification_mode) {
                 # Perform the classification
-                model_classification <- single_model_classification_of_spectra(spectra = sample_spectra, model_x = model_list[[md]], model_name = list_of_models[md], preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = 3, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = tof_mode, allow_parallelization = allow_parallelization, pixel_grouping = pixel_grouping, number_of_hca_nodes = number_of_hca_nodes, moving_window_size = moving_window_size, final_result_matrix = final_result_matrix_msi_patient, seed = seed, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change_GA, number_of_spectra_partitions = number_of_spectra_partitions_graph, partitioning_method = partitioning_method_graph, plot_figures = plot_figures, plot_graphs = plot_graphs, plot_legends = plot_legends)
+                model_classification <- single_model_classification_of_spectra(spectra = sample_spectra, model_x = model_list[[md]], model_name = list_of_models[md], preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = 3, peak_filtering_frequency_threshold_percent = 0, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = tof_mode, allow_parallelization = allow_parallelization, pixel_grouping = pixel_grouping, number_of_hca_nodes = number_of_hca_nodes, moving_window_size = moving_window_size, final_result_matrix = final_result_matrix_msi_patient, seed = seed, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change_GA, number_of_spectra_partitions = number_of_spectra_partitions_graph, partitioning_method = partitioning_method_graph, plot_figures = plot_figures, plot_graphs = plot_graphs, plot_legends = plot_legends, classification_mode_graph = classification_mode_graph, features_to_use_for_graph = features_to_use_for_graph)
                 # MSI classification
                 if (plot_figures == TRUE) {
                     classification_ms_images_model <- model_classification$classification_msi_model
@@ -3196,7 +3509,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
             }
             if ("profile" %in% classification_mode) {
                 # Perform the classification
-                model_classification_profile <- single_model_classification_of_spectra(spectra = sample_spectra_avg, model_x = model_list[[md]], model_name = list_of_models[md], preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = 3, peak_filtering_frequency_threshold_percent = NULL, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = tof_mode, allow_parallelization = allow_parallelization, pixel_grouping = pixel_grouping, number_of_hca_nodes = number_of_hca_nodes, moving_window_size = moving_window_size, final_result_matrix = final_result_matrix_profile_patient, seed = seed, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change_GA, number_of_spectra_partitions = number_of_spectra_partitions_graph, partitioning_method = partitioning_method_graph, plot_figures = plot_figures, plot_graphs = plot_graphs, plot_legends = plot_legends)
+                model_classification_profile <- single_model_classification_of_spectra(spectra = sample_spectra_avg, model_x = model_list[[md]], model_name = list_of_models[md], preprocessing_parameters = NULL, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = 3, peak_filtering_frequency_threshold_percent = 0, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", tof_mode = tof_mode, allow_parallelization = allow_parallelization, pixel_grouping = pixel_grouping, number_of_hca_nodes = number_of_hca_nodes, moving_window_size = moving_window_size, final_result_matrix = final_result_matrix_profile_patient, seed = seed, correlation_method_for_adjacency_matrix = correlation_method_for_adjacency_matrix, correlation_threshold_for_adjacency_matrix = correlation_threshold_for_adjacency_matrix, pvalue_threshold_for_adjacency_matrix = pvalue_threshold_for_adjacency_matrix, max_GA_generations = max_GA_generations, iterations_with_no_change = iterations_with_no_change_GA, number_of_spectra_partitions = number_of_spectra_partitions_graph, partitioning_method = partitioning_method_graph, plot_figures = plot_figures, plot_graphs = plot_graphs, plot_legends = plot_legends, classification_mode_graph = classification_mode_graph, features_to_use_for_graph = features_to_use_for_graph)
                 # Plot AVG spectrum
                 if (plot_figures == TRUE) {
                     average_spectrum_profile_with_bars_model <- model_classification_profile$average_spectrum_with_bars
@@ -3205,7 +3518,7 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
                 }
                 # Add the model result matrix to the final matrix (the classification function automatically attach the result to a result matrix if provided)
                 final_result_matrix_profile_patient <- model_classification_profile$final_result_matrix
-                # Append the classification image list to the final list 
+                # Append the classification image list to the final list
                 average_spectrum_with_bars_patient[[(list_of_models[md])]] <- average_spectrum_profile_with_bars_model
             }
         }
@@ -3248,23 +3561,34 @@ spectral_classification <- function(spectra_path, filepath_R, model_list_object 
                 ### Molecular image of the classification
                 # Generate the "predicted classes" vector from the ensemble classification matrix
                 predicted_classes <- as.character(classification_ensemble_matrix_msi)
+                names(predicted_classes) <- rownames(classification_ensemble_matrix_msi)
                 # Define the class as number depending on the outcome
                 outcome_and_class <- outcome_and_class_to_MS(class_list = model_list[[1]]$class_list, outcome_list = model_list[[1]]$outcome_list, class_vector = predicted_classes)
                 # Replace the spectra intensities with the class number for plotting purposes
                 class_as_number <- outcome_and_class$class_vector_as_numeric
                 spectra_for_plotting <- sample_spectra
-                for (s in 1:length(spectra_for_plotting)) {
-                    spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+                if (is.null(names(spectra_for_plotting)) || is.null(names(class_as_number))) {
+                    for (s in 1:length(spectra_for_plotting)) {
+                        spectra_for_plotting[[s]]@intensity <- rep(class_as_number[s], length(spectra_for_plotting[[s]]@intensity))
+                    }
+                } else {
+                    for (s in 1:length(spectra_for_plotting)) {
+                        spectra_for_plotting[[s]]@intensity <- rep(class_as_number[names(spectra_for_plotting)[s]], length(spectra_for_plotting[[s]]@intensity))
+                    }
                 }
                 # Generate the MS images
                 slices <- msiSlices(spectra_for_plotting, center = spectra_for_plotting[[1]]@mass[(length(spectra_for_plotting[[1]]@mass)/2)], tolerance = 1, adjust = TRUE, method = "median")
                 plotMsiSlice(slices, legend = FALSE, scale = F)
                 # Define the legend
-                if (isTRUE(plot_legends)) {
+                if ("legend" %in% plot_legends) {
                     legend_text <- outcome_and_class$legend_text
                     legend_fill <- outcome_and_class$legend_fill
                     legend(x = "bottomright", legend = legend_text, fill = legend_fill, xjust = 0.5, yjust = 0.5)
+                }
+                if ("sample name" %in% plot_legends) {
                     legend(x = "topright", legend = spectra_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                }
+                if ("plot name" %in% plot_legends) {
                     legend(x = "topleft", legend = "Ensemble classifier", xjust = 0.5, yjust = 0.5)
                 }
                 # Store the plot into the list of images
@@ -3610,24 +3934,7 @@ feature_selection <- function(peaklist, feature_selection_method = "ANOVA", feat
 embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "pls", model_tuning = TRUE, model_tuning_mode = c("embedded", "after"), model_tune_grid = list(), selection_metric = "Accuracy", cv_repeats_control = 5, k_fold_cv_control = 10, discriminant_attribute = "Class", non_features = c("Sample", "Class"), seed = NULL, automatically_select_features = TRUE, generate_plots = TRUE, preprocessing = c("center","scale"), allow_parallelization = FALSE, feature_reranking = TRUE, external_peaklist = NULL, positive_class_cv = "HP") {
     # Load the required libraries
     install_and_load_required_packages(c("caret", "stats", "pROC", "nnet", "e1071", "kernlab", "randomForest", "klaR", "MASS", "pls", "iterators", "nnet", "SparseM", "stringi"))
-    ### Define better the (helper) functions to be used in rfe control
-    rfe_helper_functions <- list(summary = defaultSummary,
-                                 fit = function(x, y, ...) {
-                                     library("e1071")
-                                     svm(x, y, ...)
-                                 },
-                                 pred = function(object, x) predict.svm(object, nwdata = x),
-                                 rank = function(object, x, y) {
-                                     vimp <- varImp(object)
-                                     vimp <- vimp[order(vimp$Overall, decreasing = TRUE),, drop = FALSE]
-                                     vimp$var <- rownames(vimp)
-                                     vimp
-                                 },
-                                 selectSize = pickSizeBest,
-                                 selectVar = pickVars
-    )
-    # Store th helper functions in the control function
-    #rfe_ctrl$functions <- rfe_helper_functions
+    # Parallelization
     if (allow_parallelization == TRUE) {
         ### PARALLEL BACKEND
         # Detect the number of cores
@@ -3648,9 +3955,7 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
     feature_weights <- NULL
     variable_importance <- NULL
     fs_model_performance <- NULL
-    pie_chart_classification <- NULL
-    model_roc <- NULL
-    ### The simulation will fit models with subset sizes: (the subset size is the number of predictors to use)
+    ### The simulation will fit models with subset sizes: the subset size is the number of predictors to use
     if (automatically_select_features == TRUE) {
         # Define the feature subset sizes
         subset_sizes <- seq(2, features_to_select, by = 1)
@@ -3685,11 +3990,10 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         fs_model_performance <- as.numeric(max(rfe_model$fit$results$Accuracy, na.rm = TRUE))
         names(fs_model_performance) <- "Accuracy"
     }
+    # Output the best predictors after the RFE
     if (automatically_select_features == TRUE) {
-        # Output the best predictors after the RFE
         predictors_rfe <- predictors(rfe_model)
     } else {
-        # Output the best predictors after the RFE
         predictors_rfe <- predictors(rfe_model)[1:features_to_select]
     }
     # Predictors
@@ -3745,11 +4049,11 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         predicted_classes_model <- predict(fs_model, newdata = external_peaklist[,!(names(external_peaklist) %in% non_features)])
         # Create the outcomes dataframe
         classification_results_model <- data.frame(Sample = external_peaklist$Sample, Predicted = predicted_classes_model, True = external_peaklist$Class)
-        # Generate the confusion matrix to evaluate the performances
+        # Generate the confusion matrix to evaluate the performances (take the first class as positive if not specified)
         if (is.null(positive_class_cv) || !(positive_class_cv %in% levels(as.factor(peaklist[, discriminant_attribute])))) {
             positive_class_cv <- levels(as.factor(peaklist[, discriminant_attribute]))[1]
         }
-        test_performances_model <- confusionMatrix(data = predicted_classes_model, external_peaklist$Class, positive = positive_class_cv)
+        model_performance_confusion_matrix <- confusionMatrix(data = predicted_classes_model, reference = external_peaklist$Class, positive = positive_class_cv)
         ## ROC analysis
         model_roc <- list()
         roc_curve <- roc(response = as.numeric(classification_results_model$True), predictor = as.numeric(classification_results_model$Predicted))
@@ -3779,9 +4083,13 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         } else {
             pie_chart_classification <- NULL
         }
+    } else {
+        model_performance_confusion_matrix <- NULL
+        pie_chart_classification <- NULL
+        model_roc <- NULL
     }
     ### Return the values
-    return(list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance, feature_selection_model = fs_model, class_list = levels(as.factor(peaklist[, discriminant_attribute])), pie_chart_classification = pie_chart_classification, model_roc = model_roc))
+    return(list(peaklist_feature_selection = peaklist_feature_selection, predictors_feature_selection = predictors_feature_selection, feature_selection_graphics = feature_selection_graphics, feature_weights = feature_weights, variable_importance = variable_importance, fs_model_performance = fs_model_performance, feature_selection_model = fs_model, class_list = levels(as.factor(peaklist[, discriminant_attribute])), pie_chart_classification = pie_chart_classification, model_roc = model_roc, model_performance_confusion_matrix = model_performance_confusion_matrix))
 }
 
 
@@ -3832,6 +4140,183 @@ automated_embedded_rfe <- function(peaklist, features_to_select = 20, selection_
     }
     ### Return the values
     return(best_rfe_model)
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+############### MODEL ENSEMBLE TRAINING/TUNING (WITH EMBEDDED FEATURE SELECTION)
+# The function takes a peaklist as input (samples/spectra as rows and aligned peaks as columns) and performs feature selection coupled with model training and tuning according to the input parameters. It can automatically select the number of features according to the model performances in the tuning phase or select a fix number of features in the tuning phase: corss-validation is used to adjust the tuning parameters. The best model is selected and returned.
+# Several models undergo training/tuning with a selected number of features (each model selects its own).
+# The function returns a list of models (with the model object, the model ID, the performances, the outcome list, the class list and the features), a matrix listing the cross-validation performances for each model and the feature list (common and for each model).
+model_ensemble_embedded_fs <- function(peaklist, features_to_select = 20, model_tuning = TRUE, model_tuning_mode = "after", selection_metric = "Accuracy", discriminant_attribute = "Class", non_features = c("Sample", "Class"), seed = 12345, automatically_select_features = FALSE, generate_plots = TRUE, cv_repeats_control = 5, k_fold_cv_control = 3, preprocessing = c("center", "scale"), allow_parallelization = TRUE, feature_reranking = FALSE, try_combination_of_parameters = FALSE, outcome_list = c("benign", "malignant"), progress_bar = NULL) {
+    # Progress bar (from 0 to 90 % is the feature selection and model tuning, the last 10% is the generation of the model list for the RData file: round the percentage values manually!)
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        install_and_load_required_packages("tcltk")
+        fs_progress_bar <- tkProgressBar(title = "Computing...", label = "", min = 0, max = 1, initial = 0, width = 300)
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        fs_progress_bar <- txtProgressBar(title = "Computing...", label = "", min = 0, max = 1, initial = 0, char = "=", style = 3)
+    }
+    ##### Feature selection (embedded method)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0, title = NULL, label = "Partial Least Squares")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0, title = NULL, label = "Partial Least Squares")
+    }
+    # Partial Least Squares
+    pls_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "pls", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = data.frame(ncomp = 1:5), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
+    pls_model <- pls_model_rfe$feature_selection_model
+    pls_model_features <- pls_model_rfe$predictors_feature_selection
+    pls_model_class_list <- pls_model_rfe$class_list
+    pls_model_ID <- "pls"
+    pls_model_performance <- pls_model_rfe$fs_model_performance
+    print("Partial Least Squares")
+    print(pls_model_features)
+    print(pls_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "RBF Support Vector Machines")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.12, title = NULL, label = "RBF Support Vector Machines")
+    }
+    # Support Vector Machine (with Radial Basis Kernel function)
+    svmRadial_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmRadial", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(sigma = 10^(-5:5), C = 10^(-5:5)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
+    svmRadial_model <- svmRadial_model_rfe$feature_selection_model
+    svmRadial_model_features <- svmRadial_model_rfe$predictors_feature_selection
+    svmRadial_model_class_list <- svmRadial_model_rfe$class_list
+    svmRadial_model_ID <- "svm"
+    svmRadial_model_performance <- svmRadial_model_rfe$fs_model_performance
+    print("Support Vector Machine (with Radial Basis Kernel function)")
+    print(svmRadial_model_features)
+    print(svmRadial_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Polynomial Support Vector Machines")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.24, title = NULL, label = "Polynomial Support Vector Machines")
+    }
+    # Support Vector Machine (with Polynomial Kernel function)
+    svmPoly_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "svmPoly", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(C = 10^(-5:5), degree = 1:5, scale = 1), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
+    svmPoly_model <- svmPoly_model_rfe$feature_selection_model
+    svmPoly_model_features <- svmPoly_model_rfe$predictors_feature_selection
+    svmPoly_model_class_list <- svmPoly_model_rfe$class_list
+    svmPoly_model_ID <- "svm"
+    svmPoly_model_performance <- svmPoly_model_rfe$fs_model_performance
+    print("Support Vector Machine (with Polynomial Kernel function)")
+    print(svmPoly_model_features)
+    print(svmPoly_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.36, title = NULL, label = "Random Forest")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.36, title = NULL, label = "Random Forest")
+    }
+    # Random Forest
+    rf_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "rf", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(mtry = seq(1,5, by = 1)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
+    rf_model <- rf_model_rfe$feature_selection_model
+    rf_model_features <- rf_model_rfe$predictors_feature_selection
+    rf_model_class_list <- rf_model_rfe$class_list
+    rf_model_ID <- "rf"
+    rf_model_performance <- rf_model_rfe$fs_model_performance
+    print("Random Forest")
+    print(rf_model_features)
+    print(rf_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes Classifier")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.48, title = NULL, label = "Naive Bayes Classifier")
+    }
+    # Naive Bayes Classifier
+    nbc_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "nb", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = data.frame(fL = seq(0, 1, by = 0.2), usekernel = c(TRUE, FALSE), adjust = c(TRUE, FALSE)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
+    nbc_model <- nbc_model_rfe$feature_selection_model
+    nbc_model_features <- nbc_model_rfe$predictors_feature_selection
+    nbc_model_class_list <- nbc_model_rfe$class_list
+    nbc_model_ID <- "nbc"
+    nbc_model_performance <- nbc_model_rfe$fs_model_performance
+    print("Naive Bayes Classifier")
+    print(nbc_model_features)
+    print(nbc_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "k-Nearest Neighbor")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.60, title = NULL, label = "k-Nearest Neighbor")
+    }
+    # K-Nearest Neighbor
+    knn_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "knn", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(k = seq(1,15, by = 1)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
+    knn_model <- knn_model_rfe$feature_selection_model
+    knn_model_features <- knn_model_rfe$predictors_feature_selection
+    knn_model_class_list <- knn_model_rfe$class_list
+    knn_model_ID <- "knn"
+    knn_model_performance <- knn_model_rfe$fs_model_performance
+    print("k-Nearest Neighbor")
+    print(knn_model_features)
+    print(knn_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.72, title = NULL, label = "Neural Network")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.72, title = NULL, label = "Neural Network")
+    }
+    # Neural Network
+    nnet_model_rfe <- automated_embedded_rfe(peaklist = peaklist, features_to_select = features_to_select, selection_method = "nnet", model_tuning = model_tuning, model_tuning_mode = model_tuning_mode, model_tune_grid = list(size = seq(1,5, by = 1), decay = seq(0,2,by = 1)), selection_metric = selection_metric, cv_repeats_control = cv_repeats_control, k_fold_cv_control = k_fold_cv_control, discriminant_attribute = discriminant_attribute, non_features = non_features, seed = seed, automatically_select_features = automatically_select_features, generate_plots = generate_plots, preprocessing = preprocessing, allow_parallelization = allow_parallelization, feature_reranking = feature_reranking, try_combination_of_parameters = try_combination_of_parameters)
+    nnet_model <- nnet_model_rfe$feature_selection_model
+    nnet_model_features <- nnet_model_rfe$predictors_feature_selection
+    nnet_model_class_list <- nnet_model_rfe$class_list
+    nnet_model_ID <- "nnet"
+    nnet_model_performance <- nnet_model_rfe$fs_model_performance
+    print("Neural Network")
+    print(nnet_model_features)
+    print(nnet_model_performance)
+    ##### Elements for the RData
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.90, title = NULL, label = "Building model list...")
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.90, title = NULL, label = "Building model list...")
+    }
+    ### Each model contains: the model object, the class list, the outcome list, the list of features, the model ID and the model performances
+    # Partial Least Squares
+    PLS_model_list <- list(model = pls_model, class_list = pls_model_class_list, outcome_list = outcome_list, features_model = pls_model_features, model_ID = pls_model_ID, model_performance = pls_model_performance)
+    # Support Vector Machine (with Radial Basis Kernel function)
+    RSVM_model_list <- list(model = svmRadial_model, class_list = svmRadial_model_class_list, outcome_list = outcome_list, features_model = svmRadial_model_features, model_ID = svmRadial_model_ID, model_performance = svmRadial_model_performance)
+    # Support Vector Machine (with Polynomial Kernel function)
+    PSVM_model_list <- list(model = svmPoly_model, class_list = svmPoly_model_class_list, outcome_list = outcome_list, features_model = svmPoly_model_features, model_ID = svmPoly_model_ID, model_performance = svmPoly_model_performance)
+    # Random Forest
+    RF_model_list <- list(model = rf_model, class_list = rf_model_class_list, outcome_list = outcome_list, features_model = rf_model_features, model_ID = rf_model_ID, model_performance = rf_model_performance)
+    # Naive Bayes Classifier
+    NBC_model_list <- list(model = nbc_model, class_list = nbc_model_class_list, outcome_list = outcome_list, features_model = nbc_model_features, model_ID = nbc_model_ID, model_performance = nbc_model_performance)
+    # K-Nearest Neighbor
+    KNN_model_list <- list(model = knn_model, class_list = knn_model_class_list, outcome_list = outcome_list, features_model = knn_model_features, model_ID = knn_model_ID, model_performance = knn_model_performance)
+    # Neural Network
+    NNET_model_list <- list(model = nnet_model, class_list = nnet_model_class_list, outcome_list = outcome_list, features_model = nnet_model_features, model_ID = nnet_model_ID, model_performance = nnet_model_performance)
+    # Progress bar
+    if (!is.null(progress_bar) && progress_bar == "tcltk") {
+        setTkProgressBar(fs_progress_bar, value = 0.95, title = NULL, label = NULL)
+    } else if (!is.null(progress_bar) && progress_bar == "txt") {
+        setTxtProgressBar(fs_progress_bar, value = 0.95, title = NULL, label = NULL)
+    }
+    ### Build the final model list (to be exported) (each element has the proper name of the model)
+    model_list <- list("SVM Radial Basis" = RSVM_model_list, "SVM Polynomial" = PSVM_model_list, "Partial Least Squares" = PLS_model_list, "Random Forest" = RF_model_list, "Naive Bayes Classifier" = NBC_model_list, "k-Nearest Neighbor" = KNN_model_list, "Neural Network" = NNET_model_list)
+    ### Build the final feature vector
+    feature_list <- extract_feature_list_from_model_list(filepath_R = model_list, model_list_object = "model_list", features_to_return = features_to_select)
+    ### Build the matrix with the model performances
+    model_performance_matrix <- extract_performance_matrix_from_model_list(filepath_R = model_list, model_list_object = "model_list")
+    # Progress bar
+    if (!is.null(progress_bar)) {
+        close(fs_progress_bar)
+    }
+    ##### Return
+    return(list(model_list = model_list, feature_list = feature_list, model_performance_matrix = model_performance_matrix))
 }
 
 
@@ -4907,7 +5392,7 @@ spectral_typer_score_similarity_index <- function(spectra_database, spectra_test
 
 #################################################### ADJACENCY MATRIX GENERATION
 # The function generates an adjacency matrix from a peak list matrix, in order to generate a graph. The matrix is computed first by generating a correlation matrix and then replacing the correlation coefficients with 0 or 1 according to a threshold value.
-generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "pearson", correlation_threshold = 0.90, pvalue_threshold = 0.05) {
+generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "spearman", correlation_threshold = 0.90, pvalue_threshold = 0.05) {
     ##### Install the required packages
     install_and_load_required_packages("stats")
     ##### Transpose the peaklist matrix to compute the correlation between observations and not features
@@ -4926,6 +5411,9 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "pea
         }
         ##### Generate the final adjacency matrix
         adjacency_matrix <- apply(correlation_matrix, MARGIN = c(1,2), FUN = function(x) matrix_replacement_subfunction(x, threshold = correlation_threshold))
+        ##### Fix the column and row names
+        rownames(adjacency_matrix) <- rownames(peaklist_matrix)
+        colnames(adjacency_matrix) <- rownames(peaklist_matrix)
     } else {
         ##### Install the required packages
         install_and_load_required_packages("psych")
@@ -4955,6 +5443,9 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "pea
         }
         ##### Generate the final adjacency matrix
         adjacency_matrix <- apply(global_matrix, MARGIN = c(1,2), FUN = function(x) matrix_replacement_subfunction(x, coeff_threshold = correlation_threshold, p_threshold = pvalue_threshold))
+        ##### Fix the column and row names
+        rownames(adjacency_matrix) <- rownames(peaklist_matrix)
+        colnames(adjacency_matrix) <- rownames(peaklist_matrix)
     }
     ##### Return the matrix
     return(adjacency_matrix)
@@ -4974,11 +5465,9 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "pea
 # The function takes a list of spectra and a vector of custom features to be included in the generation of the final peaklist intensity matrix. The functions takes the spectra, preprocesses the spectra according to the specified parameters, performs the peak picking and outputs the intensity matrix only for the peaks specified as input (not all of those custom peaks if they are outside of the spectral mass range).
 # If the range provided is too large, the function will return a NULL value, since some custom features cannot be found.
 # This function is suited for aligning the spectral features (of an unknown dataset) with the model features.
-generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NULL, tof_mode = "linear", preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_method = NULL), peak_picking_algorithm = "SuperSmoother", peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", allow_parallelization = FALSE, deisotope_peaklist = FALSE) {
+generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NULL, tof_mode = "linear", preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL), peak_picking_algorithm = "SuperSmoother", peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", allow_parallelization = FALSE, deisotope_peaklist = FALSE) {
     ### Install the required packages
     install_and_load_required_packages("MALDIquant")
-    ### Rearrange spectra for reproducibility
-    spectra <- rearrange_spectral_dataset(spectra = spectra, rearranging_method = "space")
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     ### Define the tolerance
@@ -5092,7 +5581,11 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
                 final_peaklist_matrix <- as.matrix(rbind(intensity_matrix_all[names(intensity_matrix_all) %in% as.character(custom_feature_vector)]))
             }
             # Rownames
-            rownames(final_peaklist_matrix) <- seq(1, nrow(final_peaklist_matrix), by = 1)
+            if (is.null(names(spectra))) {
+                rownames(final_peaklist_matrix) <- seq(1, nrow(final_peaklist_matrix), by = 1)
+            } else {
+                rownames(final_peaklist_matrix) <- names(spectra)
+            }
             ### Return the final matrix with the custom features
             return(final_peaklist_matrix)
         } else {
@@ -5104,7 +5597,11 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
         peaks <- align_and_filter_peaks(peaks, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, reference_peaklist = NULL, spectra = spectra, alignment_iterations = 5, allow_parallelization = allow_parallelization)
         final_peaklist_matrix <- intensityMatrix(peaks, spectra)
         # Rownames
-        rownames(final_peaklist_matrix) <- seq(1, nrow(final_peaklist_matrix), by = 1)
+        if (is.null(names(spectra))) {
+            rownames(final_peaklist_matrix) <- seq(1, nrow(final_peaklist_matrix), by = 1)
+        } else {
+            rownames(final_peaklist_matrix) <- names(spectra)
+        }
         return(final_peaklist_matrix)
     }
 }
@@ -5150,7 +5647,7 @@ rearrange_spectral_dataset <- function(spectra, rearranging_method = c("space","
                 rectangle_coordinates[1,2] <- min(spectral_coordinates[,2])
                 rectangle_coordinates[2,2] <- max(spectral_coordinates[,2])
                 rownames(rectangle_coordinates) <- c("min", "max")
-                colnames(rectangle_coordinates) <- c("x", "y") 
+                colnames(rectangle_coordinates) <- c("x", "y")
                 ## Determine the WIDEST coordinate
                 if (rectangle_coordinates[2,1] >= rectangle_coordinates[2,2]) {
                     widest_coordinate <- "x"
@@ -5242,7 +5739,7 @@ partition_spectral_dataset <- function(spectra, partitioning_method = c("space",
                 rectangle_coordinates[1,2] <- min(spectral_coordinates[,2])
                 rectangle_coordinates[2,2] <- max(spectral_coordinates[,2])
                 rownames(rectangle_coordinates) <- c("min", "max")
-                colnames(rectangle_coordinates) <- c("x", "y") 
+                colnames(rectangle_coordinates) <- c("x", "y")
                 ##### Split the dataset based upon the the WIDEST coordinate
                 if (abs(rectangle_coordinates[2,1] - rectangle_coordinates[1,1]) >= abs(rectangle_coordinates[2,2] - rectangle_coordinates[1,2])) {
                     widest_coordinate <- "x"
@@ -5628,8 +6125,6 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
         input_graph <- initial_graph
         input_adjacency_matrix <- input_adjacency_matrix
     }
-    #### Define the graph typology
-    graph_type <- graph_type
     ########## Vertex mutation parameters
     # The vertex number is the number of spectra in the graph
     vertex_number <- length(V(input_graph))
@@ -5791,8 +6286,8 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
     final_graph <- FinalSplitGraph(best_solution)
     # Generate the adjacency matrix again from the final graph
     output_adjacency_matrix <- as.matrix(as_adjacency_matrix(final_graph, type = "both"))
-    rownames(output_adjacency_matrix) <- seq(1, nrow(output_adjacency_matrix))
-    colnames(output_adjacency_matrix) <- seq(1, ncol(output_adjacency_matrix))
+    rownames(output_adjacency_matrix) <- rownames(input_adjacency_matrix)
+    colnames(output_adjacency_matrix) <- colnames(input_adjacency_matrix)
     ########## Extract the final chromosome (with the vertex IDs) and Reassign the leftover vertices
     ##### Subgraph generated
     if (!is.null(number_of_high_degree_vertices_for_subgraph) && number_of_high_degree_vertices_for_subgraph > 0 && number_of_high_degree_vertices_for_subgraph < length(V(initial_graph))) {
@@ -5827,10 +6322,10 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
         # Extract the final chromosome (with the vertex IDs)
         if (nrow(as.matrix(GA_model@solution)) > 1) {
             final_chromosome <- as.vector(GA_model@solution[1,])
-            names(final_chromosome) <- colnames(as.matrix(GA_model@solution[1,]))
+            names(final_chromosome) <- colnames(output_adjacency_matrix)
         } else {
             final_chromosome <- as.vector(GA_model@solution)
-            names(final_chromosome) <- colnames(as.matrix(GA_model@solution))
+            names(final_chromosome) <- colnames(output_adjacency_matrix)
         }
     }
     ### Return
@@ -5848,20 +6343,23 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
 
 
 ####################### FROM GENETIC ALGORITHM ON GRAPH TO SPECTRA AND MS IMAGES
-# The function takes the result of the genetic algorithm optimization (the genetic model object) and the list of spectra used to generate the adjacency matrix for the function 'genetic_algorithm_graph', it extracts the final chromosome (generated after the optimization) and it mirrors it onto the list of spectra, so that the output is a list of spectra belonging to the clique and a list of spectra belonging to the independent set. In addition, a list of spectra for plotting purposes is returned. 
+# The function takes the result of the genetic algorithm optimization (the genetic model object) and the list of spectra used to generate the adjacency matrix for the function 'genetic_algorithm_graph', it extracts the final chromosome (generated after the optimization) and it mirrors it onto the list of spectra, so that the output is a list of spectra belonging to the clique and a list of spectra belonging to the independent set. In addition, a list of spectra for plotting purposes is returned.
 from_GA_to_MS <- function(final_chromosome_GA, spectra, spectra_format = "imzml") {
     ##### Install and load the required packages
     install_and_load_required_packages(c("MALDIquant", "parallel", "doParallel", "igraph", "GA"))
-    ### Rearrange spectra for reproducibility
-    spectra <- rearrange_spectral_dataset(spectra = spectra, rearranging_method = "space")
     ########## Isolate the final chromosome (after mutations and fitness optimization)
     ## The spectra with identified with a 0 are the spectra outside the clique, while the spectra identified by a 1 belong to the clique (take only the first row if it is a matrix)
     ## Identify the spectra belonging to the clique and to the independent set
     spectra_clique_id <- which(final_chromosome_GA == 1)
     spectra_independent_id <- which(final_chromosome_GA == 0)
     ### Generate the lists (clique and independent)
-    spectra_clique <- spectra[spectra_clique_id]
-    spectra_independent <- spectra[spectra_independent_id]
+    if (is.null(names(spectra))) {
+        spectra_clique <- spectra[spectra_clique_id]
+        spectra_independent <- spectra[spectra_independent_id]
+    } else {
+        spectra_clique <- spectra[names(spectra_clique_id)]
+        spectra_independent <- spectra[names(spectra_independent_id)]
+    }
     ### Replace intensities with a number resembling their belonging to the clique (red) or independent set (green)
     spectra_clique_for_plotting <- spectra_clique
     spectra_independent_for_plotting <- spectra_independent
@@ -5888,7 +6386,9 @@ from_GA_to_MS <- function(final_chromosome_GA, spectra, spectra_format = "imzml"
     ## Append to the final spectral lists
     spectra_all_for_plotting <- append(spectra_clique_for_plotting, spectra_independent_for_plotting)
     # Fix the spectra name (for output)
-    spectra_all_for_plotting <- replace_sample_name(spectra_all_for_plotting, spectra_format = spectra_format)
+    #spectra_all_for_plotting <- replace_sample_name(spectra_all_for_plotting, spectra_format = spectra_format)
+    ### Rearrange spectra for reproducibility
+    #spectra_all_for_plotting <- rearrange_spectral_dataset(spectra = spectra_all_for_plotting, rearranging_method = "space")
     #file_explan <- "Performance"
     #FILE_NAME <- sprintf("%s%s%s%s%s",vertex_number,"_",graph_type,"_",file_explan)
     #sizeGrWindow(10,5)
@@ -5918,7 +6418,7 @@ from_GA_to_MS <- function(final_chromosome_GA, spectra, spectra_format = "imzml"
 #################################################### GRAPH SEGMENTATION FUNCTION
 # The function returns (for the imzML MSI dataset provided as the variable spectra) the list of spectra in the clique, the list of spectra in the independent set and the MS images (with pixels related to spectra in the clique in red and pixels related to spectra in the independent set in green), the initial and the final graph.
 # It returns a NULL value if the segmentation is not possible due to incompatibilities between the features in the dataset and the ones provided by the model.
-graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL, process_spectra_in_packages_of = 0, spectral_alignment_method = NULL), allow_parallelization = FALSE, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, SNR = 5, tof_mode = "reflectron", peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = TRUE, number_of_spectra_partitions = 1, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
+graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL, process_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL), allow_parallelization = FALSE, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, SNR = 5, tof_mode = "reflectron", peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name"), number_of_spectra_partitions = 1, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
     # Install and load the required packages
     install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "parallel", "caret", "pls", "tcltk", "kernlab", "pROC", "e1071", "igraph", "GA"))
     ### Import the dataset (if filepath_imzml is not already a list of spectra)
@@ -5931,8 +6431,10 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
     } else if (isMassSpectrumList(filepath_imzml) || isMassSpectrum(filepath_imzml)) {
         spectra <- filepath_imzml
     }
+    ### Identify the original spectra by setting the names (better unique identification of the spectra)
+    spectra <- replace_sample_name_list(spectra, spectra_format = spectra_format)
     ### Rearrange spectra for reproducibility
-    spectra <- rearrange_spectral_dataset(spectra = spectra, rearranging_method = "space")
+    #spectra <- rearrange_spectral_dataset(spectra = spectra, rearranging_method = "space")
     #################### Partition the spectra
     if (number_of_spectra_partitions > 1) {
         # Initialize the output
@@ -5994,10 +6496,14 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
         ### Plot the MS image
         if (plot_figures == TRUE) {
             plotMsiSlice(slices, legend = FALSE, scale = F)
-            if (isTRUE(plot_legends)) {
+            if ("legend" %in% plot_legends) {
                 ### Add the legend
                 legend(x = "bottomright", legend = c("clique","independent set"), fill = c("red","green"), xjust = 0.5, yjust = 0.5)
+            }
+            if ("sample name" %in% plot_legends) {
                 legend(x = "topright", legend = spectra_all_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+            }
+            if ("plot name" %in% plot_legends) {
                 legend(x = "topleft", legend = "Graph segmentation", xjust = 0.5, yjust = 0.5)
             }
             # Record the plot
@@ -6013,7 +6519,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
         ga_model_plot <- NULL
         final_graph_plot <- NULL
         ### Use only the features from the model
-        peaklist_matrix <- generate_custom_intensity_matrix(spectra, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization)
+        peaklist_matrix <- generate_custom_intensity_matrix(spectra = spectra, custom_feature_vector = custom_feature_vector, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, peak_picking_algorithm = peak_picking_algorithm, deisotope_peaklist = deisotope_peaklist, peak_picking_SNR = SNR, peak_filtering_frequency_threshold_percent = peak_filtering_frequency_threshold_percent, low_intensity_peak_removal_threshold_percent = low_intensity_peak_removal_threshold_percent, low_intensity_peak_removal_threshold_method = low_intensity_peak_removal_threshold_method, allow_parallelization = allow_parallelization)
         ### If a NULL value is returned, it means that the model is incompatible with the features in the dataset
         if (!is.null(peaklist_matrix)) {
             # Compute the adjacency matrix
@@ -6045,10 +6551,14 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
             ### Plot the MS image
             if (plot_figures == TRUE) {
                 plotMsiSlice(slices, legend = FALSE, scale = F)
-                if (isTRUE(plot_legends)) {
+                if ("legend" %in% plot_legends) {
                     ### Add the legend
                     legend(x = "bottomright", legend = c("clique","independent set"), fill = c("red","green"), xjust = 0.5, yjust = 0.5)
+                }
+                if ("sample name" %in% plot_legends) {
                     legend(x = "topright", legend = spectra_all_for_plotting[[1]]@metaData$file[1], xjust = 0.5, yjust = 0.5)
+                }
+                if ("plot name" %in% plot_legends) {
                     legend(x = "topleft", legend = "Graph segmentation", xjust = 0.5, yjust = 0.5)
                 }
                 # Record the plot
@@ -6153,7 +6663,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.03.30.0"
+R_script_version <- "2017.04.28.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -6175,15 +6685,15 @@ install_and_load_required_packages(c("tcltk", "ggplot2"), repository = "http://c
 
 
 
-###################################### Initialise the variables (default values)
+###################################### Initialize the variables (default values)
 filepath_database <- NULL
 filepath_test <- NULL
 output_folder <- getwd()
 average_replicates_in_database <- FALSE
 average_replicates_in_test <- FALSE
 peaks_filtering <- FALSE
-low_intensity_peaks_removal <- FALSE
-intensity_threshold_method <- "element-wise"
+low_intensity_peak_removal_threshold_percent <- 0
+low_intensity_peak_removal_threshold_method <- "element-wise"
 tof_mode <- "linear"
 spectra_format <- "brukerflex"
 score_only <- FALSE
@@ -6209,8 +6719,12 @@ baseline_subtraction_iterations <- 200
 normalization <- TRUE
 normalization_algorithm <- "TIC"
 normalization_mass_range <- NULL
-preprocess_spectra_in_packages_of <- 200
+preprocess_spectra_in_packages_of <- 0
 mass_range <- c(3000,15000)
+spectral_alignment <- FALSE
+spectral_alignment_algorithm <- NULL
+spectral_alignment_reference <- NULL
+peaks_deisotoping <- FALSE
 preprocessing_parameters_database <- list(crop_spectra = TRUE, mass_range = NULL, data_transformation = NULL, transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = NULL, baseline_subtraction_algorithm = NULL, baseline_subtraction_iterations = NULL, normalization_algorithm = NULL, normalization_mass_range = NULL)
 
 
@@ -6227,17 +6741,20 @@ low_intensity_peaks_removal_value <- "NO"
 score_only_value <- "NO"
 spectra_path_output_value <- "YES"
 similarity_criteria_value <- "correlation"
-peak_picking_algorithm_value <- "   SuperSmoother   "
+peak_picking_algorithm_value <- "SuperSmoother"
 peak_picking_mode_value <- "all"
-intensity_threshold_method_value <- "element-wise"
+low_intensity_peak_removal_threshold_method_value <- "element-wise"
 spectra_format_value <- "Xmass"
-allow_parallelization_value <- "   NO   "
-transform_data_value <- "    NO    "
-smoothing_value <- "YES (SavitzkyGolay , medium)"
-baseline_subtraction_value <- "YES (SNIP , iterations: 200)"
-normalization_value <- "YES (TIC , mass range: )"
-mass_range_value <- "3000 , 15000"
-preprocess_spectra_in_packages_of_value <- "200"
+allow_parallelization_value <- "NO"
+transform_data_value <- "NO"
+smoothing_value <- paste("YES", "\n( ", "SavitzkyGolay", ",\n" , "medium", " )", sep = "")
+baseline_subtraction_value <- paste("YES", "\n( ", "SNIP", ",\niterations: ", "200", " )", sep = "")
+normalization_value <- paste("YES", "\n( ", "TIC", " )", sep = "")
+spectral_alignment_value <- "NO"
+spectral_alignment_algorithm_value <- ""
+spectral_alignment_reference_value <- ""
+peaks_deisotoping_value <- "NO"
+preprocess_spectra_in_packages_of_value <- "0"
 
 
 
@@ -6319,11 +6836,11 @@ check_for_updates_function <- function() {
             if (is.null(online_version_number)) {
                 # The version number could not be ckecked due to internet problems
                 # Update the label
-                check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked: connection problems", sep = "")
+                check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked:\nconnection problems", sep = "")
             } else {
                 if (update_available == TRUE) {
                     # Update the label
-                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
+                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available:\n", online_version_number, sep = "")
                 } else {
                     # Update the label
                     check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
@@ -6334,7 +6851,7 @@ check_for_updates_function <- function() {
     ### Something went wrong: library not installed, retrieving failed, errors in parsing the version number
     if (is.null(online_version_number)) {
         # Update the label
-        check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked: connection problems", sep = "")
+        check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked:\nconnection problems", sep = "")
     }
     # Escape the function
     .GlobalEnv$update_available <- update_available
@@ -6365,7 +6882,7 @@ download_updates_function <- function() {
             file_downloaded <- TRUE
         }, silent = TRUE)
         if (file_downloaded == TRUE) {
-            tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", script_file_name, "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
+            tkmessageBox(title = "Updated file downloaded!", message = paste("The updated script, named:\n\n", paste(script_file_name, " (", online_version_number, ").R", sep = ""), "\n\nhas been downloaded to:\n\n", download_folder, "\n\nClose everything, delete this file and run the script from the new file!", sep = ""), icon = "info")
             tkmessageBox(title = "Changelog", message = paste("The updated script contains the following changes:\n", online_change_log, sep = ""), icon = "info")
         } else {
             tkmessageBox(title = "Connection problem", message = paste("The updated script file could not be downloaded due to internet connection problems!\n\nManually download the updated script file at:\n\n", github_R_url, sep = ""), icon = "warning")
@@ -6381,12 +6898,12 @@ preprocessing_window_function <- function() {
     # Transform the data
     transform_data_choice <- function() {
         # Catch the value from the menu
-        transform_data <- select.list(c("YES","NO"), title = "Choose")
+        transform_data <- select.list(c("YES","NO"), title = "Choose", multiple = FALSE, preselect = "NO")
         # Default
         if (transform_data == "YES") {
             transform_data <- TRUE
             # Ask for the algorithm
-            transform_data_algorithm <- select.list(c("sqrt","log","log2","log10"), title="Choose")
+            transform_data_algorithm <- select.list(c("sqrt","log","log2","log10"), title = "Choose", multiple = FALSE, preselect = "log10")
             # Default
             if (transform_data_algorithm == "") {
                 transform_data_algorithm <- "sqrt"
@@ -6397,12 +6914,12 @@ preprocessing_window_function <- function() {
         }
         # Set the value of the displaying label
         if (transform_data == TRUE) {
-            transform_data_value <- paste("YES", "(", transform_data_algorithm, ")")
+            transform_data_value <- paste("YES", "\n( ", transform_data_algorithm, " )", sep = "")
         } else {
-            transform_data_value <- "                      NO                           "
+            transform_data_value <- "NO"
         }
-        transform_data_value_label <- tklabel(preproc_window, text = transform_data_value, font = label_font)
-        tkgrid(transform_data_value_label, row = 3, column = 2)
+        transform_data_value_label <- tklabel(preproc_window, text = transform_data_value, font = label_font, bg = "white", width = 20, height = 2)
+        tkgrid(transform_data_value_label, row = 3, column = 2, padx = c(5, 5), pady = c(5, 5))
         # Escape the function
         .GlobalEnv$transform_data <- transform_data
         .GlobalEnv$transform_data_algorithm <- transform_data_algorithm
@@ -6411,18 +6928,18 @@ preprocessing_window_function <- function() {
     # Smoothing
     smoothing_choice <- function() {
         # Catch the value from the menu
-        smoothing <- select.list(c("YES","NO"), title="Choose")
+        smoothing <- select.list(c("YES","NO"), title = "Choose", multiple = FALSE, preselect = "YES")
         # Default
         if (smoothing == "YES" || smoothing == "") {
             smoothing <- TRUE
             # Ask for the algorithm
-            smoothing_algorithm <- select.list(c("SavitzkyGolay","MovingAverage"), title="Choose")
+            smoothing_algorithm <- select.list(c("SavitzkyGolay","MovingAverage"), title = "Choose", multiple = FALSE, preselect = "SavitzkyGolay")
             # Default
             if (smoothing_algorithm == "") {
                 smoothing_algorithm <- "SavitzkyGolay"
             }
             # Strength
-            smoothing_strength <- select.list(c("medium","strong","stronger"), title="Choose")
+            smoothing_strength <- select.list(c("medium","strong","stronger"), title = "Choose", multiple = FALSE, preselect = "medium")
             if (smoothing_strength == "") {
                 smoothing_strength <- "medium"
             }
@@ -6432,12 +6949,12 @@ preprocessing_window_function <- function() {
         }
         # Set the value of the displaying label
         if (smoothing == TRUE) {
-            smoothing_value <- paste("YES", "(", smoothing_algorithm, "," , smoothing_strength, ")")
+            smoothing_value <- paste("YES", "\n( ", smoothing_algorithm, ",\n" , smoothing_strength, " )", sep = "")
         } else {
-            smoothing_value <- "                           NO                             "
+            smoothing_value <- "NO"
         }
-        smoothing_value_label <- tklabel(preproc_window, text = smoothing_value, font = label_font)
-        tkgrid(smoothing_value_label, row = 4, column = 2)
+        smoothing_value_label <- tklabel(preproc_window, text = smoothing_value, font = label_font, bg = "white", width = 20, height = 3)
+        tkgrid(smoothing_value_label, row = 4, column = 2, padx = c(5, 5), pady = c(5, 5))
         # Escape the function
         .GlobalEnv$smoothing <- smoothing
         .GlobalEnv$smoothing_strength <- smoothing_strength
@@ -6447,12 +6964,12 @@ preprocessing_window_function <- function() {
     # Baseline subtraction
     baseline_subtraction_choice <- function() {
         # Catch the value from the menu
-        baseline_subtraction <- select.list(c("YES","NO"), title = "Choose")
+        baseline_subtraction <- select.list(c("YES","NO"), title = "Choose", multiple = FALSE, preselect = "YES")
         # Default
         if (baseline_subtraction == "YES" || baseline_subtraction == "") {
             baseline_subtraction <- TRUE
             # Ask for the algorithm
-            baseline_subtraction_algorithm <- select.list(c("SNIP","TopHat","ConvexHull","median"), title="Choose")
+            baseline_subtraction_algorithm <- select.list(c("SNIP","TopHat","ConvexHull","median"), title = "Choose", multiple = FALSE, preselect = "SNIP")
             # SNIP
             if (baseline_subtraction_algorithm == "SNIP") {
                 baseline_subtraction_iterations <- tclvalue(baseline_subtraction_iterations2)
@@ -6470,14 +6987,14 @@ preprocessing_window_function <- function() {
         }
         # Set the value of the displaying label
         if (baseline_subtraction == TRUE && baseline_subtraction_algorithm != "SNIP") {
-            baseline_subtraction_value <- paste("YES", "(", baseline_subtraction_algorithm, ")")
+            baseline_subtraction_value <- paste("YES", "\n( ", baseline_subtraction_algorithm, " )\n", sep = "")
         } else if (baseline_subtraction == TRUE && baseline_subtraction_algorithm == "SNIP") {
-            baseline_subtraction_value <- paste("YES", "(", baseline_subtraction_algorithm, ", iterations:", baseline_subtraction_iterations, ")")
+            baseline_subtraction_value <- paste("YES", "\n( ", baseline_subtraction_algorithm, ",\niterations: ", baseline_subtraction_iterations, " )", sep = "")
         } else {
-            baseline_subtraction_value <- "                                    NO                                 "
+            baseline_subtraction_value <- "NO"
         }
-        baseline_subtraction_value_label <- tklabel(preproc_window, text = baseline_subtraction_value, font = label_font)
-        tkgrid(baseline_subtraction_value_label, row = 5, column = 3)
+        baseline_subtraction_value_label <- tklabel(preproc_window, text = baseline_subtraction_value, font = label_font, bg = "white", width = 20, height = 3)
+        tkgrid(baseline_subtraction_value_label, row = 5, column = 3, padx = c(5, 5), pady = c(5, 5))
         # Escape the function
         .GlobalEnv$baseline_subtraction <- baseline_subtraction
         .GlobalEnv$baseline_subtraction_iterations <- baseline_subtraction_iterations
@@ -6487,12 +7004,12 @@ preprocessing_window_function <- function() {
     # Normalization
     normalization_choice <- function() {
         # Catch the value from the menu
-        normalization <- select.list(c("YES","NO"), title="Choose")
+        normalization <- select.list(c("YES","NO"), title = "Choose", multiple = FALSE, preselect = "YES")
         # Default
         if (normalization == "YES" || normalization == "") {
             normalization <- TRUE
             # Ask for the algorithm
-            normalization_algorithm <- select.list(c("TIC","PQN","median"), title="Choose")
+            normalization_algorithm <- select.list(c("TIC","PQN","median"), title = "Choose", multiple = FALSE, preselect = "TIC")
             # TIC
             if (normalization_algorithm == "TIC") {
                 normalization_mass_range <- tclvalue(normalization_mass_range2)
@@ -6514,14 +7031,18 @@ preprocessing_window_function <- function() {
         }
         # Set the value of the displaying label
         if (normalization == TRUE && normalization_algorithm != "TIC") {
-            normalization_value <- paste("YES", "(", normalization_algorithm, ")")
+            normalization_value <- paste("YES", "\n( ", normalization_algorithm, " )\n", sep = "")
         } else if (normalization == TRUE && normalization_algorithm == "TIC") {
-            normalization_value <- paste("YES", "(", normalization_algorithm, ", range:", normalization_mass_range_value, ")")
+            if (!is.null(normalization_mass_range)) {
+                normalization_value <- paste("YES", "\n( ", normalization_algorithm, ",\nrange:\n", normalization_mass_range_value, " )", sep = "")
+            } else {
+                normalization_value <- paste("YES", "\n( ", normalization_algorithm, " )", sep = "")
+            }
         } else {
-            normalization_value <- "                                 NO                             "
+            normalization_value <- "NO"
         }
-        normalization_value_label <- tklabel(preproc_window, text = normalization_value, font = label_font)
-        tkgrid(normalization_value_label, row = 6, column = 3)
+        normalization_value_label <- tklabel(preproc_window, text = normalization_value, font = label_font, bg = "white", width = 20, height = 4)
+        tkgrid(normalization_value_label, row = 6, column = 3, padx = c(5, 5), pady = c(5, 5))
         # Escape the function
         .GlobalEnv$normalization <- normalization
         .GlobalEnv$normalization_mass_range <- normalization_mass_range
@@ -6531,18 +7052,18 @@ preprocessing_window_function <- function() {
     # Spectral alignment
     spectral_alignment_choice <- function() {
         # Catch the value from the menu
-        spectral_alignment <- select.list(c("YES","NO"), title = "Choose")
+        spectral_alignment <- select.list(c("YES","NO"), title = "Choose", multiple = FALSE, preselect = "NO")
         # YES and Default
         if (spectral_alignment == "YES") {
             spectral_alignment <- TRUE
             # Ask for the algorithm
-            spectral_alignment_algorithm <- select.list(c("cubic","quadratic","linear","lowess"), title = "Choose")
+            spectral_alignment_algorithm <- select.list(c("cubic","quadratic","linear","lowess"), title = "Choose", multiple = FALSE, preselect = "cubic")
             # Default
             if (spectral_alignment_algorithm == "") {
                 spectral_alignment_algorithm <- "cubic"
             }
             ## Ask for the reference peaklist
-            spectral_alignment_reference <- select.list(c("auto","average spectrum", "skyline spectrum"), title = "Choose")
+            spectral_alignment_reference <- select.list(c("auto","average spectrum", "skyline spectrum"), title = "Choose", multiple = FALSE, preselect = "auto")
             if (spectral_alignment_reference == "") {
                 spectral_alignment_reference <- "auto"
             }
@@ -6553,12 +7074,12 @@ preprocessing_window_function <- function() {
         }
         # Set the value of the displaying label
         if (spectral_alignment == TRUE) {
-            spectral_alignment_value <- paste("YES", "(", spectral_alignment_algorithm, ",", spectral_alignment_reference, ")")
+            spectral_alignment_value <- paste("YES", "\n( ", spectral_alignment_algorithm, ",\n", spectral_alignment_reference, " )", sep = "")
         } else {
-            spectral_alignment_value <- "                                   NO                            "
+            spectral_alignment_value <- "NO"
         }
-        spectral_alignment_value_label <- tklabel(preproc_window, text = spectral_alignment_value, font = label_font)
-        tkgrid(spectral_alignment_value_label, row = 8, column = 2)
+        spectral_alignment_value_label <- tklabel(preproc_window, text = spectral_alignment_value, font = label_font, bg = "white", width = 20, height = 3)
+        tkgrid(spectral_alignment_value_label, row = 8, column = 2, padx = c(5, 5), pady = c(5, 5))
         # Escape the function
         .GlobalEnv$spectral_alignment <- spectral_alignment
         .GlobalEnv$spectral_alignment_algorithm <- spectral_alignment_algorithm
@@ -6568,7 +7089,7 @@ preprocessing_window_function <- function() {
     # TOF mode
     tof_mode_choice <- function() {
         # Catch the value from the menu
-        tof_mode <- select.list(c("Linear","Reflector"), title="Choose")
+        tof_mode <- select.list(c("Linear", "Reflector"), title = "Choose")
         # Default
         if (tof_mode == "" || tof_mode == "Linear") {
             tof_mode <- "linear"
@@ -6578,12 +7099,12 @@ preprocessing_window_function <- function() {
         }
         # Set the value of the displaying label
         if (tof_mode == "linear") {
-            tof_mode_value <- "    Linear    "
+            tof_mode_value <- "Linear"
         } else if (tof_mode == "reflector") {
             tof_mode_value <- "Reflector"
         }
-        tof_mode_value_label <- tklabel(preproc_window, text = tof_mode_value, font = label_font)
-        tkgrid(tof_mode_value_label, row = 2, column = 3)
+        tof_mode_value_label <- tklabel(preproc_window, text = tof_mode_value, font = label_font, bg = "white", width = 20)
+        tkgrid(tof_mode_value_label, row = 2, column = 3, padx = c(5, 5), pady = c(5, 5))
         # Escape the function
         .GlobalEnv$tof_mode <- tof_mode
         .GlobalEnv$tof_mode_value <- tof_mode_value
@@ -6602,6 +7123,7 @@ preprocessing_window_function <- function() {
         # Escape the function
         .GlobalEnv$mass_range <- mass_range
         .GlobalEnv$preprocess_spectra_in_packages_of <- preprocess_spectra_in_packages_of
+        .GlobalEnv$preprocessing_parameters <- list(mass_range = mass_range, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, spectral_alignment_algorithm = spectral_alignment_algorithm, spectral_alignment_reference = spectral_alignment_reference)
         # Destroy the window upon committing
         tkdestroy(preproc_window)
     }
@@ -6611,82 +7133,84 @@ preprocessing_window_function <- function() {
     baseline_subtraction_iterations2 <- tclVar("")
     normalization_mass_range2 <- tclVar("")
     ##### Window
-    preproc_window <- tktoplevel()
-    tktitle(preproc_window) <- "Spectra preprocessing parameters"
+    preproc_window <- tktoplevel(bg = "white")
+    tkwm.resizable(preproc_window, FALSE, FALSE)
+    tktitle(preproc_window) <- "Spectral preprocessing parameters"
+    #tkpack.propagate(preproc_window, FALSE)
     # Mass range
-    mass_range_label <- tklabel(preproc_window, text="Mass range", font = label_font)
-    mass_range_entry <- tkentry(preproc_window, width = 15, textvariable = mass_range2, font = entry_font)
+    mass_range_label <- tklabel(preproc_window, text = "Mass range", font = label_font, bg = "white", width = 20)
+    mass_range_entry <- tkentry(preproc_window, textvariable = mass_range2, font = entry_font, bg = "white", width = 20, justify = "center")
     tkinsert(mass_range_entry, "end", as.character(paste(mass_range[1],",",mass_range[2])))
     # Preprocessing (in packages of)
-    preprocess_spectra_in_packages_of_label <- tklabel(preproc_window, text="Preprocess spectra\nin packages of", font = label_font)
-    preprocess_spectra_in_packages_of_entry <- tkentry(preproc_window, width = 10, textvariable = preprocess_spectra_in_packages_of2, font = entry_font)
+    preprocess_spectra_in_packages_of_label <- tklabel(preproc_window, text="Preprocess spectra\nin packages of", font = label_font, bg = "white", width = 20)
+    preprocess_spectra_in_packages_of_entry <- tkentry(preproc_window, textvariable = preprocess_spectra_in_packages_of2, font = entry_font, bg = "white", width = 10, justify = "center")
     tkinsert(preprocess_spectra_in_packages_of_entry, "end", as.character(preprocess_spectra_in_packages_of))
     # Tof mode
-    tof_mode_label <- tklabel(preproc_window, text="Select the TOF mode", font = label_font)
-    tof_mode_entry <- tkbutton(preproc_window, text="Choose the TOF mode", command = tof_mode_choice, font = button_font)
+    tof_mode_label <- tklabel(preproc_window, text="Select the TOF mode", font = label_font, bg = "white", width = 20)
+    tof_mode_entry <- tkbutton(preproc_window, text="Choose the TOF mode", command = tof_mode_choice, font = button_font, bg = "white", width = 20)
     # Transform the data
-    transform_data_button <- tkbutton(preproc_window, text="Transform the data", command = transform_data_choice, font = button_font)
+    transform_data_button <- tkbutton(preproc_window, text="Transform the data", command = transform_data_choice, font = button_font, bg = "white", width = 20)
     # Smoothing
-    smoothing_button <- tkbutton(preproc_window, text="Smoothing", command = smoothing_choice, font = button_font)
+    smoothing_button <- tkbutton(preproc_window, text="Smoothing", command = smoothing_choice, font = button_font, bg = "white", width = 20)
     # Baseline subtraction
-    baseline_subtraction_button <- tkbutton(preproc_window, text="Baseline subtraction", command = baseline_subtraction_choice, font = button_font)
-    baseline_subtraction_iterations_entry <- tkentry(preproc_window, width = 15, textvariable = baseline_subtraction_iterations2, font = entry_font)
+    baseline_subtraction_button <- tkbutton(preproc_window, text="Baseline subtraction", command = baseline_subtraction_choice, font = button_font, bg = "white", width = 20)
+    baseline_subtraction_iterations_entry <- tkentry(preproc_window, textvariable = baseline_subtraction_iterations2, font = entry_font, bg = "white", width = 10, justify = "center")
     tkinsert(baseline_subtraction_iterations_entry, "end", as.character(baseline_subtraction_iterations))
     # Normalization
-    normalization_button <- tkbutton(preproc_window, text="Normalization", command = normalization_choice, font = button_font)
-    normalization_mass_range_entry <- tkentry(preproc_window, width = 15, textvariable = normalization_mass_range2, font = entry_font)
+    normalization_button <- tkbutton(preproc_window, text="Normalization", command = normalization_choice, font = button_font, bg = "white", width = 20)
+    normalization_mass_range_entry <- tkentry(preproc_window, textvariable = normalization_mass_range2, font = entry_font, bg = "white", width = 20, justify = "center")
     tkinsert(normalization_mass_range_entry, "end", as.character(normalization_mass_range))
     # Spectral alignment
-    spectral_alignment_button <- tkbutton(preproc_window, text="Align spectra", command = spectral_alignment_choice, font = button_font)
+    spectral_alignment_button <- tkbutton(preproc_window, text="Align spectra", command = spectral_alignment_choice, font = button_font, bg = "white", width = 20)
     # Commit preprocessing
-    commit_preprocessing_button <- tkbutton(preproc_window, text="Commit preprocessing", command = commit_preprocessing_function, font = button_font)
+    commit_preprocessing_button <- tkbutton(preproc_window, text="Commit preprocessing", command = commit_preprocessing_function, font = button_font, bg = "white", width = 20)
     ##### Displaying labels
-    tof_mode_value_label <- tklabel(preproc_window, text = tof_mode_value, font = label_font)
-    transform_data_value_label <- tklabel(preproc_window, text = transform_data_value, font = label_font)
-    smoothing_value_label <- tklabel(preproc_window, text = smoothing_value, font = label_font)
-    baseline_subtraction_value_label <- tklabel(preproc_window, text = baseline_subtraction_value, font = label_font)
-    normalization_value_label <- tklabel(preproc_window, text = normalization_value, font = label_font)
-    spectral_alignment_value_label <- tklabel(preproc_window, text = spectral_alignment_value, font = label_font)
+    tof_mode_value_label <- tklabel(preproc_window, text = tof_mode_value, font = label_font, bg = "white", width = 20)
+    transform_data_value_label <- tklabel(preproc_window, text = transform_data_value, font = label_font, bg = "white", width = 20, height = 2)
+    smoothing_value_label <- tklabel(preproc_window, text = smoothing_value, font = label_font, bg = "white", width = 20, height = 3)
+    baseline_subtraction_value_label <- tklabel(preproc_window, text = baseline_subtraction_value, font = label_font, bg = "white", width = 20, height = 3)
+    normalization_value_label <- tklabel(preproc_window, text = normalization_value, font = label_font, bg = "white", width = 20, height = 4)
+    spectral_alignment_value_label <- tklabel(preproc_window, text = spectral_alignment_value, font = label_font, bg = "white", width = 20, height = 3)
     #### Geometry manager
-    tkgrid(mass_range_label, row = 1, column = 1)
-    tkgrid(mass_range_entry, row = 1, column = 2)
-    tkgrid(tof_mode_label, row = 2, column = 1)
-    tkgrid(tof_mode_entry, row = 2, column = 2)
-    tkgrid(tof_mode_value_label, row = 2, column = 3)
-    tkgrid(transform_data_button, row = 3, column = 1)
-    tkgrid(transform_data_value_label, row = 3, column = 2)
-    tkgrid(smoothing_button, row = 4, column = 1)
-    tkgrid(smoothing_value_label, row = 4, column = 2)
-    tkgrid(baseline_subtraction_button, row = 5, column = 1)
-    tkgrid(baseline_subtraction_iterations_entry, row = 5, column = 2)
-    tkgrid(baseline_subtraction_value_label, row = 5, column = 3)
-    tkgrid(normalization_button, row = 6, column = 1)
-    tkgrid(normalization_mass_range_entry, row = 6, column = 2)
-    tkgrid(normalization_value_label, row = 6, column = 3)
-    tkgrid(preprocess_spectra_in_packages_of_label, row = 7, column = 1)
-    tkgrid(preprocess_spectra_in_packages_of_entry, row = 7, column = 2)
-    tkgrid(spectral_alignment_button, row = 8, column = 1)
-    tkgrid(spectral_alignment_value_label, row = 8, column = 2)
-    tkgrid(commit_preprocessing_button, row = 9, column = 1)
+    tkgrid(mass_range_label, row = 1, column = 1, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(mass_range_entry, row = 1, column = 2, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(tof_mode_label, row = 2, column = 1, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(tof_mode_entry, row = 2, column = 2, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(tof_mode_value_label, row = 2, column = 3, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(transform_data_button, row = 3, column = 1, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(transform_data_value_label, row = 3, column = 2, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(smoothing_button, row = 4, column = 1, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(smoothing_value_label, row = 4, column = 2, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(baseline_subtraction_button, row = 5, column = 1, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(baseline_subtraction_iterations_entry, row = 5, column = 2, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(baseline_subtraction_value_label, row = 5, column = 3, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(normalization_button, row = 6, column = 1, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(normalization_mass_range_entry, row = 6, column = 2, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(normalization_value_label, row = 6, column = 3, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(preprocess_spectra_in_packages_of_label, row = 7, column = 1, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(preprocess_spectra_in_packages_of_entry, row = 7, column = 2, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(spectral_alignment_button, row = 8, column = 1, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(spectral_alignment_value_label, row = 8, column = 2, padx = c(5, 5), pady = c(5, 5))
+    tkgrid(commit_preprocessing_button, row = 9, column = 1, padx = c(5, 5), pady = c(5, 5))
 }
 
 ##### File type (export)
 file_type_export_choice <- function() {
     # Catch the value from the menu
-    file_type_export <<- select.list(c("csv","xlsx","xls"), title="Choose")
+    file_type_export <- select.list(c("csv","xlsx","xls"), title="Choose output file format", multiple = FALSE, preselect = "csv")
     # Default
     if (file_type_export == "") {
-        file_type_export <<- "csv"
+        file_type_export <- "csv"
     }
     # Install the packages
     if (file_type_export == "xls" || file_type_export == "xlsx") {
         install_and_load_required_packages("XLConnect")
     }
     # Escape the function
-    #.GlobalEnv$file_type_export <- file_type_export
+    .GlobalEnv$file_type_export <- file_type_export
     # Set the value of the displaying label
-    file_type_export_value_label <- tklabel(window, text = file_type_export, font = label_font)
-    tkgrid(file_type_export_value_label, row = 12, column = 6)
+    file_type_export_value_label <- tklabel(window, text = file_type_export, font = label_font, bg = "white", width = 20)
+    tkgrid(file_type_export_value_label, row = 3, column = 2, padx = c(5, 5), pady = c(5, 5))
 }
 
 ##### Dump the peaklist of the database
@@ -6780,41 +7304,41 @@ database_dump_function <- function() {
 
 ##### File name (export)
 set_file_name <- function() {
-    filename <<- tclvalue(file_name)
+    filename <- tclvalue(file_name)
     # Add the extension if it is not present in the filename
     if (file_type_export == "csv") {
         if (length(grep(".csv", filename, fixed = TRUE)) == 1) {
-            filename <<- filename
-        }    else {filename <<- paste (filename, ".csv", sep="")}
+            filename <- filename
+        }    else {filename <- paste (filename, ".csv", sep="")}
     }
     if (file_type_export == "xlsx") {
         if (length(grep(".xlsx", filename, fixed = TRUE)) == 1) {
-            filename <<- filename
-        }    else {filename <<- paste (filename, ".xlsx", sep="")}
+            filename <- filename
+        }    else {filename <- paste (filename, ".xlsx", sep="")}
     }
     if (file_type_export == "xls") {
         if (length(grep(".xls", filename, fixed = TRUE)) == 1) {
-            filename <<- filename
-        }    else {filename <<- paste (filename, ".xls", sep="")}
+            filename <- filename
+        }    else {filename <- paste (filename, ".xls", sep="")}
     }
     # Set the value for displaying purposes
-    filename_value <<- filename
+    filename_value <- filename
     #### Exit the function and put the variable into the R workspace
-    #.GlobalEnv$filename <- filename
-    return (filename)
+    .GlobalEnv$filename <- filename
+    .GlobalEnv$filename_value <- filename_value
 }
 
 ##### Library
 select_database_function <- function() {
     ########## Prompt if a folder has to be selected or a single file
     # Catch the value from the popping out menu
-    spectra_input_type <- select.list(c("file","folder"), title="Folder or file?")
+    spectra_input_type <- select.list(c("file","folder"), title="Folder or file?", preselect = "folder", multiple = FALSE)
     if (spectra_input_type == "") {
         spectra_input_type <- "folder"
     }
     if (spectra_input_type == "folder") {
-        filepath_database_select <- tkmessageBox(title = "Library", message = "Select the folder for the spectra for the database.\nThe database should be structured like this:\nDatabase folder/Database entry samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data\n\nor\n\nDatabase folder/Classes - Entries/Sample imzML files", icon = "info")
-        filepath_database <<- tclvalue(tkchooseDirectory())
+        filepath_database_select <- tkmessageBox(title = "Library", message = "Select the folder for the spectra for the database.\n\n\nThe database should be structured like this:\n\nDatabase folder/Database entry samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data\n\nor\n\nDatabase folder/Classes - Entries/Sample imzML files", icon = "info")
+        filepath_database <- tclvalue(tkchooseDirectory())
         if (!nchar(filepath_database)) {
             tkmessageBox(message = "No folder selected")
         }    else {
@@ -6822,7 +7346,7 @@ select_database_function <- function() {
         }
     } else if (spectra_input_type == "file") {
         filepath_database_select <- tkmessageBox(title = "Library", message = "Select a previously dumped database RData file", icon = "info")
-        filepath_database <<- tclvalue(tkgetOpenFile(filetypes="{{RData database files} {.RData}}"))
+        filepath_database <- tclvalue(tkgetOpenFile(filetypes="{{RData database files} {.RData}}"))
         if (!nchar(filepath_database)) {
             tkmessageBox(message = "No file selected")
         } else {
@@ -6830,37 +7354,39 @@ select_database_function <- function() {
         }
     }
     # Set the value for displaying purposes
-    filepath_database_value <<- filepath_database
+    filepath_database_value <- filepath_database
     # Exit the function and put the variable into the R workspace
-    #.GlobalEnv$filepath_database <- filepath_database
+    .GlobalEnv$filepath_database <- filepath_database
+    .GlobalEnv$filepath_database_value <- filepath_database_value
 }
 
 ##### Samples
 select_samples_function <-function() {
-    filepath_test_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\nThe files should be organised like this:\nSample folder/Samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data\n\nor\n\nSample folder/Sample imzML files", icon = "info")
-    filepath_test <<- tclvalue(tkchooseDirectory())
+    filepath_test_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be tested.\n\n\nThe files should be organized like this:\n\nSample folder/Samples/Treatments/Spectra_replicates/Spectrum_coordinates/1/1SLin/Spectrum_data\n\nor\n\nSample folder/Sample imzML files", icon = "info")
+    filepath_test <- tclvalue(tkchooseDirectory())
     if (!nchar(filepath_test)) {
         tkmessageBox(message = "No folder selected")
     }    else {
         tkmessageBox(message = paste("The sample spectra will be read from:", filepath_test))
     }
     # Set the value for displaying purposes
-    filepath_test_value <<- filepath_test
+    filepath_test_value <- filepath_test
     # Exit the function and put the variable into the R workspace
-    #.GlobalEnv$filepath_test <- filepath_test
+    .GlobalEnv$filepath_test <- filepath_test
+    .GlobalEnv$filepath_test_value <- filepath_test_value
 }
 
 ##### Output
 browse_output_function <- function() {
-    output_folder <<- tclvalue(tkchooseDirectory())
+    output_folder <- tclvalue(tkchooseDirectory())
     if (!nchar(output_folder)) {
         # Get the output folder from the default working directory
         output_folder <- getwd()
     }
-    tkmessageBox(message = paste("Every file will be saved in", output_folder))
+    tkmessageBox(message = paste("Every file will be saved in:\n\n", output_folder))
     setwd(output_folder)
     # Exit the function and put the variable into the R workspace
-    #.GlobalEnv$output_folder <- output_folder
+    .GlobalEnv$output_folder <- output_folder
 }
 
 ##### Close
@@ -6871,6 +7397,30 @@ quit_function <- function() {
 ##### Exit
 end_session_function <- function () {
     q(save="no")
+}
+
+##### Peaks deisotoping
+peaks_deisotoping_choice <- function() {
+    # Catch the value from the menu
+    peaks_deisotoping <- select.list(c("YES","NO"), title = "Peak deisotoping", multiple = FALSE, preselect = "NO")
+    # Default
+    if (peaks_deisotoping == "YES") {
+        peaks_deisotoping <- TRUE
+    }
+    if (peaks_deisotoping == "NO" || peaks_deisotoping == "") {
+        peaks_deisotoping <- FALSE
+    }
+    # Set the value of the displaying label
+    if (peaks_deisotoping == TRUE) {
+        peaks_deisotoping_value <- "YES"
+    } else {
+        peaks_deisotoping_value <- "NO"
+    }
+    peaks_deisotoping_value_label <- tklabel(window, text = peaks_deisotoping_value, font = label_font, bg = "white", width = 20)
+    tkgrid(peaks_deisotoping_value_label, row = 4, column = 4, padx = c(5, 5), pady = c(5, 5))
+    # Escape the function
+    .GlobalEnv$peaks_deisotoping <- peaks_deisotoping
+    .GlobalEnv$peaks_deisotoping_value <- peaks_deisotoping_value
 }
 
 ##### Import the spectra
@@ -7024,9 +7574,9 @@ import_spectra_function <- function() {
         if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
             spectra_database <- spectra_database
         } else {
-            spectra_database <- preprocess_spectra(spectra_database, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, align_spectra = FALSE, spectra_alignment_method="cubic", allow_parallelization = allow_parallelization)
+            spectra_database <- preprocess_spectra(spectra_database, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
         }
-        spectra_test <- preprocess_spectra(spectra_test, tof_mode = tof_mode, preprocessing_parameters = list(crop_spectra = TRUE, mass_range = NULL, data_transformation = transform_data, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), process_in_packages_of = preprocess_spectra_in_packages_of, align_spectra = FALSE, spectra_alignment_method="cubic", allow_parallelization = allow_parallelization)
+        spectra_test <- preprocess_spectra(spectra_test, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
         # Number of samples
         if (isMassSpectrumList(spectra_test)) {
             number_of_samples <- length(spectra_test)
@@ -7050,7 +7600,7 @@ import_spectra_function <- function() {
 ##### Peak picking mode
 peak_picking_mode_choice <- function() {
     # Catch the value from the menu
-    peak_picking_mode <- select.list(c("all","most intense"), title="Choose")
+    peak_picking_mode <- select.list(c("all","most intense"), title="Choose", multiple = FALSE, preselect = "all")
     # Default
     if (peak_picking_mode == "") {
         peak_picking_mode <- "all"
@@ -7058,10 +7608,10 @@ peak_picking_mode_choice <- function() {
     # Set the value of the displaying label
     peak_picking_mode_value <- peak_picking_mode
     if (peak_picking_mode_value == "all") {
-        peak_picking_mode_value <- "        all        "
+        peak_picking_mode_value <- "all"
     }
-    peak_picking_mode_value_label <- tklabel(window, text = peak_picking_mode_value, font = label_font)
-    tkgrid(peak_picking_mode_value_label, row = 2, column = 5)
+    peak_picking_mode_value_label <- tklabel(window, text = peak_picking_mode_value, font = label_font, bg = "white", width = 20)
+    tkgrid(peak_picking_mode_value_label, row = 5, column = 2, padx = c(5, 5), pady = c(5, 5))
     # Escape the function
     .GlobalEnv$peak_picking_mode <- peak_picking_mode
     .GlobalEnv$peak_picking_mode_value <- peak_picking_mode_value
@@ -7124,8 +7674,8 @@ peak_picking_function <- function() {
             peaks_database <- most_intense_signals(spectra_database, signals_to_take = signals_to_take, tof_mode = tof_mode)
             peaks_test <- most_intense_signals(spectra_test, signals_to_take = signals_to_take)
         } else if (peak_picking_mode == "all") {
-            peaks_database <- peak_picking(spectra_database, peak_picking_algorithm = peak_picking_algorithm, SNR = SNR, tof_mode = tof_mode)
-            peaks_test <- peak_picking(spectra_test, peak_picking_algorithm = peak_picking_algorithm, SNR = SNR, tof_mode = tof_mode)
+            peaks_database <- peak_picking(spectra_database, peak_picking_algorithm = peak_picking_algorithm, SNR = SNR, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
+            peaks_test <- peak_picking(spectra_test, peak_picking_algorithm = peak_picking_algorithm, SNR = SNR, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
         }
         # Exit the function and put the variable into the R workspace
         .GlobalEnv$peaks_database <- peaks_database
@@ -7175,16 +7725,16 @@ run_spectral_typer_function <- function() {
         score_si_matrix <- NULL
         ############### CORRELATION
         if (similarity_criteria == "correlation") {
-            score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, peaks_filtering = peaks_filtering, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, low_intensity_percentage_threshold = intensity_percentage_threshold, low_intensity_threshold_method = intensity_threshold_method, tolerance_ppm = tolerance_ppm, intensity_correction_coefficient = intensity_correction_coefficient, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
+            score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = intensity_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tolerance_ppm = tolerance_ppm, intensity_correction_coefficient = intensity_correction_coefficient, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
         } else if (similarity_criteria == "hca") {
             ############### HIERARCHICAL CLUSTERING ANALYSIS
-            score_hca <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = database_folder_list, peaks_filtering = peaks_filtering, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, low_intensity_percentage_threshold = intensity_percentage_threshold, low_intensity_threshold_method = intensity_threshold_method, tolerance_ppm = tolerance_ppm, spectra_path_output = spectra_path_output, score_only = score_only, spectra_format = spectra_format, normalise_distances = TRUE, normalization_method="sum")
+            score_hca <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = intensity_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tolerance_ppm = tolerance_ppm, spectra_path_output = spectra_path_output, score_only = score_only, spectra_format = spectra_format, normalise_distances = TRUE, normalization_method="sum")
         } else if (similarity_criteria == "similarity index") {
             ############### SIMILARITY INDEX
-            score_si_matrix <- spectral_typer_score_similarity_index(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, peaks_filtering = peaks_filtering, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, low_intensity_percentage_threshold = intensity_percentage_threshold, low_intensity_threshold_method = intensity_threshold_method, tolerance_ppm = tolerance_ppm, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
+            score_si_matrix <- spectral_typer_score_similarity_index(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = intensity_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tolerance_ppm = tolerance_ppm, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
         } else if (similarity_criteria == "signal intensity") {
             ############### INTENSITY
-            score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = database_folder_list, comparison = signal_intensity_evaluation, peaks_filtering = peaks_filtering, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_peaks_removal = low_intensity_peaks_removal, low_intensity_percentage_threshold = intensity_percentage_threshold, low_intensity_threshold_method = intensity_threshold_method, tolerance_ppm = tolerance_ppm, intensity_tolerance_percent_threshold = intensity_tolerance_percent, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, number_of_st_dev = 1, allow_parallelization = allow_parallelization)
+            score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = database_folder_list, comparison = signal_intensity_evaluation, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = intensity_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tolerance_ppm = tolerance_ppm, intensity_tolerance_percent_threshold = intensity_tolerance_percent, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, number_of_st_dev = 1, allow_parallelization = allow_parallelization)
         }
         ### Parameters matrices
         # Parameters vector
@@ -7333,8 +7883,8 @@ similarity_criteria_choice <- function() {
     } else if (similarity_criteria_value == "correlation") {
         similarity_criteria_value <- "   correlation   "
     }
-    similarity_criteria_value_label <- tklabel(window, text = similarity_criteria_value, font = label_font)
-    tkgrid(similarity_criteria_value_label, row = 3, column = 3)
+    similarity_criteria_value_label <- tklabel(window, text = similarity_criteria_value, font = label_font, bg = "white", width = 20)
+    tkgrid(similarity_criteria_value_label, row = 7, column = 2, padx = c(5, 5), pady = c(5, 5))
     # Escape the function
     .GlobalEnv$similarity_criteria <- similarity_criteria
     .GlobalEnv$similarity_criteria_value <- similarity_criteria_value
@@ -7351,8 +7901,8 @@ signal_intensity_evaluation_choice <- function() {
     # Escape the function
     .GlobalEnv$signal_intensity_evaluation <- signal_intensity_evaluation
     # Set the value of the displaying label
-    signal_intensity_evaluation_value_label <- tklabel(window, text = signal_intensity_evaluation, font = label_font)
-    tkgrid(signal_intensity_evaluation_value_label, row = 4, column = 6)
+    signal_intensity_evaluation_value_label <- tklabel(window, text = signal_intensity_evaluation, font = label_font, bg = "white", width = 20)
+    tkgrid(signal_intensity_evaluation_value_label, row = 7, column = 6, padx = c(5, 5), pady = c(5, 5))
 }
 
 ##### Peak picking algorithm
@@ -7370,79 +7920,28 @@ peak_picking_algorithm_choice <- function() {
     } else if (peak_picking_algorithm_value == "SuperSmoother") {
         peak_picking_algorithm_value <- "Super Smoother"
     }
-    peak_picking_algorithm_value_label <- tklabel(window, text = peak_picking_algorithm_value, font = label_font)
-    tkgrid(peak_picking_algorithm_value_label, row = 3, column = 5)
+    peak_picking_algorithm_value_label <- tklabel(window, text = peak_picking_algorithm_value, font = label_font, bg = "white", width = 20)
+    tkgrid(peak_picking_algorithm_value_label, row = 4, column = 2, padx = c(5, 5), pady = c(5, 5))
     # Escape the function
     .GlobalEnv$peak_picking_algorithm <- peak_picking_algorithm
     .GlobalEnv$peak_picking_algorithm_value <- peak_picking_algorithm_value
 }
 
-##### Peaks filtering
-peaks_filtering_choice <- function() {
-    # Catch the value from the menu
-    peaks_filtering <- select.list(c("YES","NO"), title="Choose")
-    # Default
-    if (peaks_filtering == "YES") {
-        peaks_filtering <- TRUE
-    }
-    if (peaks_filtering == "NO" || peaks_filtering == "") {
-        peaks_filtering <- FALSE
-    }
-    # Set the value of the displaying label
-    if (peaks_filtering == TRUE) {
-        peaks_filtering_value <- "YES"
-    } else {
-        peaks_filtering_value <- "NO"
-    }
-    peaks_filtering_value_label <- tklabel(window, text = peaks_filtering_value, font = label_font)
-    tkgrid(peaks_filtering_value_label, row = 7, column = 3)
-    # Escape the function
-    .GlobalEnv$peaks_filtering <- peaks_filtering
-    .GlobalEnv$peaks_filtering_value <- peaks_filtering_value
-}
-
-##### Low intensity peaks removal
-low_intensity_peaks_removal_choice <- function() {
-    # Catch the value from the menu
-    low_intensity_peaks_removal <- select.list(c("YES","NO"), title="Choose")
-    # Default
-    if (low_intensity_peaks_removal == "" || low_intensity_peaks_removal == "NO") {
-        low_intensity_peaks_removal <- FALSE
-    }
-    if (low_intensity_peaks_removal == "YES") {
-        low_intensity_peaks_removal <- TRUE
-    }
-    # Set the value of the displaying label
-    if (low_intensity_peaks_removal == TRUE) {
-        low_intensity_peaks_removal_value <- "YES"
-    } else {
-        low_intensity_peaks_removal_value <- "NO"
-    }
-    low_intensity_peaks_removal_value_label <- tklabel(window, text = low_intensity_peaks_removal_value, font = label_font)
-    tkgrid(low_intensity_peaks_removal_value_label, row = 8, column = 3)
-    # Escape the function
-    .GlobalEnv$low_intensity_peaks_removal <- low_intensity_peaks_removal
-    .GlobalEnv$low_intensity_peaks_removal_value <- low_intensity_peaks_removal_value
-}
-
 ##### Low intensity peaks removal Method
-intensity_threshold_method_choice <- function() {
+low_intensity_peak_removal_threshold_method_choice <- function() {
     # Catch the value from the menu
-    intensity_threshold_method <- select.list(c("whole","element-wise"), title="Choose")
+    low_intensity_peak_removal_threshold_method <- select.list(c("whole","element-wise"), title="Choose")
     # Default
-    if (intensity_threshold_method == "") {
-        intensity_threshold_method <- "element-wise"
+    if (low_intensity_peak_removal_threshold_method == "") {
+        low_intensity_peak_removal_threshold_method <- "element-wise"
     }
     # Set the value of the displaying label
-    intensity_threshold_method_value <- intensity_threshold_method
-    if (intensity_threshold_method_value == "whole") {
-        intensity_threshold_method_value <- "     whole     "
-    }
-    intensity_threshold_method_value_label <- tklabel(window, text = intensity_threshold_method_value, font = label_font)
-    tkgrid(intensity_threshold_method_value_label, row = 9, column = 3)
+    low_intensity_peak_removal_threshold_method_value <- low_intensity_peak_removal_threshold_method
+    low_intensity_peak_removal_threshold_method_value_label <- tklabel(window, text = low_intensity_peak_removal_threshold_method_value, font = label_font, bg = "white", width = 20)
+    tkgrid(low_intensity_peak_removal_threshold_method_value_label, row = 6, column = 4, padx = c(5, 5), pady = c(5, 5))
     # Escape the function
-    .GlobalEnv$intensity_threshold_method <- intensity_threshold_method
-    .GlobalEnv$intensity_threshold_method_value <- intensity_threshold_method_value
+    .GlobalEnv$low_intensity_peak_removal_threshold_method <- low_intensity_peak_removal_threshold_method
+    .GlobalEnv$low_intensity_peak_removal_threshold_method_value <- low_intensity_peak_removal_threshold_method_value
 }
 
 ##### Multicore processing
@@ -7464,8 +7963,8 @@ allow_parallelization_choice <- function() {
     } else {
         allow_parallelization_value <- "NO"
     }
-    allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font)
-    tkgrid(allow_parallelization_value_label, row = 9, column = 5)
+    allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font, bg = "white", width = 20)
+    tkgrid(allow_parallelization_value_label, row = 8, column = 4, padx = c(5, 5), pady = c(5, 5))
     # Escape the function
     .GlobalEnv$allow_parallelization <- allow_parallelization
     .GlobalEnv$allow_parallelization_value <- allow_parallelization_value
@@ -7489,8 +7988,8 @@ average_replicates_in_database_choice <- function() {
     } else {
         average_replicates_in_database_value <- "NO"
     }
-    average_replicates_in_database_value_label <- tklabel(window, text = average_replicates_in_database_value, font = label_font)
-    tkgrid(average_replicates_in_database_value_label, row = 10, column = 3)
+    average_replicates_in_database_value_label <- tklabel(window, text = average_replicates_in_database_value, font = label_font, bg = "white", width = 20)
+    tkgrid(average_replicates_in_database_value_label, row = 2, column = 4, padx = c(5, 5), pady = c(5, 5))
     # Escape the function
     .GlobalEnv$average_replicates_in_database <- average_replicates_in_database
     .GlobalEnv$average_replicates_in_database_value <- average_replicates_in_database_value
@@ -7513,8 +8012,8 @@ average_replicates_in_test_choice <- function() {
     } else {
         average_replicates_in_test_value <- "NO"
     }
-    average_replicates_in_test_value_label <- tklabel(window, text = average_replicates_in_test_value, font = label_font)
-    tkgrid(average_replicates_in_test_value_label, row = 10, column = 6)
+    average_replicates_in_test_value_label <- tklabel(window, text = average_replicates_in_test_value, font = label_font, bg = "white", width = 20)
+    tkgrid(average_replicates_in_test_value_label, row = 2, column = 6, padx = c(5, 5), pady = c(5, 5))
     # Escape the function
     .GlobalEnv$average_replicates_in_test <- average_replicates_in_test
     .GlobalEnv$average_replicates_in_test_value <- average_replicates_in_test_value
@@ -7537,8 +8036,8 @@ score_only_choice <- function() {
     } else {
         score_only_value <- "NO"
     }
-    score_only_value_label <- tklabel(window, text = score_only_value, font = label_font)
-    tkgrid(score_only_value_label, row = 11, column = 3)
+    score_only_value_label <- tklabel(window, text = score_only_value, font = label_font, bg = "white", width = 20)
+    tkgrid(score_only_value_label, row = 3, column = 4, padx = c(5, 5), pady = c(5, 5))
     # Escape the function
     .GlobalEnv$score_only <- score_only
     .GlobalEnv$score_only_value <- score_only_value
@@ -7561,8 +8060,8 @@ spectra_path_output_choice <- function() {
     } else {
         spectra_path_output_value <- "NO"
     }
-    spectra_path_output_value_label <- tklabel(window, text = spectra_path_output_value, font = label_font)
-    tkgrid(spectra_path_output_value_label, row = 11, column = 6)
+    spectra_path_output_value_label <- tklabel(window, text = spectra_path_output_value, font = label_font, bg = "white", width = 20)
+    tkgrid(spectra_path_output_value_label, row = 3, column = 6, padx = c(5, 5), pady = c(5, 5))
     # Escape the function
     .GlobalEnv$spectra_path_output <- spectra_path_output
     .GlobalEnv$spectra_path_output_value <- spectra_path_output_value
@@ -7585,8 +8084,13 @@ spectra_format_choice <- function() {
     .GlobalEnv$spectra_format <- spectra_format
     .GlobalEnv$spectra_format_value <- spectra_format_value
     # Set the value of the displaying label
-    spectra_format_value_label <- tklabel(window, text = spectra_format_value, font = label_font)
-    tkgrid(spectra_format_value_label, row = 12, column = 3)
+    spectra_format_value_label <- tklabel(window, text = spectra_format_value, font = label_font, bg = "white", width = 20)
+    tkgrid(spectra_format_value_label, row = 2, column = 2, padx = c(5, 5), pady = c(5, 5))
+}
+
+##### Show info function
+show_info_function <- function() {
+    tkmessageBox(title = "Info", message = "Spectral Typer", icon = "info")
 }
 
 
@@ -7708,11 +8212,17 @@ if (system_os == "Windows") {
         ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = title_font_size, weight = "bold")
         ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "normal")
         ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "bold")
+        liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
+        liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
+        liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
+        bitstream_charter_title_bold = tkfont.create(family = "Bitstream Charter", size = title_font_size, weight = "bold")
+        bitstream_charter_other_normal = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "normal")
+        bitstream_charter_other_bold = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "bold")
         # Use them in the GUI
-        title_font = ubuntu_title_bold
-        label_font = ubuntu_other_normal
-        entry_font = ubuntu_other_normal
-        button_font = ubuntu_other_bold
+        title_font = bitstream_charter_title_bold
+        label_font = bitstream_charter_other_normal
+        entry_font = bitstream_charter_other_normal
+        button_font = bitstream_charter_other_bold
     } else if (length(grep("Fedora", os_version, ignore.case = TRUE)) > 0) {
         # Fedora
         # Define the fonts
@@ -7753,206 +8263,178 @@ if (system_os == "Windows") {
 }
 
 
-### Initial Messagebox
-#tkmessageBox(title = "Before starting", message = "The library should be structured like this: Main folder/Classes/Samples/Replicates/Spectra/Spectrum_coordinates/Spectrum_data", icon = "info")
-
 # The "area" where we will put our input lines
-window <- tktoplevel()
+window <- tktoplevel(bg = "white")
+tkwm.resizable(window, FALSE, FALSE)
 tktitle(window) <- "SPECTRAL TYPER"
-#### Browse
+# Title label
+title_label <- tkbutton(window, text = "SPECTRAL TYPER", command = show_info_function, font = title_font, bg = "white", relief = "flat")
 # Library
-select_database_label <- tklabel(window, text="The library should be structured like this:\nMain folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/Spectrum_data", font = label_font)
-select_database_button <- tkbutton(window, text="Browse database folder", command = select_database_function, font = button_font)
+select_database_button <- tkbutton(window, text="Browse database\nfolder...", command = select_database_function, font = button_font, bg = "white", width = 20)
 # Samples
-select_samples_label <- tklabel(window, text="The library should be structured like this:\nMain folder/Classes/Samples/Replicates/Spectra/\nSpectrum_coordinates/Spectrum_data", font = label_font)
-select_samples_button <- tkbutton(window, text="Browse samples folder", command = select_samples_function, font = button_font)
+select_samples_button <- tkbutton(window, text="Browse samples\nfolder...", command = select_samples_function, font = button_font, bg = "white", width = 20)
 # Output
-select_output_label <- tklabel(window, text="Select the folder where to save all the outputs", font = label_font)
-browse_output_button <- tkbutton(window, text="Browse output folder", command = browse_output_function, font = button_font)
+browse_output_button <- tkbutton(window, text="Browse output\nfolder...", command = browse_output_function, font = button_font, bg = "white", width = 20)
 #### Entries
 # Similarity criteria
-similarity_criteria_label <- tklabel(window, text="Similarity criteria", font = label_font)
-similarity_criteria_entry <- tkbutton(window, text="Choose similarity\ncriteria", command = similarity_criteria_choice, font = button_font)
+similarity_criteria_entry <- tkbutton(window, text="Choose\nsimilarity criteria", command = similarity_criteria_choice, font = button_font, bg = "white", width = 20)
 # Intensity correction coefficient
-intensity_correction_coefficient_label <- tklabel(window, text="Intensity correction coefficient\n(0: discard the intensities,\n1: unweighted correlation)", font = label_font)
-intensity_correction_coefficient_entry <- tkentry(window, width = 10, textvariable = intensity_correction_coefficient, font = entry_font)
+intensity_correction_coefficient_label <- tklabel(window, text="Intensity correction coefficient\n(0: discard the intensities,\n1: unweighted correlation)", font = label_font, bg = "white", width = 30)
+intensity_correction_coefficient_entry <- tkentry(window, textvariable = intensity_correction_coefficient, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(intensity_correction_coefficient_entry, "end", "1")
 # Intensty tolerance percent
-intensity_tolerance_percent_label <- tklabel(window, text="Intensity tolerance percent\n(if 'signal intensity' is selected)", font = label_font)
-intensity_tolerance_percent_entry <- tkentry(window, width = 10, textvariable = intensity_tolerance_percent, font = entry_font)
+intensity_tolerance_percent_label <- tklabel(window, text="Intensity tolerance percent\n(if 'signal intensity' is selected)", font = label_font, bg = "white", width = 30)
+intensity_tolerance_percent_entry <- tkentry(window, textvariable = intensity_tolerance_percent, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(intensity_tolerance_percent_entry, "end", "80")
 # Signal intensity evaluation
-signal_intensity_evaluation_label <- tklabel(window, text="Signal intensity evaluation", font = label_font)
-signal_intensity_evaluation_entry <- tkbutton(window, text="Choose signal intensity\nevaluation method", command = signal_intensity_evaluation_choice, font = button_font)
+signal_intensity_evaluation_label <- tklabel(window, text="Signal intensity\nevaluation", font = label_font, bg = "white", width = 20)
+signal_intensity_evaluation_entry <- tkbutton(window, text="Signal intensity\nevaluation method", command = signal_intensity_evaluation_choice, font = button_font, bg = "white", width = 20)
 # Peak picking mode
-peak_picking_mode_label <- tklabel(window, text="Peak picking mode", font = label_font)
-peak_picking_mode_entry <- tkbutton(window, text="Choose peak picking\nmode", command = peak_picking_mode_choice, font = button_font)
-# Peak picking mode
-peak_picking_algorithm_button <- tkbutton(window, text="Choose peak picking\nalgorithm", command = peak_picking_algorithm_choice, font = button_font)
-peak_picking_algorithm_value_label <- tklabel(window, text = peak_picking_algorithm_value, font = label_font)
+peak_picking_mode_entry <- tkbutton(window, text="Peak picking\nmode", command = peak_picking_mode_choice, font = button_font, bg = "white", width = 20)
+# Peak picking algorithm
+peak_picking_algorithm_button <- tkbutton(window, text="Peak picking\nalgorithm", command = peak_picking_algorithm_choice, font = button_font, bg = "white", width = 20)
+peak_picking_algorithm_value_label <- tklabel(window, text = peak_picking_algorithm_value, font = label_font, bg = "white", width = 20)
 # Signals to take
-signals_to_take_label <- tklabel(window, text="Most intense signals to take\n(if 'most intense' is selected)", font = label_font)
-signals_to_take_entry <- tkentry(window, width = 10, textvariable = signals_to_take, font = entry_font)
+signals_to_take_label <- tklabel(window, text="Most intense\nsignals to take\n(if 'most intense' is selected)", font = label_font, bg = "white", width = 30)
+signals_to_take_entry <- tkentry(window, textvariable = signals_to_take, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(signals_to_take_entry, "end", "25")
 # SNR
-SNR_label <- tklabel(window, text="Signal-to-noise ratio", font = label_font)
-SNR_entry <- tkentry(window, width = 10, textvariable = SNR, font = entry_font)
+SNR_label <- tklabel(window, text="Signal-to-noise\nratio", font = label_font, bg = "white", width = 20)
+SNR_entry <- tkentry(window, textvariable = SNR, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(SNR_entry, "end", "5")
 # Peaks filtering
-peaks_filtering_label <- tklabel(window, text="Peaks filtering", font = label_font)
-peaks_filtering_entry <- tkbutton(window, text="Choose peak filtering", command = peaks_filtering_choice, font = button_font)
+peaks_filtering_label <- tklabel(window, text="Peaks filtering", font = label_font, bg = "white", width = 20)
 # Peaks filtering threshold
-peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold frequency percentage", font = label_font)
-peaks_filtering_threshold_percent_entry <- tkentry(window, width = 10, textvariable = peaks_filtering_threshold_percent, font = entry_font)
+peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold\nfrequency percentage", font = button_font, bg = "white", width = 30)
+peaks_filtering_threshold_percent_entry <- tkentry(window, textvariable = peaks_filtering_threshold_percent, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(peaks_filtering_threshold_percent_entry, "end", "25")
+# Peaks deisotoping
+peaks_deisotoping_entry <- tkbutton(window, text="PEAK\nDEISOTOPING", command = peaks_deisotoping_choice, font = button_font, bg = "white", width = 20)
 # Low intensity peaks removal
-low_intensity_peaks_removal_label <- tklabel(window, text="Low intensity peaks removal", font = label_font)
-low_intensity_peaks_removal_entry <- tkbutton(window, text="Choose low intensity\npeaks removal", command = low_intensity_peaks_removal_choice, font = button_font)
+low_intensity_peaks_removal_label <- tklabel(window, text="Low intensity peak\nremoval", font = label_font, bg = "white", width = 20)
 # Intensity percentage threshold
-intensity_percentage_threshold_label <- tklabel(window, text="Intensity percentage threshold", font = label_font)
-intensity_percentage_threshold_entry <- tkentry(window, width = 10, textvariable = intensity_percentage_threshold, font = entry_font)
-tkinsert(intensity_percentage_threshold_entry, "end", "0.1")
-# Intensiry percentage theshold method
-intensity_threshold_method_label <- tklabel(window, text="Intensity threshold method", font = label_font)
-intensity_threshold_method_entry <- tkbutton(window, text="Choose the method for\nthe intensity threshold", command = intensity_threshold_method_choice, font = button_font)
+low_intensity_peak_removal_threshold_percent_label <- tklabel(window, text="Low-intensity peak\nremoval\npercentage threshold", font = button_font, bg = "white", width = 20)
+low_intensity_peak_removal_threshold_percent_entry <- tkentry(window, textvariable = low_intensity_peak_removal_threshold_percent, font = entry_font, bg = "white", width = 5, justify = "center")
+tkinsert(low_intensity_peak_removal_threshold_percent_entry, "end", "0")
+# Intensity percentage theshold method
+low_intensity_peak_removal_threshold_method_entry <- tkbutton(window, text="Low-intensity peak\nremoval\nthreshold method", command = low_intensity_peak_removal_threshold_method_choice, font = button_font, bg = "white", width = 20)
 # Average replicates in database
-average_replicates_in_database_label <- tklabel(window, text="Average replicates in the database", font = label_font)
-average_replicates_in_database_entry <- tkbutton(window, text="Choose average replicates\nin the database", command = average_replicates_in_database_choice, font = button_font)
+average_replicates_in_database_label <- tklabel(window, text="Average replicates in the database", font = label_font, bg = "white", width = 20)
+average_replicates_in_database_entry <- tkbutton(window, text="Average replicates\nin the database", command = average_replicates_in_database_choice, font = button_font, bg = "white", width = 20)
 # Average replicates in samples
-average_replicates_in_test_label <- tklabel(window, text="Average replicates in the samples", font = label_font)
-average_replicates_in_test_entry <- tkbutton(window, text="Choose average replicates\nin the samples", command = average_replicates_in_test_choice, font = button_font)
+average_replicates_in_test_label <- tklabel(window, text="Average replicates in the samples", font = label_font, bg = "white", width = 20)
+average_replicates_in_test_entry <- tkbutton(window, text="Average replicates\nin the samples", command = average_replicates_in_test_choice, font = button_font, bg = "white", width = 20)
 # Score only
-score_only_label <- tklabel(window, text="Score only\n('NO', all the score\ncomponents are displayed)", font = label_font)
-score_only_entry <- tkbutton(window, text="Choose", command = score_only_choice, font = button_font)
+score_only_entry <- tkbutton(window, text="Score only\n('NO', all the score\ncomponents are displayed)", command = score_only_choice, font = button_font, bg = "white", width = 30)
 # Spectra path output
-spectra_path_output_label <- tklabel(window, text="Spectra path in the output", font = label_font)
-spectra_path_output_entry <- tkbutton(window, text="Choose to display\nthe spectra path", command = spectra_path_output_choice, font = button_font)
+spectra_path_output_entry <- tkbutton(window, text="Display\nthe spectra path\nin output", command = spectra_path_output_choice, font = button_font, bg = "white", width = 20)
 # File format
-spectra_format_label <- tklabel(window, text="Select the spectra format", font = label_font)
-spectra_format_entry <- tkbutton(window, text="Choose the spectra format", command = spectra_format_choice, font = button_font)
+spectra_format_entry <- tkbutton(window, text="Spectra format", command = spectra_format_choice, font = button_font, bg = "white", width = 20)
 # File type export
-file_type_export_label <- tklabel(window, text="Select the format\nof the exported file", font = label_font)
-file_type_export_entry <- tkbutton(window, text="Choose the file type", command = file_type_export_choice, font = button_font)
-#### Close
-exit_label <- tklabel(window, text="Exit", font = label_font)
-quit_button <- tkbutton(window, text="Quit", command = quit_function, font = button_font)
+file_type_export_entry <- tkbutton(window, text="Format\nof the exported file", command = file_type_export_choice, font = button_font, bg = "white", width = 20)
 # End session
-#end_session_label <- tklabel(window, text="Quit")
-end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font)
+end_session_button <- tkbutton(window, text="QUIT", command = end_session_function, font = button_font, bg = "white", width = 20)
 # Multicore
-allow_parallelization_button <- tkbutton(window, text="ALLOW PARALLELIZATION", command = allow_parallelization_choice, font = button_font)
+allow_parallelization_button <- tkbutton(window, text="ALLOW\nPARALLELIZATION", command = allow_parallelization_choice, font = button_font, bg = "white", width = 20)
 # Import the spectra
-import_spectra_button <- tkbutton(window, text="SPECTRA IMPORT AND\nPREPROCESSING", command = import_spectra_function, font = button_font)
+import_spectra_button <- tkbutton(window, text="IMPORT AND\nPREPROCESS SPECTRA", command = import_spectra_function, font = button_font, bg = "white", width = 20)
 # Peak picking
-peak_picking_button <- tkbutton(window, text="PEAK PICKING", command = peak_picking_function, font = button_font)
+peak_picking_button <- tkbutton(window, text="PEAK PICKING", command = peak_picking_function, font = button_font, bg = "white", width = 20)
 # Run the Spectral typer!
-run_spectral_typer_button <- tkbutton(window, text="RUN THE SPECTRAL TYPER", command = run_spectral_typer_function, font = button_font)
+run_spectral_typer_button <- tkbutton(window, text="RUN\nSPECTRAL TYPER", command = run_spectral_typer_function, font = button_font, bg = "white", width = 20)
 # Spectra preprocessing button
-spectra_preprocessing_button <- tkbutton(window, text="SPECTRA PREPROCESSING\nPARAMETERS", command = preprocessing_window_function, font = button_font)
+spectra_preprocessing_parameters_button <- tkbutton(window, text="SPECTRA\nPREPROCESSING\nPARAMETERS...", command = preprocessing_window_function, font = button_font, bg = "white", width = 20)
 # Set the file name
-set_file_name_label <- tklabel(window, text="<-- Set the file name", font = label_font)
-set_file_name_entry <- tkentry(window, width = 30, textvariable = file_name, font = entry_font)
-tkinsert(set_file_name_entry, "end", "Score")
+set_file_name_label <- tklabel(window, text="<--- Set the file name", font = label_font, bg = "white", width = 20)
+set_file_name_entry <- tkentry(window, textvariable = file_name, font = entry_font, bg = "white", width = 30, justify = "center")
+tkinsert(set_file_name_entry, "end", "Spectral Typer Score")
 # Dump the database peaklist
-database_peaklist_dump_button <- tkbutton(window, text="Dump the database", command = database_dump_function, font = button_font)
+database_peaklist_dump_button <- tkbutton(window, text="Dump the database", command = database_dump_function, font = button_font, bg = "white", width = 20)
 # Updates
-download_updates_button <- tkbutton(window, text="DOWNLOAD UPDATE", command = download_updates_function, font = button_font)
+download_updates_button <- tkbutton(window, text="DOWNLOAD UPDATE...", command = download_updates_function, font = button_font, bg = "white", width = 20)
 
 
 
 
 #### Displaying labels
-file_type_export_value_label <- tklabel(window, text = file_type_export, font = label_font)
-similarity_criteria_value_label <- tklabel(window, text = similarity_criteria_value, font = label_font)
-signal_intensity_evaluation_value_label <- tklabel(window, text = signal_intensity_evaluation, font = label_font)
-peak_picking_mode_value_label <- tklabel(window, text = peak_picking_mode_value, font = label_font)
-peaks_filtering_value_label <- tklabel(window, text = peaks_filtering_value, font = label_font)
-low_intensity_peaks_removal_value_label <- tklabel(window, text = low_intensity_peaks_removal_value, font = label_font)
-intensity_threshold_method_value_label <- tklabel(window, text = intensity_threshold_method_value, font = label_font)
-average_replicates_in_database_value_label <- tklabel(window, text = average_replicates_in_database_value, font = label_font)
-average_replicates_in_test_value_label <- tklabel(window, text = average_replicates_in_test_value, font = label_font)
-score_only_value_label <- tklabel(window, text = score_only_value, font = label_font)
-spectra_path_output_value_label <- tklabel(window, text = spectra_path_output_value, font = label_font)
-spectra_format_value_label <- tklabel(window, text = spectra_format_value, font = label_font)
-allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font)
-check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font)
+file_type_export_value_label <- tklabel(window, text = file_type_export, font = label_font, bg = "white", width = 20)
+similarity_criteria_value_label <- tklabel(window, text = similarity_criteria_value, font = label_font, bg = "white", width = 20)
+signal_intensity_evaluation_value_label <- tklabel(window, text = signal_intensity_evaluation, font = label_font, bg = "white", width = 20)
+peak_picking_mode_value_label <- tklabel(window, text = peak_picking_mode_value, font = label_font, bg = "white", width = 20)
+peaks_deisotoping_value_label <- tklabel(window, text = peaks_deisotoping_value, font = label_font, bg = "white", width = 20)
+peaks_filtering_value_label <- tklabel(window, text = peaks_filtering_value, font = label_font, bg = "white", width = 20)
+low_intensity_peaks_removal_value_label <- tklabel(window, text = low_intensity_peaks_removal_value, font = label_font, bg = "white", width = 20)
+low_intensity_peak_removal_threshold_method_value_label <- tklabel(window, text = low_intensity_peak_removal_threshold_method_value, font = label_font, bg = "white", width = 20)
+average_replicates_in_database_value_label <- tklabel(window, text = average_replicates_in_database_value, font = label_font, bg = "white", width = 20)
+average_replicates_in_test_value_label <- tklabel(window, text = average_replicates_in_test_value, font = label_font, bg = "white", width = 20)
+score_only_value_label <- tklabel(window, text = score_only_value, font = label_font, bg = "white", width = 20)
+spectra_path_output_value_label <- tklabel(window, text = spectra_path_output_value, font = label_font, bg = "white", width = 20)
+spectra_format_value_label <- tklabel(window, text = spectra_format_value, font = label_font, bg = "white", width = 20)
+allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font, bg = "white", width = 20)
+check_for_updates_value_label <- tklabel(window, text = check_for_updates_value, font = label_font, bg = "white", width = 20)
 
 
 
 
 #### Geometry manager
-# Scrollbar
-#window_scrollbar <- tkscrollbar(window, command = function(...)tkyview(window,...))
-# tkgrid
-tkgrid(set_file_name_label, row = 1, column = 5)
-tkgrid(set_file_name_entry, row = 1, column = 4)
-#tkgrid(select_database_label, row = 1, column = 1)
-tkgrid(select_database_button, row = 1, column = 1)
-#tkgrid(select_samples_label, row = 1, column = 3)
-tkgrid(select_samples_button, row = 1, column = 2)
-#tkgrid(select_output_label, row = 2, column = 3)
-tkgrid(browse_output_button, row = 1, column = 3)
-tkgrid(similarity_criteria_label, row = 3, column = 1)
-tkgrid(similarity_criteria_entry, row = 3, column = 2)
-tkgrid(similarity_criteria_value_label, row = 3, column = 3)
-tkgrid(peak_picking_algorithm_button, row = 3, column = 4)
-tkgrid(peak_picking_algorithm_value_label, row = 3, column = 5)
-tkgrid(intensity_correction_coefficient_label, row = 4, column = 1)
-tkgrid(intensity_correction_coefficient_entry, row = 4, column = 2)
-tkgrid(signal_intensity_evaluation_label, row = 4, column = 4)
-tkgrid(signal_intensity_evaluation_entry, row = 4, column = 5)
-tkgrid(signal_intensity_evaluation_value_label, row = 4, column = 6)
-tkgrid(peak_picking_mode_label, row = 5, column = 1)
-tkgrid(peak_picking_mode_entry, row = 5, column = 2)
-tkgrid(peak_picking_mode_value_label, row = 5, column = 3)
-tkgrid(signals_to_take_label, row = 5, column = 4)
-tkgrid(signals_to_take_entry, row = 5, column = 5)
-tkgrid(SNR_label, row = 6, column = 2)
-tkgrid(SNR_entry, row = 6, column = 3)
-tkgrid(peaks_filtering_label, row = 7, column = 1)
-tkgrid(peaks_filtering_entry, row = 7, column = 2)
-tkgrid(peaks_filtering_value_label, row = 7, column = 3)
-tkgrid(peaks_filtering_threshold_percent_label, row = 7, column = 4)
-tkgrid(peaks_filtering_threshold_percent_entry, row = 7, column = 5)
-tkgrid(low_intensity_peaks_removal_label, row = 8, column = 1)
-tkgrid(low_intensity_peaks_removal_entry, row = 8, column = 2)
-tkgrid(low_intensity_peaks_removal_value_label, row = 8, column = 3)
-tkgrid(intensity_threshold_method_label, row = 9, column = 1)
-tkgrid(intensity_threshold_method_entry, row = 9, column = 2)
-tkgrid(intensity_threshold_method_value_label, row = 9, column = 3)
-tkgrid(intensity_percentage_threshold_label, row = 8, column = 4)
-tkgrid(intensity_percentage_threshold_entry, row = 8, column = 5)
-tkgrid(average_replicates_in_database_label, row = 10, column = 1)
-tkgrid(average_replicates_in_database_entry, row = 10, column = 2)
-tkgrid(average_replicates_in_database_value_label, row = 10, column = 3)
-tkgrid(average_replicates_in_test_label, row = 10, column = 4)
-tkgrid(average_replicates_in_test_entry, row = 10, column = 5)
-tkgrid(average_replicates_in_test_value_label, row = 10, column = 6)
-tkgrid(allow_parallelization_button, row = 9, column = 4)
-tkgrid(allow_parallelization_value_label, row = 9, column = 5)
-tkgrid(score_only_label, row = 11, column = 1)
-tkgrid(score_only_entry, row = 11, column = 2)
-tkgrid(score_only_value_label, row = 11, column = 3)
-tkgrid(spectra_path_output_label, row = 11, column = 4)
-tkgrid(spectra_path_output_entry, row = 11, column = 5)
-tkgrid(spectra_path_output_value_label, row = 11, column = 6)
-tkgrid(spectra_format_label, row = 12, column = 1)
-tkgrid(spectra_format_entry, row = 12, column = 2)
-tkgrid(spectra_format_value_label, row = 12, column = 3)
-tkgrid(intensity_tolerance_percent_label, row = 6, column = 4)
-tkgrid(intensity_tolerance_percent_entry, row = 6, column = 5)
-tkgrid(file_type_export_label, row = 12, column = 4)
-tkgrid(file_type_export_entry, row = 12, column = 5)
-tkgrid(file_type_export_value_label, row = 12, column = 6)
-tkgrid(import_spectra_button, row = 14, column = 2)
-tkgrid(peak_picking_button, row = 14, column = 3)
-tkgrid(run_spectral_typer_button, row = 14, column = 4)
-tkgrid(spectra_preprocessing_button, row = 14, column = 5)
-tkgrid(database_peaklist_dump_button, row = 15, column = 3)
-#tkgrid(exit_label, row = 15, column = 1)
-#tkgrid(quit_button, row = 15, column = 2)
-tkgrid(end_session_button, row = 15, column = 4)
-tkgrid(download_updates_button, row = 15, column = 5)
-tkgrid(check_for_updates_value_label, row = 15, column = 6)
-#window_scrollbar
+tkgrid(title_label, row = 1, column = 1, padx = c(20, 20), pady = c(20, 20), columnspan = 4)
+tkgrid(download_updates_button, row = 1, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(check_for_updates_value_label, row = 1, column = 6, padx = c(5, 5), pady = c(5, 5))
+tkgrid(spectra_format_entry, row = 2, column = 1, padx = c(5, 5), pady = c(5, 5))
+tkgrid(spectra_format_value_label, row = 2, column = 2, padx = c(5, 5), pady = c(5, 5))
+tkgrid(average_replicates_in_database_entry, row = 2, column = 3, padx = c(5, 5), pady = c(5, 5))
+tkgrid(average_replicates_in_database_value_label, row = 2, column = 4, padx = c(5, 5), pady = c(5, 5))
+tkgrid(average_replicates_in_test_entry, row = 2, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(average_replicates_in_test_value_label, row = 2, column = 6, padx = c(5, 5), pady = c(5, 5))
+tkgrid(file_type_export_entry, row = 3, column = 1, padx = c(5, 5), pady = c(5, 5))
+tkgrid(file_type_export_value_label, row = 3, column = 2, padx = c(5, 5), pady = c(5, 5))
+tkgrid(score_only_entry, row = 3, column = 3, padx = c(5, 5), pady = c(5, 5))
+tkgrid(score_only_value_label, row = 3, column = 4, padx = c(5, 5), pady = c(5, 5))
+tkgrid(spectra_path_output_entry, row = 3, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(spectra_path_output_value_label, row = 3, column = 6, padx = c(5, 5), pady = c(5, 5))
+tkgrid(peak_picking_algorithm_button, row = 4, column = 1, padx = c(5, 5), pady = c(5, 5))
+tkgrid(peak_picking_algorithm_value_label, row = 4, column = 2, padx = c(5, 5), pady = c(5, 5))
+tkgrid(peaks_deisotoping_entry, row = 4, column = 3, padx = c(5, 5), pady = c(5, 5))
+tkgrid(peaks_deisotoping_value_label, row = 4, column = 4, padx = c(5, 5), pady = c(5, 5))
+tkgrid(SNR_label, row = 4, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(SNR_entry, row = 4, column = 6, padx = c(5, 5), pady = c(5, 5))
+tkgrid(peak_picking_mode_entry, row = 5, column = 1, padx = c(5, 5), pady = c(5, 5))
+tkgrid(peak_picking_mode_value_label, row = 5, column = 2, padx = c(5, 5), pady = c(5, 5))
+tkgrid(signals_to_take_label, row = 5, column = 3, padx = c(5, 5), pady = c(5, 5))
+tkgrid(signals_to_take_entry, row = 5, column = 4, padx = c(5, 5), pady = c(5, 5))
+tkgrid(peaks_filtering_threshold_percent_label, row = 5, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(peaks_filtering_threshold_percent_entry, row = 5, column = 6, padx = c(5, 5), pady = c(5, 5))
+tkgrid(low_intensity_peak_removal_threshold_percent_label, row = 6, column = 1, padx = c(5, 5), pady = c(5, 5))
+tkgrid(low_intensity_peak_removal_threshold_percent_entry, row = 6, column = 2, padx = c(5, 5), pady = c(5, 5))
+tkgrid(low_intensity_peak_removal_threshold_method_entry, row = 6, column = 3, padx = c(5, 5), pady = c(5, 5))
+tkgrid(low_intensity_peak_removal_threshold_method_value_label, row = 6, column = 4, padx = c(5, 5), pady = c(5, 5))
+tkgrid(intensity_tolerance_percent_label, row = 6, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(intensity_tolerance_percent_entry, row = 6, column = 6, padx = c(5, 5), pady = c(5, 5))
+tkgrid(similarity_criteria_entry, row = 7, column = 1, padx = c(5, 5), pady = c(5, 5))
+tkgrid(similarity_criteria_value_label, row = 7, column = 2, padx = c(5, 5), pady = c(5, 5))
+tkgrid(intensity_correction_coefficient_label, row = 7, column = 3, padx = c(5, 5), pady = c(5, 5))
+tkgrid(intensity_correction_coefficient_entry, row = 7, column = 4, padx = c(5, 5), pady = c(5, 5))
+tkgrid(signal_intensity_evaluation_entry, row = 7, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(signal_intensity_evaluation_value_label, row = 7, column = 6, padx = c(5, 5), pady = c(5, 5))
+tkgrid(allow_parallelization_button, row = 8, column = 3, padx = c(5, 5), pady = c(5, 5))
+tkgrid(allow_parallelization_value_label, row = 8, column = 4, padx = c(5, 5), pady = c(5, 5))
+tkgrid(select_database_button, row = 9, column = 1, padx = c(5, 5), pady = c(5, 5))
+tkgrid(select_samples_button, row = 9, column = 2, padx = c(5, 5), pady = c(5, 5))
+tkgrid(browse_output_button, row = 9, column = 3, padx = c(5, 5), pady = c(5, 5))
+tkgrid(spectra_preprocessing_parameters_button, row = 9, column = 4, padx = c(5, 5), pady = c(5, 5))
+tkgrid(set_file_name_label, row = 9, column = 6, padx = c(5, 5), pady = c(5, 5))
+tkgrid(set_file_name_entry, row = 9, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(import_spectra_button, row = 10, column = 1, padx = c(5, 5), pady = c(5, 5))
+tkgrid(peak_picking_button, row = 10, column = 2, padx = c(5, 5), pady = c(5, 5))
+tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c(5, 5))
+tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
+tkgrid(end_session_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
+
+
+
+
+
+
+
+
 
