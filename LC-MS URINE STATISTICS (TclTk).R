@@ -1,17 +1,17 @@
-#################### LC-MS URINE STATISTICS (TCL-TK GUI) ####################
+#################### LC-MS URINE STATISTICS (PARALLEL) (TCL-TK GUI) ############
 
 
 
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.19.2"
+R_script_version <- "2017.04.28.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/LC-MS%20URINE%20STATISTICS.R"
 ### Name of the file when downloaded
 script_file_name <- "LC-MS URINE STATISTICS"
 # Change log
-change_log <- "1. Fixed a bug when only one signal is differently expressed\n2. Fixed GUI\n3. Added the possibility to transform the data\n4. Dump the original data in 'Data'"
+change_log <- "1. Parallel processing in correlation enabled!"
 
 
 
@@ -112,7 +112,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
 }
 
 ########## INSTALL AND LOAD THE REQUIRED PACKAGES
-install_and_load_required_packages(c("rattle", "phia", "MASS", "ggplot2", "lawstat", "coin", "multcomp", "agricolae", "tcltk", "Hmisc"), update_packages = TRUE) # "Rcmdr", "RcmdrPlugin.coin"
+install_and_load_required_packages(c("rattle", "phia", "MASS", "ggplot2", "lawstat", "coin", "multcomp", "agricolae", "tcltk", "Hmisc", "parallel"), update_packages = TRUE) # "Rcmdr", "RcmdrPlugin.coin"
 # The package lawstat is used for levene test for non parametric anova
 
 
@@ -158,6 +158,7 @@ age_bins <- 6
 plot_correlation_graphs <- FALSE
 transform_data <- FALSE
 correlation_analysis_method <- "spearman"
+allow_parallelization <- FALSE
 
 
 
@@ -178,6 +179,7 @@ cumulative_class_in_two_level_effect_analysis_value <- "NO"
 plot_correlation_graphs_value <- "NO"
 transform_data_value <- "NO"
 correlation_analysis_method_value <- "Spearman"
+allow_parallelization_value <- "NO"
 check_for_updates_value <- R_script_version
 
 
@@ -265,7 +267,7 @@ check_for_updates_function <- function() {
             } else {
                 if (update_available == TRUE) {
                     # Update the label
-                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available: ", online_version_number, sep = "")
+                    check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdate available:\n", online_version_number, sep = "")
                 } else {
                     # Update the label
                     check_for_updates_value <- paste("Version: ", R_script_version, "\nNo updates available", sep = "")
@@ -333,7 +335,7 @@ output_file_type_export_choice <- function() {
     }
     # Set the value of the displaying label
     output_file_type_export_value_label <- tklabel(window, text = output_format, font = label_font, bg = "white", width = 30)
-    tkgrid(output_file_type_export_value_label, row = 7, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(output_file_type_export_value_label, row = 7, column = 3, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$output_format <- output_format
     .GlobalEnv$file_format <- file_format
@@ -353,7 +355,7 @@ image_file_type_export_choice <- function() {
     }
     # Set the value of the displaying label
     image_file_type_export_value_label <- tklabel(window, text = image_output_format, font = label_font, bg = "white", width = 20)
-    tkgrid(image_file_type_export_value_label, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(image_file_type_export_value_label, row = 7, column = 5, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$image_output_format <- image_output_format
     .GlobalEnv$image_format <- image_format
@@ -381,8 +383,6 @@ file_import_function <- function() {
             ##### CSV
             input_data <- read.csv(input_file, header=TRUE, sep=",")
         }
-        ## Rownames
-        try({rownames(input_data) <- input_data$No}, silent = TRUE)
         ## Data type
         try({input_data$Age <- as.numeric(input_data$Age)}, silent = TRUE)
         try({input_data$pT <- as.numeric(input_data$pT)}, silent = TRUE)
@@ -417,6 +417,9 @@ file_import_function <- function() {
         # Discriminant column
         tkmessageBox(title = "Discriminant feature", message = "Select the discriminant feature", icon = "info")
         discriminant_feature <- select.list(c(non_signals, "NONE"), title = "Discriminant feature", preselect = ifelse("Class" %in% feature_vector, "Class", NULL))
+        # Discriminant column
+        tkmessageBox(title = "Patient ID", message = "Select the attribute for the patient ID", icon = "info")
+        patient_id_attribute <- select.list(c(non_signals, "NONE"), title = "Patient ID attribute", preselect = ifelse("No" %in% feature_vector, "No", NULL))
         # Features for correlation analysis
         if (correlation_analysis == TRUE) {
             tkmessageBox(title = "Correlation analysis data", message = "Select the demographic data for correlation analysis", icon = "info")
@@ -439,10 +442,16 @@ file_import_function <- function() {
             multi_level_effect_analysis_non_features <- character()
         }
         ## Class list
-        if (discriminant_feature == "NONE") {
+        if (discriminant_feature == "NONE" || discriminant_feature == "") {
             class_list <- discriminant_feature
         } else {
             class_list <- levels(as.factor(input_data[, discriminant_feature]))
+        }
+        ## Patient ID as rownames
+        if (patient_id_attribute == "NONE" || patient_id_attribute == "") {
+            rownames(input_data) <- seq(1, nrow(input_data), by = 1)
+        } else {
+            rownames(input_data) <- input_data[, patient_id_attribute]
         }
         ### Retrieve the input file name
         input_filename <- NULL
@@ -468,6 +477,7 @@ file_import_function <- function() {
         .GlobalEnv$signals_data <- signals_data
         .GlobalEnv$signal_name <- signal_name
         .GlobalEnv$discriminant_feature <- discriminant_feature
+        .GlobalEnv$patient_id_attribute <- patient_id_attribute
         .GlobalEnv$non_signals_for_correlation_analysis <- non_signals_for_correlation_analysis
         .GlobalEnv$two_level_effect_analysis_non_features <- two_level_effect_analysis_non_features
         .GlobalEnv$multi_level_effect_analysis_non_features <- multi_level_effect_analysis_non_features
@@ -500,6 +510,32 @@ end_session_function <- function() {
     q(save = "no")
 }
 
+##### Multicore processing
+allow_parallelization_choice <- function() {
+    ##### Messagebox
+    tkmessageBox(title = "Parallel processing is resource hungry", message = "Parallel processing is resource hungry.\nBy activating it, the computation becomes faster, but the program will eat a lot of RAM, possibly causing your computer to freeze. If you want to play safe, do not enable it.", icon = "warning")
+    # Catch the value from the menu
+    allow_parallelization <- select.list(c("YES","NO"), title = "Choose", multiple = FALSE, preselect = "NO")
+    # Default
+    if (allow_parallelization == "YES") {
+        allow_parallelization <- TRUE
+    }
+    if (allow_parallelization == "NO" || allow_parallelization == "") {
+        allow_parallelization <- FALSE
+    }
+    # Set the value of the displaying label
+    if (allow_parallelization == TRUE) {
+        allow_parallelization_value <- "YES"
+    } else {
+        allow_parallelization_value <- "NO"
+    }
+    allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font, bg = "white", width = 20)
+    tkgrid(allow_parallelization_value_label, row = 9, column = 5)
+    # Escape the function
+    .GlobalEnv$allow_parallelization <- allow_parallelization
+    .GlobalEnv$allow_parallelization_value <- allow_parallelization_value
+}
+
 ##### Data Record
 data_record_choice <- function() {
     # Catch the value from the menu
@@ -518,7 +554,7 @@ data_record_choice <- function() {
         data_record_value <- "NO"
     }
     data_record_value_label <- tklabel(window, text = data_record_value, font = label_font, bg = "white", width = 20)
-    tkgrid(data_record_value_label, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(data_record_value_label, row = 5, column = 5, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$data_record <- data_record
     .GlobalEnv$data_record_value <- data_record_value
@@ -608,7 +644,7 @@ plot_correlation_graphs_choice <- function() {
         plot_correlation_graphs_value <- "NO"
     }
     plot_correlation_graphs_value_label <- tklabel(window, text = plot_correlation_graphs_value, font = label_font, bg = "white", width = 20)
-    tkgrid(plot_correlation_graphs_value_label, row = 6, column = 4, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(plot_correlation_graphs_value_label, row = 2, column = 6, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$plot_correlation_graphs <- plot_correlation_graphs
     .GlobalEnv$plot_correlation_graphs_value <- plot_correlation_graphs_value
@@ -656,7 +692,7 @@ cumulative_class_in_two_level_effect_analysis_choice <- function() {
         cumulative_class_in_two_level_effect_analysis_value <- "NO"
     }
     cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
-    tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 6, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 3, column = 6, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$cumulative_class_in_two_level_effect_analysis <- cumulative_class_in_two_level_effect_analysis
     .GlobalEnv$cumulative_class_in_two_level_effect_analysis_value <- cumulative_class_in_two_level_effect_analysis_value
@@ -680,7 +716,7 @@ multi_level_effect_analysis_choice <- function() {
         multi_level_effect_analysis_value <- "NO"
     }
     multi_level_effect_analysis_value_label <- tklabel(window, text = multi_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
-    tkgrid(multi_level_effect_analysis_value_label, row = 4, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(multi_level_effect_analysis_value_label, row = 4, column = 3, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$multi_level_effect_analysis <- multi_level_effect_analysis
     .GlobalEnv$multi_level_effect_analysis_value <- multi_level_effect_analysis_value
@@ -728,7 +764,7 @@ remove_outliers_multi_level_effect_analysis_choice <- function() {
         remove_outliers_multi_level_effect_analysis_value <- "NO"
     }
     remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text = remove_outliers_multi_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
-    tkgrid(remove_outliers_multi_level_effect_analysis_value_label, row = 4, column = 4, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(remove_outliers_multi_level_effect_analysis_value_label, row = 4, column = 5, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$remove_outliers_multi_level_effect_analysis <- remove_outliers_multi_level_effect_analysis
     .GlobalEnv$remove_outliers_multi_level_effect_analysis_value <- remove_outliers_multi_level_effect_analysis_value
@@ -757,7 +793,7 @@ transform_data_choice <- function() {
         transform_data_value <- "NO"
     }
     transform_data_value_label <- tklabel(window, text = transform_data_value, font = label_font, bg = "white", width = 20, height = 2)
-    tkgrid(transform_data_value_label, row = 5, column = 2, padx = c(10, 10), pady = c(10, 10))
+    tkgrid(transform_data_value_label, row = 5, column = 3, padx = c(10, 10), pady = c(10, 10))
     # Escape the function
     .GlobalEnv$transform_data <- transform_data
     .GlobalEnv$transform_data_algorithm <- transform_data_algorithm
@@ -951,6 +987,66 @@ run_statistics_function <- function() {
             }
         }
         
+        ## Function for correlation analysis: x corresponds to each element of the list (a data frame with the signal column and the non-signal column, with patient IDs as rownames)
+        correlation_analysis_subfunction <- function(x, correlation_method, plot_correlation, remove_outliers_correlation, plot_format, correlation_plots_subfolder, correlation_plots_subfolder_no_outliers) {
+            # Initialize outputs
+            outlier_list <- list()
+            correlation_list <- list()
+            # Isolate the column corresponding to the mass (as a vector)
+            mass_x <- x[, 1]
+            non_signal_column_original <- x[, 2]
+            patient_id <- rownames(x)
+            # Remove NAs from the non signal and from the signal
+            mass_x <- mass_x[!is.na(non_signal_column_original)]
+            non_signal_column <- non_signal_column_original[!is.na(non_signal_column_original)]
+            patient_id <- patient_id[!is.na(non_signal_column_original)]
+            ### Generate a graph before the removal of outliers
+            if (plot_correlation == TRUE) {
+                plot_name <- sprintf("%s%s%s%s", "Correlation ", names(x)[1], " vs ", names(x)[2])
+                file_name <- sprintf("%s%s", plot_name, plot_format)
+                scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = plot_name, ylab = names(x)[2], xlab = names(x)[1])
+                setwd(correlation_plots_subfolder)
+                ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+            }
+            ### Outlier detection
+            if (isTRUE(remove_outliers_correlation)) {
+                # Detect the outliers (fence)
+                outliers <- boxplot(mass_x, plot = FALSE)$out
+                # If there are some...
+                if (length(outliers) > 0) {
+                    # Build the dataframe to be dumped
+                    outliers_dataframe <- as.data.frame(cbind(patient_id[mass_x %in% outliers]))
+                    # Signal name
+                    sign_name <- rep(names(x)[1], nrow(outliers_dataframe))
+                    # Append the two columns...
+                    outliers_dataframe <- cbind(outliers_dataframe, sign_name)
+                    # Fix the column names
+                    colnames(outliers_dataframe) <- c("Patient", "Mass")
+                    # Store this in the final list of outlier dataframes
+                    outlier_list[[names(x)[1]]] <- outliers_dataframe
+                    # Replace the intensity in the original dataframe with NA (so that they are excluded)
+                    mass_x[mass_x %in% outliers] <- NA
+                }
+                # Extract the values without the outliers
+                mass_x_no_outliers <- mass_x[!is.na(mass_x)]
+                non_signal_column_no_outliers <- non_signal_column[!is.na(mass_x)]
+                ### Generate a graph after the removal of outliers
+                if (plot_correlation == TRUE) {
+                    plot_name <- sprintf("%s%s%s%s", "Correlation ", names(x)[1], " vs ", names(x)[2], " (without outliers)")
+                    file_name <- sprintf("%s%s", plot_name, plot_format)
+                    scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = sprintf("%s%s%s%s", "Correlation ", names(x)[1], " vs ", names(x)[2], "\n(without outliers)"), ylab = names(x)[2], xlab = names(x)[1])
+                    setwd(correlation_plots_subfolder_no_outliers)
+                    ggsave(scatter_plot, file = file_name , width = 4, height = 4)
+                }
+            }
+            ### Compute the results
+            correlation_result_vector <- c(cor.test(mass_x, as.numeric(non_signal_column), method = correlation_method)$estimate, cor.test(mass_x, as.numeric(non_signal_column), method = correlation_method)$p.value)
+            ### Correlation (signal m with the non-signal ns)
+            # Append to the final correlation list
+            correlation_list[[names(x)[2]]][[names(x)[1]]] <- correlation_result_vector
+            ### Return
+            return(list(correlation_sublist = correlation_list, outlier_sublist = outlier_list))
+        }
         
         ########################################################################
         
@@ -1075,16 +1171,12 @@ run_statistics_function <- function() {
             # Temporary data filter for task #1
             ### For each class...
             for (cl in 1:length(class_list)) {
-                # Message
-                if (discriminant_feature == "NONE") {
-                    print("########## CORRELATION ANALYSIS: Whole data ##########")
-                } else {
-                    print(paste("########## CORRELATION ANALYSIS, class:", discriminant_feature, class_list[cl], "##########"))
-                }
                 # Filter the dataframe with only the data for that selected class
-                if (discriminant_feature == "NONE") {
+                if (discriminant_feature == "NONE" || discriminant_feature == "") {
+                    print("########## CORRELATION ANALYSIS: Whole data ##########")
                     data_frame_correlation <- input_data[, features_for_correlation_analysis]
                 } else {
+                    print(paste("########## CORRELATION ANALYSIS, class:", discriminant_feature, class_list[cl], "##########"))
                     data_frame_correlation <- input_data[input_data[, discriminant_feature] == class_list[cl], features_for_correlation_analysis]
                 }
                 # Store the original (after it will be modified by the outlier exclusion)
@@ -1096,70 +1188,61 @@ run_statistics_function <- function() {
                 # List of the correlation matrices
                 correlation_matrix_list <- list()
                 ### Perform the operations only if a minimum number of patients is present...
-                if (nrow(data_frame_correlation) > 1) {
+                if (nrow(data_frame_correlation) >= minimum_number_of_patients) {
                     ### For each non-signal...
                     for (f in 1:length(non_signals_for_correlation_analysis)) {
-                        ns <- non_signals_for_correlation_analysis[f]
                         # Isolate the column corresponding to the non-signal...
-                        non_signal_column_original <- data_frame_correlation[, ns]
-                        ##### Scroll the masses...
+                        non_signal_column <- as.data.frame(data_frame_correlation[, non_signals_for_correlation_analysis[f]])
+                        names(non_signal_column) <- as.character(non_signals_for_correlation_analysis[f])
+                        # Generate the list for the parallel function (lapply): each element (x in the subfunction) should be a dataframe with the non-signal column and the signal column
+                        list_for_correlation_subfunction <- list()
+                        # Extract the columns from the dataframe containing the intensity information of the signals
                         for (ms in 1:ncol(signals_data)) {
-                            m <- colnames(signals_data)[ms]
-                            # Isolate the column corresponding to the mass (as a vector)
-                            mass_x <- data_frame_correlation[, m]
-                            # Remove NAs from the non signal and from the signal
-                            mass_x <- mass_x[!is.na(non_signal_column_original)]
-                            non_signal_column <- non_signal_column_original[!is.na(non_signal_column_original)]
-                            ### Generate a graph before the removal of outliers
-                            if (plot_correlation_graphs == TRUE) {
-                                plot_name <- sprintf("%s%s%s%s", "Correlation ", m, " vs ", ns)
-                                file_name <- sprintf("%s%s", plot_name, image_format)
-                                scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = plot_name, ylab = ns, xlab = m)
-                                setwd(correlation_plot_subfolder)
-                                ggsave(scatter_plot, file = file_name , width = 4, height = 4)
-                            }
-                            ### Outlier detection
-                            if (isTRUE(remove_outliers_correlation_analysis)) {
-                                # Detect the outliers (fence)
-                                outliers <- boxplot(mass_x, plot = FALSE)$out
-                                # If there are some...
-                                if (length(outliers) > 0) {
-                                    # Build the dataframe to be dumped
-                                    outliers_dataframe <- data_frame_correlation[mass_x %in% outliers, c(non_signals_for_correlation_analysis, m)]
-                                    # Signal name
-                                    sign_name <- rep(m, dim(outliers_dataframe)[1])
-                                    # Patients
-                                    patients <- rownames(outliers_dataframe)
-                                    # Append the two columns...
-                                    outliers_dataframe <- cbind(outliers_dataframe, patients, sign_name)
-                                    # Fix the column names
-                                    colnames(outliers_dataframe) <- c(non_signals_for_correlation_analysis,"Intensity","Patient","Mass")
-                                    # Store this in the final list of outlier dataframes
-                                    outlier_list[[ms]] <- outliers_dataframe
-                                    # Replace the intensity in the original dataframe with NA (so that they are excluded)
-                                    #data_frame_correlation[mass_x %in% outliers, m] <- NA
-                                    mass_x[mass_x %in% outliers] <- NA
-                                }
-                                # Extract the values without the outliers
-                                mass_x_no_outliers <- mass_x[!is.na(mass_x)]
-                                non_signal_column_no_outliers <- non_signal_column[!is.na(mass_x)]
-                                ### Generate a graph after the removal of outliers
-                                if (plot_correlation_graphs == TRUE) {
-                                    plot_name <- sprintf("%s%s%s%s", "Correlation ", m, " vs ", ns, " (without outliers)")
-                                    file_name <- sprintf("%s%s", plot_name, image_format)
-                                    scatter_plot <- qplot(mass_x, non_signal_column, geom = "auto", main = sprintf("%s%s%s%s", "Correlation ", m, " vs ", ns, "\n(without outliers)"), ylab = ns, xlab = m)
-                                    setwd(correlation_plot_subfolder_no_outliers)
-                                    ggsave(scatter_plot, file = file_name , width = 4, height = 4)
-                                }
-                            }
-                            ### Compute the results
-                            correlation_result_vector <- c(cor.test(mass_x, as.numeric(non_signal_column), method = correlation_analysis_method)$estimate, cor.test(mass_x, as.numeric(non_signal_column), method = correlation_analysis_method)$p.value)
-                            ### Correlation (signal m with the non-signal ns)
-                            # Append to the final correlation list
-                            correlation_list[[ns]][[m]] <- correlation_result_vector
+                            signal_column <- as.data.frame(data_frame_correlation[, colnames(signals_data)[ms]])
+                            names(signal_column) <- colnames(signals_data)[ms]
+                            # Append it to the nonsignal column
+                            data_frame_for_correlation <- cbind(signal_column, non_signal_column)
+                            # Rownames
+                            rownames(data_frame_for_correlation) <- rownames(data_frame_correlation)
+                            # Add it to the final list for correlation subfunction
+                            list_for_correlation_subfunction[[names(signal_column)]] <- data_frame_for_correlation
                         }
-                        # Restore the original
-                        #data_frame_correlation <- data_frame_correlation_original
+                        ### Apply the function for correlation
+                        # MULTICORE
+                        if (allow_parallelization == TRUE) {
+                            # Detect the number of cores
+                            cpu_thread_number <- detectCores(logical = TRUE)
+                            cpu_thread_number <- cpu_thread_number - 1
+                            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                                correlation_results <- mclapply(X = list_for_correlation_subfunction, FUN = function(list_for_correlation_subfunction, correlation_method, plot_correlation, remove_outliers_correlation, plot_format, correlation_plots_subfolder, correlation_plots_subfolder_no_outliers) correlation_analysis_subfunction(list_for_correlation_subfunction, correlation_method = correlation_analysis_method, plot_correlation = plot_correlation_graphs, remove_outliers_correlation = remove_outliers_correlation_analysis, plot_format = image_format, correlation_plots_subfolder = correlation_plot_subfolder, correlation_plots_subfolder_no_outliers = correlation_plot_subfolder_no_outliers), mc.cores = cpu_thread_number)
+                            } else if (Sys.info()[1] == "Windows") {
+                                # Make the CPU cluster for parallelization
+                                cl <- makeCluster(cpu_thread_number)
+                                # Make the cluster use the custom functions and the package functions along with their parameters
+                                #clusterEvalQ(cl, {library(MALDIquant)})
+                                # Pass the variables to the cluster for running the function
+                                clusterExport(cl = cl, varlist = c("list_for_correlation_subfunction", "correlation_analysis_method", "plot_correlation_graphs", "remove_outliers_correlation_analysis", "image_format", "correlation_plot_subfolder", "correlation_plot_subfolder_no_outliers"), envir = environment())
+                                # Apply the multicore function
+                                correlation_results <- parLapply(cl = cl, list_for_correlation_subfunction, fun = function(list_for_correlation_subfunction, correlation_method, plot_correlation, remove_outliers_correlation, plot_format, correlation_plots_subfolder, correlation_plots_subfolder_no_outliers) correlation_analysis_subfunction(list_for_correlation_subfunction, correlation_method = correlation_analysis_method, plot_correlation = plot_correlation_graphs, remove_outliers_correlation = remove_outliers_correlation_analysis, plot_format = image_format, correlation_plots_subfolder = correlation_plot_subfolder, correlation_plots_subfolder_no_outliers = correlation_plot_subfolder_no_outliers))
+                                stopCluster(cl)
+                            } else {
+                                correlation_results <- lapply(X = list_for_correlation_subfunction, FUN = function(list_for_correlation_subfunction, correlation_method, plot_correlation, remove_outliers_correlation, plot_format, correlation_plots_subfolder, correlation_plots_subfolder_no_outliers) correlation_analysis_subfunction(list_for_correlation_subfunction, correlation_method = correlation_analysis_method, plot_correlation = plot_correlation_graphs, remove_outliers_correlation = remove_outliers_correlation_analysis, plot_format = image_format, correlation_plots_subfolder = correlation_plot_subfolder, correlation_plots_subfolder_no_outliers = correlation_plot_subfolder_no_outliers))
+                            }
+                        } else {
+                            ### SINGLE CORE
+                            correlation_results <- lapply(X = list_for_correlation_subfunction, FUN = function(list_for_correlation_subfunction, correlation_method, plot_correlation, remove_outliers_correlation, plot_format, correlation_plots_subfolder, correlation_plots_subfolder_no_outliers) correlation_analysis_subfunction(list_for_correlation_subfunction, correlation_method = correlation_analysis_method, plot_correlation = plot_correlation_graphs, remove_outliers_correlation = remove_outliers_correlation_analysis, plot_format = image_format, correlation_plots_subfolder = correlation_plot_subfolder, correlation_plots_subfolder_no_outliers = correlation_plot_subfolder_no_outliers))
+                        }
+                        ### Repopulate the lists
+                        for (l in 1:length(correlation_results)) {
+                            # Correlation list: each element is a non-signal (so each element's name is the non-signal) with its correlation with all the signals
+                            correlation_list[[names(correlation_results[[l]]$correlation_sublist)]] <- append(correlation_list[[names(correlation_results[[l]]$correlation_sublist)]], correlation_results[[l]]$correlation_sublist[[1]])
+                            # Outlier list:each element is a signal (so each element's name is the signal) (check if for that signal there is the outlier first)
+                            if (!is.null(names(correlation_results[[l]]$outlier_sublist))) {
+                                if (is.null(outlier_list[[names(correlation_results[[l]]$outlier_sublist)]])) {
+                                    outlier_list[[names(correlation_results[[l]]$outlier_sublist)]] <- correlation_results[[l]]$outlier_sublist[[1]]
+                                }
+                            }
+                        }
                     }
                     ### Correlation matrices
                     # For each element of the correlation list...
@@ -1179,21 +1262,24 @@ run_statistics_function <- function() {
                     if (isTRUE(remove_outliers_correlation_analysis)) {
                         final_outlier_matrix <- matrix(ncol = (length(non_signals_for_correlation_analysis)) + 3)
                         final_outlier_matrix <- do.call(rbind, outlier_list)
-                        colnames(final_outlier_matrix) <- c(non_signals_for_correlation_analysis , "Intensity", "Patient", "Mass")
+                        colnames(final_outlier_matrix) <- c("Patient", "Mass")
                     }
-                }
-                #### Save the outputs
-                setwd(correlation_tables_subfolder)
-                if (discriminant_feature == "NONE") {
-                    write_file(file_name = "Correlation matrix", data = final_correlation_matrix, file_format = file_format)
-                    if (isTRUE(remove_outliers_correlation_analysis)) {
-                        write_file(file_name = "Outlier matrix", data = final_outlier_matrix, file_format = file_format)
+                    #### Save the outputs
+                    setwd(correlation_tables_subfolder)
+                    if (discriminant_feature == "NONE") {
+                        write_file(file_name = "Correlation matrix", data = final_correlation_matrix, file_format = file_format)
+                        if (isTRUE(remove_outliers_correlation_analysis)) {
+                            write_file(file_name = "Outlier matrix", data = final_outlier_matrix, file_format = file_format)
+                        }
+                    } else {
+                        write_file(file_name = paste(discriminant_feature, class_list[cl], "- Correlation matrix"), data = final_correlation_matrix, file_format = file_format)
+                        if (isTRUE(remove_outliers_correlation_analysis)) {
+                            write_file(file_name = paste(discriminant_feature, class_list[cl], "- Outlier matrix"), data = final_outlier_matrix, file_format = file_format)
+                        }
                     }
                 } else {
-                    write_file(file_name = paste(discriminant_feature, class_list[cl], "- Correlation matrix"), data = final_correlation_matrix, file_format = file_format)
-                    if (isTRUE(remove_outliers_correlation_analysis)) {
-                        write_file(file_name = paste(discriminant_feature, class_list[cl], "- Outlier matrix"), data = final_outlier_matrix, file_format = file_format)
-                    }
+                    ### Correlation not possible
+                    print("The correlation cannot be performed due to an insufficient number of patients!")
                 }
             }
         }
@@ -1476,8 +1562,6 @@ run_statistics_function <- function() {
                 } else {
                     selected_signals_for_inference_intensity_df_no_outliers <- NULL
                 }
-                ### data for testing: for diagnostic analysis
-                if (isTRUE(sampling)) TEST <- DIAGTFD[c("No",BaseEffName,non_signal_variable,SelectedSignsForEffect)]
                 ############################### Dump the files
                 # For each signals of inference...
                 ### OUTLIERS
@@ -2403,14 +2487,15 @@ two_level_effect_analysis_entry <- tkbutton(window, text="Two-level effect\nanal
 remove_outliers_two_level_effect_analysis_entry <- tkbutton(window, text="Remove outliers\nTwo-level effect\nanalysis", command = remove_outliers_two_level_effect_analysis_choice, font = button_font, bg = "white", width = 20)
 multi_level_effect_analysis_entry <- tkbutton(window, text="Multi-level effect\nanalysis", command = multi_level_effect_analysis_choice, font = button_font, bg = "white", width = 20)
 remove_outliers_multi_level_effect_analysis_entry <- tkbutton(window, text="Remove outliers\nMulti-level effect\nanalysis", command = remove_outliers_multi_level_effect_analysis_choice, font = button_font, bg = "white", width = 20)
+allow_parallelization_entry <- tkbutton(window, text="Allow parallel\nprocessing", command = allow_parallelization_choice, font = button_font, bg = "white", width = 20)
 minimum_number_of_patients_label <- tklabel(window, text="Minimum number\nof patients for tests", font = label_font, bg = "white", width = 20)
-minimum_number_of_patients_entry <- tkentry(window, width = 10, textvariable = minimum_number_of_patients, font = entry_font, bg = "white", width = 20)
+minimum_number_of_patients_entry <- tkentry(window, textvariable = minimum_number_of_patients, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(minimum_number_of_patients_entry, "end", "3")
 pvalue_expression_label <- tklabel(window, text="p-value for signal\nexpression difference", font = label_font, bg = "white", width = 20)
-pvalue_expression_entry <- tkentry(window, width = 10, textvariable = pvalue_expression, font = entry_font, bg = "white", width = 20)
+pvalue_expression_entry <- tkentry(window, textvariable = pvalue_expression, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(pvalue_expression_entry, "end", "0.05")
 pvalue_tests_label <- tklabel(window, text="p-value for significance\nin statistical tests", font = label_font, bg = "white", width = 20)
-pvalue_tests_entry <- tkentry(window, width = 10, textvariable = pvalue_tests, font = entry_font, bg = "white", width = 20)
+pvalue_tests_entry <- tkentry(window, textvariable = pvalue_tests, font = entry_font, bg = "white", width = 5, justify = "center")
 tkinsert(pvalue_tests_entry, "end", "0.05")
 cumulative_class_in_two_level_effect_analysis_entry <- tkbutton(window, text="Cumulative class in the\ntwo-level effect analysis", command = cumulative_class_in_two_level_effect_analysis_choice, font = button_font, bg = "white", width = 20)
 plot_correlation_graphs_entry <- tkbutton(window, text = "Plot correlation\ngraphs", command = plot_correlation_graphs_choice, font = button_font, bg = "white", width = 20)
@@ -2440,48 +2525,51 @@ remove_outliers_multi_level_effect_analysis_value_label <- tklabel(window, text 
 cumulative_class_in_two_level_effect_analysis_value_label <- tklabel(window, text = cumulative_class_in_two_level_effect_analysis_value, font = label_font, bg = "white", width = 20)
 plot_correlation_graphs_value_label <- tklabel(window, text = plot_correlation_graphs_value, font = label_font, bg = "white", width = 20)
 transform_data_value_label <- tklabel(window, text = transform_data_value, font = label_font, bg = "white", width = 20, height = 2)
+allow_parallelization_value_label <- tklabel(window, text = allow_parallelization_value, font = label_font, bg = "white", width = 20)
 
 ########## Geometry manager
 # Entries
-tkgrid(title_label, row = 1, column = 1, columnspan = 2, padx = c(20, 20), pady = c(20, 20))
-tkgrid(download_updates_button, row = 1, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(check_for_updates_value_label, row = 1, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(title_label, row = 1, column = 1, columnspan = 4, padx = c(20, 20), pady = c(20, 20))
+tkgrid(download_updates_button, row = 1, column = 5, padx = c(10, 10), pady = c(10, 10))
+tkgrid(check_for_updates_value_label, row = 1, column = 6, padx = c(10, 10), pady = c(10, 10))
 tkgrid(correlation_analysis_entry, row = 2, column = 1, padx = c(10, 10), pady = c(10, 10))
 tkgrid(remove_outliers_correlation_analysis_entry, row = 2, column = 3, padx = c(10, 10), pady = c(10, 10))
 tkgrid(two_level_effect_analysis_entry, row = 3, column = 1, padx = c(10, 10), pady = c(10, 10))
 tkgrid(remove_outliers_two_level_effect_analysis_entry, row = 3, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(multi_level_effect_analysis_entry, row = 4, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(remove_outliers_multi_level_effect_analysis_entry, row = 4, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(transform_data_entry, row = 5, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(data_record_entry, row = 5, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(cumulative_class_in_two_level_effect_analysis_entry, row = 6, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(plot_correlation_graphs_entry, row = 6, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(output_file_type_export_entry, row = 7, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(image_file_type_export_entry, row = 7, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(pvalue_expression_entry, row = 8, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(pvalue_tests_entry, row = 8, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(multi_level_effect_analysis_entry, row = 4, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(remove_outliers_multi_level_effect_analysis_entry, row = 4, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(transform_data_entry, row = 5, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(data_record_entry, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(cumulative_class_in_two_level_effect_analysis_entry, row = 3, column = 5, padx = c(10, 10), pady = c(10, 10))
+tkgrid(plot_correlation_graphs_entry, row = 2, column = 5, padx = c(10, 10), pady = c(10, 10))
+tkgrid(output_file_type_export_entry, row = 7, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(image_file_type_export_entry, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(pvalue_expression_entry, row = 8, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(pvalue_tests_entry, row = 8, column = 5, padx = c(10, 10), pady = c(10, 10))
 tkgrid(minimum_number_of_patients_entry, row = 9, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(browse_output_button, row = 10, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(select_input_button, row = 10, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(run_statistics_function_button, row = 10, column = 3, padx = c(10, 10), pady = c(10, 10))
-tkgrid(end_session_button, row = 10, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(allow_parallelization_entry, row = 9, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(browse_output_button, row = 10, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(select_input_button, row = 10, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(run_statistics_function_button, row = 10, column = 4, padx = c(10, 10), pady = c(10, 10))
+tkgrid(end_session_button, row = 10, column = 5, padx = c(10, 10), pady = c(10, 10))
 
 # Displaying labels
 tkgrid(correlation_analysis_value_label, row = 2, column = 2, padx = c(10, 10), pady = c(10, 10))
 tkgrid(remove_outliers_correlation_analysis_value_label, row = 2, column = 4, padx = c(10, 10), pady = c(10, 10))
 tkgrid(two_level_effect_analysis_value_label, row = 3, column = 2, padx = c(10, 10), pady = c(10, 10))
 tkgrid(remove_outliers_two_level_effect_analysis_value_label, row = 3, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(multi_level_effect_analysis_value_label, row = 4, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(remove_outliers_multi_level_effect_analysis_value_label, row = 4, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(transform_data_value_label, row = 5, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(data_record_value_label, row = 5, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 6, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(plot_correlation_graphs_value_label, row = 6, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(output_file_type_export_value_label, row = 7, column = 2, padx = c(10, 10), pady = c(10, 10))
-tkgrid(image_file_type_export_value_label, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
-tkgrid(pvalue_expression_label, row = 8, column = 1, padx = c(10, 10), pady = c(10, 10))
-tkgrid(pvalue_tests_label, row = 8, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(multi_level_effect_analysis_value_label, row = 4, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(remove_outliers_multi_level_effect_analysis_value_label, row = 4, column = 5, padx = c(10, 10), pady = c(10, 10))
+tkgrid(transform_data_value_label, row = 5, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(data_record_value_label, row = 5, column = 5, padx = c(10, 10), pady = c(10, 10))
+tkgrid(cumulative_class_in_two_level_effect_analysis_value_label, row = 3, column = 6, padx = c(10, 10), pady = c(10, 10))
+tkgrid(plot_correlation_graphs_value_label, row = 2, column = 6, padx = c(10, 10), pady = c(10, 10))
+tkgrid(output_file_type_export_value_label, row = 7, column = 3, padx = c(10, 10), pady = c(10, 10))
+tkgrid(image_file_type_export_value_label, row = 7, column = 5, padx = c(10, 10), pady = c(10, 10))
+tkgrid(pvalue_expression_label, row = 8, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(pvalue_tests_label, row = 8, column = 4, padx = c(10, 10), pady = c(10, 10))
 tkgrid(minimum_number_of_patients_label, row = 9, column = 2, padx = c(10, 10), pady = c(10, 10))
+tkgrid(allow_parallelization_value_label, row = 9, column = 5, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Base_label, row = 7, column = 3, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Base_entry, row = 7, column = 4, padx = c(10, 10), pady = c(10, 10))
 #tkgrid(TestPer_Adv_label, row = 8, column = 3, padx = c(10, 10), pady = c(10, 10))
