@@ -4417,15 +4417,8 @@ spectral_typer_score_hierarchical_distance <- function(spectra_database, spectra
     # The distance matrix displays the distance between the spectra
     colnames(distance_matrix) <- peaklist_matrix[,"Sample"]
     rownames(distance_matrix) <- peaklist_matrix[,"Sample"]
-    # Remove the first rows (the spectra from the database)
-    distance_matrix <- distance_matrix[(database_size + 1):nrow(distance_matrix), ]
-    # Keep only the first columns (the spectra from the database)
-    distance_matrix <- distance_matrix[, 1:database_size]
-    # Fix the column names (database folder list)
-    if (!is.null(class_list_library)) {
-        colnames(distance_matrix) <- class_list_library
-    }
-    colnames(distance_matrix) <- peaklist_matrix[,"Sample"]
+    # Remove the first rows (the spectra from the database) and Keep only the first columns (the spectra from the database)
+    distance_matrix <- distance_matrix[(database_size + 1):nrow(distance_matrix), 1:database_size]
     ### Normalise the euclidean distances
     if (normalize_distances == TRUE) {
         # TIC (SUM)
@@ -6714,7 +6707,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.03.1"
+R_script_version <- "2017.05.03.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -8597,6 +8590,7 @@ tkgrid(peak_picking_button, row = 10, column = 2, padx = c(5, 5), pady = c(5, 5)
 tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c(5, 5))
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
