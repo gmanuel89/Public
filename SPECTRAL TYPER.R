@@ -4418,9 +4418,14 @@ spectral_typer_score_hierarchical_distance <- function(spectra_database, spectra
     colnames(distance_matrix) <- peaklist_matrix[,"Sample"]
     rownames(distance_matrix) <- peaklist_matrix[,"Sample"]
     # Remove the first rows (the spectra from the database)
-    distance_matrix <- distance_matrix[(database_size+1):nrow(distance_matrix),]
+    distance_matrix <- distance_matrix[(database_size + 1):nrow(distance_matrix), ]
     # Keep only the first columns (the spectra from the database)
-    distance_matrix <- distance_matrix[,1:database_size]
+    distance_matrix <- distance_matrix[, 1:database_size]
+    # Fix the column names (database folder list)
+    if (!is.null(class_list_library)) {
+        colnames(distance_matrix) <- class_list_library
+    }
+    colnames(distance_matrix) <- peaklist_matrix[,"Sample"]
     ### Normalise the euclidean distances
     if (normalize_distances == TRUE) {
         # TIC (SUM)
@@ -6709,7 +6714,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.03.0"
+R_script_version <- "2017.05.03.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -7656,12 +7661,17 @@ spectra_format_choice <- function() {
 ##### Import the spectra
 import_spectra_function <- function() {
     if (!is.null(filepath_database) && !is.null(filepath_test)) {
+        # Progress bar
+        import_progress_bar <- tkProgressBar(title = "Importing spectra...", label = "", min = 0, max = 1, initial = 0, width = 300)
+        setTkProgressBar(import_progress_bar, value = 0, title = NULL, label = "0 %")
         # Load the required libraries
         install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
         # Generate the list of spectra (library and test)
         if (spectra_format == "brukerflex" || spectra_format == "xmass") {
             ### Load the spectra
             if (!is.null(mass_range)) {
+                # Progress bar
+                setTkProgressBar(import_progress_bar, value = 0.15, title = "Importing database spectra...", label = "15 %")
                 if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
                     ## LOAD THE R WORKSPACE (FOR DATABASE)
                     # Create a temporary environment
@@ -7683,12 +7693,16 @@ import_spectra_function <- function() {
                         spectra_database[[x]]@metaData$databaseFolders <- database_folder_list
                     }
                 }
+                # Progress bar
+                setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
                 spectra_test <- importBrukerFlex(filepath_test, massRange = mass_range)
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
                     spectra_test[[x]]@metaData$path <- filepath_test
                 }
             } else {
+                # Progress bar
+                setTkProgressBar(import_progress_bar, value = 0.15, title = "Importing database spectra...", label = "15 %")
                 if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
                     ## LOAD THE R WORKSPACE (FOR DATABASE)
                     # Create a temporary environment
@@ -7710,6 +7724,8 @@ import_spectra_function <- function() {
                         spectra_database[[x]]@metaData$databaseFolders <- database_folder_list
                     }
                 }
+                # Progress bar
+                setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
                 spectra_test <- importBrukerFlex(filepath_test)
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
@@ -7719,6 +7735,8 @@ import_spectra_function <- function() {
         } else if (spectra_format == "imzml" | spectra_format == "imzML") {
             ### Load the spectra
             if (!is.null(mass_range)) {
+                # Progress bar
+                setTkProgressBar(import_progress_bar, value = 0.15, title = "Importing database spectra...", label = "15 %")
                 if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
                     ## LOAD THE R WORKSPACE (FOR DATABASE)
                     # Create a temporary environment
@@ -7740,12 +7758,16 @@ import_spectra_function <- function() {
                         spectra_database[[x]]@metaData$databaseFolders <- database_folder_list
                     }
                 }
+                # Progress bar
+                setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
                 spectra_test <- importImzMl(filepath_test, massRange = mass_range)
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
                     spectra_test[[x]]@metaData$path <- filepath_test
                 }
             } else {
+                # Progress bar
+                setTkProgressBar(import_progress_bar, value = 0.15, title = "Importing database spectra...", label = "15 %")
                 if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
                     ## LOAD THE R WORKSPACE (FOR DATABASE)
                     # Create a temporary environment
@@ -7767,6 +7789,8 @@ import_spectra_function <- function() {
                         spectra_database[[x]]@metaData$databaseFolders <- database_folder_list
                     }
                 }
+                # Progress bar
+                setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
                 spectra_test <- importImzMl(filepath_test)
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
@@ -7775,13 +7799,19 @@ import_spectra_function <- function() {
             }
         }
         ### Preprocessing
+        # Progress bar
+        setTkProgressBar(import_progress_bar, value = 0.45, title = "Preprocessing database spectra...", label = "45 %")
         if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
             spectra_database <- spectra_database
         } else {
             spectra_database <- preprocess_spectra(spectra_database, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
         }
+        # Progress bar
+        setTkProgressBar(import_progress_bar, value = 0.60, title = "Preprocessing sample spectra...", label = "60 %")
         spectra_test <- preprocess_spectra(spectra_test, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
         ### Average the replicates
+        # Progress bar
+        setTkProgressBar(import_progress_bar, value = 0.80, title = "Further preprocessing...", label = "80 %")
         if (average_replicates_in_database == TRUE) {
             ### If the database is a RData file, the spectra_database are just there
             if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
@@ -7805,6 +7835,8 @@ import_spectra_function <- function() {
         }
         test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
         ### Spectra grouping (class for database)
+        # Progress bar
+        setTkProgressBar(import_progress_bar, value = 0.90, title = NULL, label = "90 %")
         if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
             spectra_database <- spectra_database
         } else {
@@ -7823,6 +7855,9 @@ import_spectra_function <- function() {
         .GlobalEnv$database_folder_list <- database_folder_list
         .GlobalEnv$test_folder_list <- test_folder_list
         .GlobalEnv$number_of_samples <- number_of_samples
+        # Progress bar
+        setTkProgressBar(import_progress_bar, value = 1.00, title = NULL, label = "100 %")
+        close(import_progress_bar)
         ### Messagebox
         tkmessageBox(title = "Import successful", message = "The spectra have been successfully imported and preprocessed", icon = "info")
     } else if (is.null(filepath_database) || is.null(filepath_test)) {
@@ -7833,6 +7868,9 @@ import_spectra_function <- function() {
 
 ##### Peak picking function
 peak_picking_function <- function() {
+    # Progress bar
+    pp_progress_bar <- tkProgressBar(title = "Peak picking...", label = "", min = 0, max = 1, initial = 0, width = 300)
+    setTkProgressBar(pp_progress_bar, value = 0, title = NULL, label = "0 %")
     ########## RDATA
     if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
         ############ Do not run if the spectra have not been imported
@@ -7847,12 +7885,16 @@ peak_picking_function <- function() {
             SNR <- as.numeric(SNR)
             SNR_value <- as.character(SNR)
             ## LOAD THE R WORKSPACE (FOR DATABASE)
+            # Progress bar
+            setTkProgressBar(pp_progress_bar, value = 0.40, title = NULL, label = "40 %")
             # Create a temporary environment
             temporary_environment <- new.env()
             # Load the workspace
             load(filepath_database, envir = temporary_environment)
             # Get the spectra for the database from the workspace
             peaks_database <- get("peaks_database", pos = temporary_environment)
+            # Progress bar
+            setTkProgressBar(pp_progress_bar, value = 0.80, title = NULL, label = "80 %")
             if (peak_picking_mode == "most intense") {
                 # Peak picking on test
                 peaks_test <- most_intense_signals(spectra_test, signals_to_take = signals_to_take)
@@ -7865,6 +7907,9 @@ peak_picking_function <- function() {
             .GlobalEnv$peaks_test <- peaks_test
             .GlobalEnv$signals_to_take_value <- signals_to_take_value
             .GlobalEnv$SNR_value <- SNR_value
+            # Progress bar
+            setTkProgressBar(pp_progress_bar, value = 1.00, title = NULL, label = "100 %")
+            close(pp_progress_bar)
             ### Messagebox
             tkmessageBox(title = "Peak picking successful", message = "The peak picking process has been successfully performed", icon = "info")
         } else if (is.null(spectra_test)) {
@@ -7885,10 +7930,18 @@ peak_picking_function <- function() {
             SNR <- as.numeric(SNR)
             SNR_value <- as.character(SNR)
             if (peak_picking_mode == "most intense") {
+                # Progress bar
+                setTkProgressBar(pp_progress_bar, value = 0.40, title = NULL, label = "40 %")
                 peaks_database <- most_intense_signals(spectra_database, signals_to_take = signals_to_take, tof_mode = tof_mode)
+                # Progress bar
+                setTkProgressBar(pp_progress_bar, value = 0.80, title = NULL, label = "80 %")
                 peaks_test <- most_intense_signals(spectra_test, signals_to_take = signals_to_take)
             } else if (peak_picking_mode == "all") {
+                # Progress bar
+                setTkProgressBar(pp_progress_bar, value = 0.40, title = NULL, label = "40 %")
                 peaks_database <- peak_picking(spectra_database, peak_picking_algorithm = peak_picking_algorithm, SNR = SNR, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
+                # Progress bar
+                setTkProgressBar(pp_progress_bar, value = 0.80, title = NULL, label = "80 %")
                 peaks_test <- peak_picking(spectra_test, peak_picking_algorithm = peak_picking_algorithm, SNR = SNR, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
             }
             # Exit the function and put the variable into the R workspace
@@ -7896,6 +7949,9 @@ peak_picking_function <- function() {
             .GlobalEnv$peaks_test <- peaks_test
             .GlobalEnv$signals_to_take_value <- signals_to_take_value
             .GlobalEnv$SNR_value <- SNR_value
+            # Progress bar
+            setTkProgressBar(pp_progress_bar, value = 1.00, title = NULL, label = "100 %")
+            close(pp_progress_bar)
             ### Messagebox
             tkmessageBox(title = "Peak picking successful", message = "The peak picking process has been successfully performed", icon = "info")
         } else if (is.null(spectra_database) || is.null(spectra_test)) {
@@ -7909,13 +7965,20 @@ peak_picking_function <- function() {
 database_dump_function <- function() {
     ############### If there is a peaklist to be dumped
     if (!is.null(peaks_database) && !is.null(spectra_database)) {
+        # Progress bar
+        db_progress_bar <- tkProgressBar(title = "Dumping database RData file...", label = "", min = 0, max = 1, initial = 0, width = 300)
+        setTkProgressBar(db_progress_bar, value = 0, title = NULL, label = "0 %")
         ########## File name
         ##### Catch the filename from the menu
         filename_peaklist <- tclvalue(file_name)
         filename_peaklist <- as.character(filename_peaklist)
+        # Progress bar
+        setTkProgressBar(db_progress_bar, value = 0.15, title = NULL, label = "15 %")
         ########## Dump the RData containing the list of the spectra and peaks in the database, along with the preprocessing parameters
         database_filename <- paste(filename_peaklist, " - Database.RData", sep = "")
         save(peaks_database, spectra_database, file = database_filename)
+        # Progress bar
+        setTkProgressBar(db_progress_bar, value = 0.50, title = NULL, label = "50 %")
         ##### Generate the output filename (based upon the filename)
         filename_peaklist <- paste(filename_peaklist, " - ", "Database peaklist", sep="")
         ##### Add the extension if it is not present in the filename
@@ -7932,6 +7995,8 @@ database_dump_function <- function() {
                 filename_peaklist <- filename_peaklist
             }    else {filename_peaklist <- paste(filename_peaklist, ".xls", sep="")}
         }
+        # Progress bar
+        setTkProgressBar(db_progress_bar, value = 0.65, title = NULL, label = "65 %")
         ##### Database size
         if (isMassPeaksList(peaks_database)) {
             database_size <- length(peaks_database)
@@ -7951,6 +8016,8 @@ database_dump_function <- function() {
                 highest_peak_number <- length(peaks_database[[p]]@mass)
             }
         }
+        # Progress bar
+        setTkProgressBar(db_progress_bar, value = 0.80, title = NULL, label = "80 %")
         ##### Generate the final matrix
         peaklist_database_matrix <- NULL
         ## Fill in the matrix (for each entry)
@@ -7970,6 +8037,8 @@ database_dump_function <- function() {
                 peaklist_database_matrix <- rbind(peaklist_database_matrix, peaklist_database_matrix_entry)
             }
         }
+        # Progress bar
+        setTkProgressBar(db_progress_bar, value = 0.90, title = NULL, label = "90 %")
         ########## Dump the peaklist matrix
         if (!is.null(peaklist_database_matrix)) {
             if (file_type_export == "csv") {
@@ -7987,6 +8056,9 @@ database_dump_function <- function() {
             ##### Message box
             tkmessageBox(title = "Peaklist dumped", message = "The database peaklist file has been dumped.", icon = "info")
         }
+        # Progress bar
+        setTkProgressBar(db_progress_bar, value = 1.00, title = NULL, label = "100 %")
+        close(db_progress_bar)
     } else {
         ############### If there is no peaklist and spectra to be dumped
         ##### Messagebox
@@ -7998,6 +8070,9 @@ database_dump_function <- function() {
 run_spectral_typer_function <- function() {
     ############ Do not run if the spectra have not been imported or the peaks have not been picked
     if (!is.null(spectra_database) && !is.null(spectra_test) && !is.null(peaks_database) && !is.null(peaks_test)) {
+        # Progress bar
+        st_progress_bar <- tkProgressBar(title = "Computing...", label = "", min = 0, max = 1, initial = 0, width = 300)
+        setTkProgressBar(st_progress_bar, value = 0, title = NULL, label = "0 %")
         #### Get the values
         ## Intensity correction coefficient
         intensity_correction_coefficient <- tclvalue(intensity_correction_coefficient)
@@ -8021,22 +8096,32 @@ run_spectral_typer_function <- function() {
         score_intensity_matrix <- NULL
         score_si_matrix <- NULL
         ############### CORRELATION
+        # Progress bar
+        setTkProgressBar(st_progress_bar, value = 0.20, title = NULL, label = "20 %")
         if ("correlation" %in% similarity_criteria) {
             score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, correlation_method = correlation_method, intensity_correction_coefficient = intensity_correction_coefficient, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
         }
         ############### HIERARCHICAL CLUSTERING ANALYSIS
+        # Progress bar
+        setTkProgressBar(st_progress_bar, value = 0.40, title = NULL, label = "40 %")
         if ("hca" %in% similarity_criteria) {
             score_hca <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, spectra_path_output = spectra_path_output, score_only = score_only, spectra_format = spectra_format, hierarchical_distance_method = hierarchical_distance_method, normalize_distances = TRUE, normalization_method = "sum", allow_parallelization = allow_parallelization)
         }
         ############### SIMILARITY INDEX
+        # Progress bar
+        setTkProgressBar(st_progress_bar, value = 0.60, title = NULL, label = "60 %")
         if ("similarity index" %in% similarity_criteria) {
             score_si_matrix <- spectral_typer_score_similarity_index(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
         }
         ############### INTENSITY
+        # Progress bar
+        setTkProgressBar(st_progress_bar, value = 0.80, title = NULL, label = "80 %")
         if ("signal intensity" %in% similarity_criteria) {
             score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = database_folder_list, signal_intensity_evaluation = signal_intensity_evaluation, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, intensity_tolerance_percent_threshold = intensity_tolerance_percent, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, number_of_st_dev = 1, allow_parallelization = allow_parallelization)
         }
         ### Parameters matrices
+        # Progress bar
+        setTkProgressBar(st_progress_bar, value = 0.90, title = NULL, label = "90 %")
         # Parameters vector
         parameters_vector <- c(file_type_export, filepath_database, filepath_test, mass_range_value, tof_mode, spectra_format, preprocess_spectra_in_packages_of_value, peak_picking_mode, signals_to_take_value, intensity_tolerance_percent_value, similarity_criteria_value, intensity_correction_coefficient_value, SNR_value, peaks_filtering_value, peaks_filtering_threshold_percent_value, low_intensity_peaks_removal_value, low_intensity_peak_removal_percentage_threshold_value, average_replicates_in_database_value, average_replicates_in_test_value, score_only_value, spectra_path_output_value)
         names(parameters_vector) <- c("File type", "Database folder", "Samples folder", "Mass range", "TOF mode", "Spectra format", "Preprocess spectra in packages of", "Peak picking mode", "Most intense signals taken", "Intensity tolerance percent", "Similarity criteria", "Intensity correction coefficient", "Signal-to-noise ratio", "Peaks filtering", "Filtering threshold percentage", "Low intensity peaks removal", "Intensity threshold percent", "Average replicates in the database", "Average replicates in the samples", "Score only", "Spectra path in the output")
@@ -8160,6 +8245,9 @@ run_spectral_typer_function <- function() {
                 writeWorksheetToFile(file = paste("si_", filename, sep=""), data = score_si_matrix_results, sheet = "Scores - Similarity Index", clearSheets = TRUE, rownames = rownames(score_si_matrix_results))
             }
         }
+        # Progress bar
+        setTkProgressBar(st_progress_bar, value = 1.00, title = NULL, label = "100 %")
+        close(st_progress_bar)
         ### Messagebox
         tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity Pearson's correlation coefficient\nIntMtch: signal intensity matching\nsl: slope of the regression curve\nns: number of signals\nSI: Similarity Index\n\n\nFit = number of sample-database matching signals / number of signals in the sample\nRetrofit = number of database-sample matching signals / number of signals in the database entry", icon = "info")
     } else if (is.null(spectra_database) || is.null(spectra_test) || is.null(peaks_database) || is.null(peaks_test)) {
@@ -8377,17 +8465,17 @@ peak_picking_algorithm_value_label <- tklabel(window, text = peak_picking_algori
 # Signals to take
 signals_to_take_label <- tklabel(window, text="Most intense\nsignals to take\n(if 'most intense' is selected)", font = label_font, bg = "white", width = 30)
 signals_to_take_entry <- tkentry(window, textvariable = signals_to_take, font = entry_font, bg = "white", width = 5, justify = "center")
-tkinsert(signals_to_take_entry, "end", "25")
+tkinsert(signals_to_take_entry, "end", "10")
 # SNR
 SNR_label <- tklabel(window, text="Signal-to-noise\nratio", font = label_font, bg = "white", width = 20)
 SNR_entry <- tkentry(window, textvariable = SNR, font = entry_font, bg = "white", width = 5, justify = "center")
-tkinsert(SNR_entry, "end", "5")
+tkinsert(SNR_entry, "end", "3")
 # Peaks filtering
 peaks_filtering_label <- tklabel(window, text="Peaks filtering", font = label_font, bg = "white", width = 20)
 # Peaks filtering threshold
 peaks_filtering_threshold_percent_label <- tklabel(window, text="Peaks filtering threshold\nfrequency percentage", font = button_font, bg = "white", width = 30)
 peaks_filtering_threshold_percent_entry <- tkentry(window, textvariable = peaks_filtering_threshold_percent, font = entry_font, bg = "white", width = 5, justify = "center")
-tkinsert(peaks_filtering_threshold_percent_entry, "end", "5")
+tkinsert(peaks_filtering_threshold_percent_entry, "end", "0")
 # Peaks deisotoping
 peaks_deisotoping_entry <- tkbutton(window, text="PEAK\nDEISOTOPING", command = peaks_deisotoping_choice, font = button_font, bg = "white", width = 20)
 # Low intensity peaks removal
@@ -8509,6 +8597,7 @@ tkgrid(peak_picking_button, row = 10, column = 2, padx = c(5, 5), pady = c(5, 5)
 tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c(5, 5))
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
