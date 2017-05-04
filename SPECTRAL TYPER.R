@@ -6707,7 +6707,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.04.3"
+R_script_version <- "2017.05.04.4"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -8096,6 +8096,7 @@ database_dump_function <- function() {
 ##### Run the Spectral Typer
 run_spectral_typer_function <- function() {
     setwd(output_folder)
+    set_file_name()
     ############ Do not run if the spectra have not been imported or the peaks have not been picked
     if (!is.null(spectra_database) && !is.null(spectra_test) && !is.null(peaks_database) && !is.null(peaks_test)) {
         # Progress bar
@@ -8191,7 +8192,6 @@ run_spectral_typer_function <- function() {
         }
         # Save the files (CSV)
         if (file_type_export == "csv") {
-            filename <- set_file_name()
             if (!is.null(score_intensity_matrix)) {
                 write.csv(score_intensity_matrix_results, file = paste("int_", filename, sep=""))
             }
@@ -8218,7 +8218,6 @@ run_spectral_typer_function <- function() {
         }
         # Save the files (Excel)
         if (file_type_export == "xlsx" || file_type_export == "xls") {
-            filename <- set_file_name()
             # Check if PERL is installed by using the built in function, for WriteXLS package
             #perl_installed <- testPerl(verbose = FALSE)
             #if (perl_installed == FALSE) {
@@ -8806,6 +8805,7 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
