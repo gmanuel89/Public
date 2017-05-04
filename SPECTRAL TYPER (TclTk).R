@@ -6707,13 +6707,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.03.3"
+R_script_version <- "2017.05.04.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
 script_file_name <- "SPECTRAL TYPER"
 # Change log
-change_log <- "1. New GUI\n2. Check for updates\n3. Adaptive fonts\n4. Bugfix"
+change_log <- "1. Bugfix\n2. Added the possibility to dumpthe spectral files"
 
 
 
@@ -6782,15 +6782,13 @@ tof_mode_value <- "Linear"
 mass_range_value <- as.character(paste(mass_range[1], ",", mass_range[2]))
 average_replicates_in_database_value <- "NO"
 average_replicates_in_test_value <- "NO"
-peaks_filtering_value <- "NO"
-low_intensity_peaks_removal_value <- "NO"
 score_only_value <- "NO"
 spectra_path_output_value <- "YES"
 peak_picking_algorithm_value <- "Super Smoother"
 peak_picking_mode_value <- "all"
-similarity_criteria_value <- "correlation"
+similarity_criteria_value <- "Pearson's correlation"
 correlation_method_value <- "Pearson"
-hierarchical_distance_method_value <- "euclidean"
+hierarchical_distance_method_value <- "Euclidean"
 low_intensity_peak_removal_threshold_method_value <- "element-wise"
 spectra_format_value <- "Xmass"
 allow_parallelization_value <- "NO"
@@ -7162,8 +7160,8 @@ preprocessing_window_function <- function() {
         # Get the values (they are filled with the default anyway)
         # Mass range
         mass_range <- tclvalue(mass_range2)
-        mass_range_value <- as.character(paste(mass_range[1], ",", mass_range[2]))
         mass_range <- as.numeric(unlist(strsplit(mass_range, ",")))
+        mass_range_value <- as.character(paste(mass_range[1], ",", mass_range[2]))
         # Preprocessing
         preprocess_spectra_in_packages_of <- tclvalue(preprocess_spectra_in_packages_of2)
         preprocess_spectra_in_packages_of <- as.integer(preprocess_spectra_in_packages_of)
@@ -7421,9 +7419,12 @@ similarity_criteria_choice <- function() {
             correlation_method <- "spearman"
             correlation_method_value <- "Spearman"
         }
+        # Fix the similarity_criteria value for correlation
+        similarity_criteria_value_correlation <- paste(correlation_method_value, "'s correlation", sep = "")
         # Escape the function
         .GlobalEnv$correlation_method <- correlation_method
         .GlobalEnv$correlation_method_value <- correlation_method_value
+        .GlobalEnv$similarity_criteria_value_correlation <- similarity_criteria_value_correlation
     }
     # Hierarchical clustering distance method
     if ("hca" %in% similarity_criteria) {
@@ -7432,17 +7433,32 @@ similarity_criteria_choice <- function() {
             hierarchical_distance_method <- "euclidean"
         }
         hierarchical_distance_method_value <- hierarchical_distance_method
+        # Fix the similarity_criteria value for hierarchical clustering
+        similarity_criteria_value_hierarchical_distance <- paste("hca (", hierarchical_distance_method_value, ")", sep = "")
         # Escape the function
         .GlobalEnv$hierarchical_distance_method <- hierarchical_distance_method
         .GlobalEnv$hierarchical_distance_method_value <- hierarchical_distance_method_value
+        .GlobalEnv$similarity_criteria_value_hierarchical_distance <- similarity_criteria_value_hierarchical_distance
     }
     # Displaying value
     similarity_criteria_value <- NULL
     for (s in 1:length(similarity_criteria)) {
         if (is.null(similarity_criteria_value)) {
-            similarity_criteria_value <- as.character(similarity_criteria[s])
+            if (similarity_criteria[s] == "correlation") {
+                similarity_criteria_value <- similarity_criteria_value_correlation
+            } else if (similarity_criteria[s] == "hca") {
+                similarity_criteria_value <- similarity_criteria_value_hierarchical_distance
+            } else {
+                similarity_criteria_value <- as.character(similarity_criteria[s])
+            }
         } else {
-            similarity_criteria_value <- as.character(paste(similarity_criteria_value, "\n", similarity_criteria[s], sep = ""))
+            if (similarity_criteria[s] == "correlation") {
+                similarity_criteria_value <- as.character(paste(similarity_criteria_value, "\n", similarity_criteria_value_correlation, sep = ""))
+            } else if (similarity_criteria[s] == "hca") {
+                similarity_criteria_value <- as.character(paste(similarity_criteria_value, "\n", similarity_criteria_value_hierarchical_distance, sep = ""))
+            } else {
+                similarity_criteria_value <- as.character(paste(similarity_criteria_value, "\n", similarity_criteria[s], sep = ""))
+            }
         }
     }
     # Set the value of the displaying label
@@ -7474,13 +7490,11 @@ peak_picking_algorithm_choice <- function() {
     peak_picking_algorithm <- select.list(c("MAD","SuperSmoother"), title="Peak picking algorithm", preselect = "SuperSmoother", multiple = FALSE)
     # Default
     if (peak_picking_algorithm == "") {
-        peak_picking_algorithm <- "MAD"
+        peak_picking_algorithm <- "SuperSmoother"
     }
     # Set the value of the displaying label
     peak_picking_algorithm_value <- peak_picking_algorithm
-    if (peak_picking_algorithm_value == "MAD") {
-        peak_picking_algorithm_value <- "          MAD          "
-    } else if (peak_picking_algorithm_value == "SuperSmoother") {
+    if (peak_picking_algorithm_value == "SuperSmoother") {
         peak_picking_algorithm_value <- "Super Smoother"
     }
     peak_picking_algorithm_value_label <- tklabel(window, text = peak_picking_algorithm_value, font = label_font, bg = "white", width = 20)
@@ -7658,7 +7672,7 @@ import_spectra_function <- function() {
         import_progress_bar <- tkProgressBar(title = "Importing spectra...", label = "", min = 0, max = 1, initial = 0, width = 300)
         setTkProgressBar(import_progress_bar, value = 0, title = NULL, label = "0 %")
         # Load the required libraries
-        install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant"))
+        install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "XML"))
         # Generate the list of spectra (library and test)
         if (spectra_format == "brukerflex" || spectra_format == "xmass") {
             ### Load the spectra
@@ -7913,16 +7927,16 @@ peak_picking_function <- function() {
         ########## FOLDER
         ############ Do not run if the spectra have not been imported
         if (!is.null(spectra_database) && !is.null(spectra_test)) {
-            ###### Get the values
-            ## Signals to take in most intense peaks
-            signals_to_take <- tclvalue(signals_to_take)
-            signals_to_take <- as.integer(signals_to_take)
-            signals_to_take_value <- as.character(signals_to_take)
-            ## SNR
+            # Get the values of SNR from the entry
             SNR <- tclvalue(SNR)
             SNR <- as.numeric(SNR)
             SNR_value <- as.character(SNR)
+            # Peak picking
             if (peak_picking_mode == "most intense") {
+                ## Get the value from the entry: Signals to take in most intense peaks
+                signals_to_take <- tclvalue(signals_to_take)
+                signals_to_take <- as.integer(signals_to_take)
+                signals_to_take_value <- as.character(signals_to_take)
                 # Progress bar
                 setTkProgressBar(pp_progress_bar, value = 0.40, title = NULL, label = "40 %")
                 peaks_database <- most_intense_signals(spectra_database, signals_to_take = signals_to_take, tof_mode = tof_mode)
@@ -7930,6 +7944,8 @@ peak_picking_function <- function() {
                 setTkProgressBar(pp_progress_bar, value = 0.80, title = NULL, label = "80 %")
                 peaks_test <- most_intense_signals(spectra_test, signals_to_take = signals_to_take)
             } else if (peak_picking_mode == "all") {
+                # Set the signals_to_take_value to all (for parameters_vector)
+                signals_to_take_value <- "all peaks"
                 # Progress bar
                 setTkProgressBar(pp_progress_bar, value = 0.40, title = NULL, label = "40 %")
                 peaks_database <- peak_picking(spectra_database, peak_picking_algorithm = peak_picking_algorithm, SNR = SNR, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
@@ -8116,8 +8132,8 @@ run_spectral_typer_function <- function() {
         # Progress bar
         setTkProgressBar(st_progress_bar, value = 0.90, title = NULL, label = "90 %")
         # Parameters vector
-        parameters_vector <- c(file_type_export, filepath_database, filepath_test, mass_range_value, tof_mode, spectra_format, preprocess_spectra_in_packages_of_value, peak_picking_mode, signals_to_take_value, intensity_tolerance_percent_value, similarity_criteria_value, intensity_correction_coefficient_value, SNR_value, peaks_filtering_value, peaks_filtering_threshold_percent_value, low_intensity_peaks_removal_value, low_intensity_peak_removal_percentage_threshold_value, average_replicates_in_database_value, average_replicates_in_test_value, score_only_value, spectra_path_output_value)
-        names(parameters_vector) <- c("File type", "Database folder", "Samples folder", "Mass range", "TOF mode", "Spectra format", "Preprocess spectra in packages of", "Peak picking mode", "Most intense signals taken", "Intensity tolerance percent", "Similarity criteria", "Intensity correction coefficient", "Signal-to-noise ratio", "Peaks filtering", "Filtering threshold percentage", "Low intensity peaks removal", "Intensity threshold percent", "Average replicates in the database", "Average replicates in the samples", "Score only", "Spectra path in the output")
+        parameters_vector <- c(file_type_export, filepath_database, filepath_test, mass_range_value, tof_mode_value, spectra_format_value, preprocess_spectra_in_packages_of_value, peak_picking_mode, peak_picking_algorithm_value, signals_to_take_value, intensity_tolerance_percent_value, similarity_criteria_value, intensity_correction_coefficient_value, SNR_value, peaks_filtering_threshold_percent_value, low_intensity_peak_removal_percentage_threshold_value, average_replicates_in_database_value, average_replicates_in_test_value, score_only_value, spectra_path_output_value)
+        names(parameters_vector) <- c("File type", "Database folder", "Samples folder", "Mass range", "TOF mode", "Spectra format", "Preprocess spectra in packages of", "Peak picking mode", "Peak picking algorithm", "Most intense signals taken", "Intensity tolerance percent", "Similarity criteria", "Intensity correction coefficient", "Signal-to-noise ratio", "Peaks filtering threshold percentage", "Low intensity peaks removal threshold percent", "Average replicates in the database", "Average replicates in the samples", "Score only", "Spectra path in the output")
         # Fill in the matrices (the number of columns must be the same for rbind)
         if (!is.null(score_correlation_matrix)) {
             parameters_matrix_correlation <- matrix("", nrow = length(parameters_vector), ncol = ncol(score_correlation_matrix))
@@ -8168,7 +8184,7 @@ run_spectral_typer_function <- function() {
                 if (scaling_factor > 3) {
                     scaling_factor <- 3
                 }
-                ggsave(plot = score_hca$hca_dendrogram, device="png", filename="hca.png", width = 12.8, height = 7.2, units="in", dpi = 300, scale = scaling_factor)
+                ggsave(plot = score_hca$hca_dendrogram, device="png", filename = paste(filename, "- hca.png", sep = ""), width = 12.8, height = 7.2, units="in", dpi = 300, scale = scaling_factor)
                 #savePlot(filename="hca.png", type="png")
                 #dev.print(X11, file="hca.png", width = 1900, height = 1280)
                 #dev.off()
@@ -8249,6 +8265,161 @@ run_spectral_typer_function <- function() {
     }
 }
 
+##### Dump the spectral files
+dump_spectra_files_function <- function() {
+    install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "XML"))
+    ### Run only if there are spectra
+    if (!is.null(spectra_database) && !is.null(peaks_database) && !is.null(spectra_test) && !is.null(peaks_test)) {
+        # Get the filename from the entry (filename_subfolder)
+        filename_subfolder <- set_file_name()
+        # Go to the working directory and create a folder named 'Spectra files'
+        spectra_files_subfolder <- file.path(output_folder, paste(filename_subfolder, "- Spectral files"))
+        dir.create(spectra_files_subfolder)
+        setwd(spectra_files_subfolder)
+        # Replace the sample path with the sample name in the metadata
+        spectra_database <- replace_sample_name(spectra_database, spectra_format = spectra_format, allow_parallelization = allow_parallelization)
+        spectra_test <- replace_sample_name(spectra_test, spectra_format = spectra_format, allow_parallelization = allow_parallelization)
+        # Get the names of the spectra and generate a vector of names
+        spectra_database_name_vector <- character()
+        if (isMassSpectrumList(spectra_database)) {
+            for (s in 1:length(spectra_database)) {
+                spectra_database_name_vector <- append(spectra_database_name_vector, spectra_database[[s]]@metaData$file[1])
+            }
+        } else if (isMassSpectrum(spectra_database)) {
+            spectra_database_name_vector <- spectra_database@metaData$file[1]
+        }
+        spectra_test_name_vector <- character()
+        if (isMassSpectrumList(spectra_test)) {
+            for (s in 1:length(spectra_test)) {
+                spectra_test_name_vector <- append(spectra_test_name_vector, spectra_test[[s]]@metaData$file[1])
+            }
+        } else if (isMassSpectrum(spectra_test)) {
+            spectra_test_name_vector <- spectra_test@metaData$file[1]
+        }
+        # If there are already unique names, leave the spectra_name_vector as it is... Otherwise, generate unique names...
+        if (length(spectra_database_name_vector) == length(unique(spectra_database_name_vector))) {
+            spectra_database_name_vector <- spectra_database_name_vector
+        } else {
+            spectra_database_name_vector <- make.names(spectra_database_name_vector, unique = TRUE)
+        }
+        if (length(spectra_test_name_vector) == length(unique(spectra_test_name_vector))) {
+            spectra_test_name_vector <- spectra_test_name_vector
+        } else {
+            spectra_test_name_vector <- make.names(spectra_test_name_vector, unique = TRUE)
+        }
+        ### Dump the spectal files
+        # Choose the file format
+        spectra_output_format <- select.list(c("MSD", "TXT"), preselect = "MSD", multiple = FALSE, title = "Select the spectra format")
+        if (spectra_output_format == "") {
+            spectra_output_format <- "MSD"
+        }
+        # MSD
+        if (spectra_output_format == "MSD") {
+            if (isMassSpectrumList(spectra_database)) {
+                if (isMassPeaksList(peaks_database) && length(peaks_database) == length(spectra_database)) {
+                    for (s in 1:length(spectra_database)) {
+                        exportMsd(spectra_database[[s]], file = paste(spectra_database_name_vector[s], ".msd", sep = ""), force = TRUE, peaks = peaks_database[[s]])
+                    }
+                } else {
+                    for (s in 1:length(spectra_database)) {
+                        exportMsd(spectra_database[[s]], file = paste(spectra_database_name_vector[s], ".msd", sep = ""), force = TRUE)
+                    }
+                }
+            } else if (isMassSpectrum(spectra_database)) {
+                if (isMassPeaks(peaks_database)) {
+                    exportMsd(spectra_database, file = paste(spectra_database_name_vector, ".msd", sep = ""), force = TRUE, peaks = peaks_database)
+                } else {
+                    exportMsd(spectra_database, file = paste(spectra_database_name_vector, ".msd", sep = ""), force = TRUE)
+                }
+            }
+            if (isMassSpectrumList(spectra_test)) {
+                if (isMassPeaksList(peaks_test) && length(peaks_test) == length(spectra_test)) {
+                    for (s in 1:length(spectra_test)) {
+                        exportMsd(spectra_test[[s]], file = paste(spectra_test_name_vector[s], ".msd", sep = ""), force = TRUE, peaks = peaks_test[[s]])
+                    }
+                } else {
+                    for (s in 1:length(spectra_test)) {
+                        exportMsd(spectra_test[[s]], file = paste(spectra_test_name_vector[s], ".msd", sep = ""), force = TRUE)
+                    }
+                }
+            } else if (isMassSpectrum(spectra_test)) {
+                if (isMassPeaks(peaks_test)) {
+                    exportMsd(spectra_test, file = paste(spectra_test_name_vector, ".msd", sep = ""), force = TRUE, peaks = peaks_test)
+                } else {
+                    exportMsd(spectra_test, file = paste(spectra_test_name_vector, ".msd", sep = ""), force = TRUE)
+                }
+            }
+        } else if (spectra_output_format == "TXT") {
+            if (isMassSpectrumList(spectra_database)) {
+                if (isMassPeaksList(peaks_database) && length(peaks_database) == length(spectra_database)) {
+                    for (s in 1:length(spectra_database)) {
+                        spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra_database[[s]]@mass))
+                        peaks_txt <- matrix(0, ncol = 2, nrow = length(peaks_database[[s]]@mass))
+                        spectra_txt[, 1] <- cbind(spectra_database[[s]]@mass)
+                        spectra_txt[, 2] <- cbind(spectra_database[[s]]@intensity)
+                        peaks_txt[, 1] <- cbind(peaks_database[[s]]@mass)
+                        peaks_txt[, 2] <- cbind(peaks_database[[s]]@intensity)
+                        write.table(spectra_txt, file = paste(spectra_database_name_vector[s], ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                        write.table(peaks_txt, file = paste(spectra_database_name_vector[s], " - Peaks.txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                    }
+                } else {
+                    for (s in 1:length(spectra_database)) {
+                        spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra_database[[s]]@mass))
+                        spectra_txt[, 1] <- cbind(spectra_database[[s]]@mass)
+                        spectra_txt[, 2] <- cbind(spectra_database[[s]]@intensity)
+                        write.table(spectra_txt, file = paste(spectra_database_name_vector[s], ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                    }
+                }
+            } else if (isMassSpectrum(spectra_database)) {
+                spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra_database@mass))
+                peaks_txt <- matrix(0, ncol = 2, nrow = length(peaks_database@mass))
+                spectra_txt[, 1] <- cbind(spectra_database@mass)
+                spectra_txt[, 2] <- cbind(spectra_database@intensity)
+                peaks_txt[, 1] <- cbind(peaks_database@mass)
+                peaks_txt[, 2] <- cbind(peaks_database@intensity)
+                write.table(spectra_txt, file = paste(spectra_database_name_vector, ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                write.table(peaks_txt, file = paste(spectra_database_name_vector, " - Peaks.txt", sep = ""), row.names = FALSE, col.names = FALSE)
+            }
+            if (isMassSpectrumList(spectra_test)) {
+                if (isMassPeaksList(peaks_test) && length(peaks_test) == length(spectra_test)) {
+                    for (s in 1:length(spectra_test)) {
+                        spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra_test[[s]]@mass))
+                        peaks_txt <- matrix(0, ncol = 2, nrow = length(peaks_test[[s]]@mass))
+                        spectra_txt[, 1] <- cbind(spectra_test[[s]]@mass)
+                        spectra_txt[, 2] <- cbind(spectra_test[[s]]@intensity)
+                        peaks_txt[, 1] <- cbind(peaks_test[[s]]@mass)
+                        peaks_txt[, 2] <- cbind(peaks_test[[s]]@intensity)
+                        write.table(spectra_txt, file = paste(spectra_test_name_vector[s], ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                        write.table(peaks_txt, file = paste(spectra_test_name_vector[s], " - Peaks.txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                    }
+                } else {
+                    for (s in 1:length(spectra_test)) {
+                        spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra_test[[s]]@mass))
+                        spectra_txt[, 1] <- cbind(spectra_test[[s]]@mass)
+                        spectra_txt[, 2] <- cbind(spectra_test[[s]]@intensity)
+                        write.table(spectra_txt, file = paste(spectra_test_name_vector[s], ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                    }
+                }
+            } else if (isMassSpectrum(spectra_test)) {
+                spectra_txt <- matrix(0, ncol = 2, nrow = length(spectra_test@mass))
+                peaks_txt <- matrix(0, ncol = 2, nrow = length(peaks_test@mass))
+                spectra_txt[, 1] <- cbind(spectra_test@mass)
+                spectra_txt[, 2] <- cbind(spectra_test@intensity)
+                peaks_txt[, 1] <- cbind(peaks_test@mass)
+                peaks_txt[, 2] <- cbind(peaks_test@intensity)
+                write.table(spectra_txt, file = paste(spectra_test_name_vector, ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
+                write.table(peaks_txt, file = paste(spectra_test_name_vector, " - Peaks.txt", sep = ""), row.names = FALSE, col.names = FALSE)
+            }
+        }
+        ### Messagebox
+        tkmessageBox(title = "Spectra files dumped", message = "The spectra files have been succesfully dumped!", icon = "info")
+        
+    } else {
+        ### Messagebox
+        tkmessageBox(title = "Spectra not loaded or Peaks not picked!", message = "No spectra have been imported yet or no peak picking has been performed!", icon = "warning")
+    }
+}
+
 ##### Show info function
 show_info_function <- function() {
     tkmessageBox(title = "Info", message = "Spectral Typer", icon = "info")
@@ -8322,8 +8493,8 @@ if (system_os == "Windows") {
 
 ### FONTS
 # Default sizes (determined on a 1680x1050 screen) (in order to make them adjust to the size screen, the screen resolution should be retrieved)
-title_font_size <- 24
-other_font_size <- 11
+title_font_size <- 18
+other_font_size <- 9
 # Windows
 if (system_os == "Windows") {
     # Windows 7
@@ -8511,6 +8682,8 @@ set_file_name_entry <- tkentry(window, textvariable = file_name, font = entry_fo
 tkinsert(set_file_name_entry, "end", "Spectral Typer Score")
 # Dump the database peaklist
 database_peaklist_dump_button <- tkbutton(window, text="Dump the database", command = database_dump_function, font = button_font, bg = "white", width = 20)
+# Dump the spectra files
+dump_spectra_files_button <- tkbutton(window, text="Dump spectral files...", command = dump_spectra_files_function, font = button_font, bg = "white", width = 20)
 # Updates
 download_updates_button <- tkbutton(window, text="DOWNLOAD UPDATE...", command = download_updates_function, font = button_font, bg = "white", width = 20)
 
@@ -8523,8 +8696,6 @@ similarity_criteria_value_label <- tklabel(window, text = similarity_criteria_va
 signal_intensity_evaluation_value_label <- tklabel(window, text = signal_intensity_evaluation, font = label_font, bg = "white", width = 20)
 peak_picking_mode_value_label <- tklabel(window, text = peak_picking_mode_value, font = label_font, bg = "white", width = 20)
 peaks_deisotoping_value_label <- tklabel(window, text = peaks_deisotoping_value, font = label_font, bg = "white", width = 20)
-peaks_filtering_value_label <- tklabel(window, text = peaks_filtering_value, font = label_font, bg = "white", width = 20)
-low_intensity_peaks_removal_value_label <- tklabel(window, text = low_intensity_peaks_removal_value, font = label_font, bg = "white", width = 20)
 low_intensity_peak_removal_threshold_method_value_label <- tklabel(window, text = low_intensity_peak_removal_threshold_method_value, font = label_font, bg = "white", width = 20)
 average_replicates_in_database_value_label <- tklabel(window, text = average_replicates_in_database_value, font = label_font, bg = "white", width = 20)
 average_replicates_in_test_value_label <- tklabel(window, text = average_replicates_in_test_value, font = label_font, bg = "white", width = 20)
@@ -8589,7 +8760,10 @@ tkgrid(import_spectra_button, row = 10, column = 1, padx = c(5, 5), pady = c(5, 
 tkgrid(peak_picking_button, row = 10, column = 2, padx = c(5, 5), pady = c(5, 5))
 tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c(5, 5))
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
-tkgrid(end_session_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
+tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
+
 
 
 
