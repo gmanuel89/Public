@@ -6707,13 +6707,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.04.1"
+R_script_version <- "2017.05.04.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
 script_file_name <- "SPECTRAL TYPER"
 # Change log
-change_log <- "1. Bugfix\n2. Added the possibility to dumpthe spectral files"
+change_log <- "1. Bugfix\n2. Added the possibility to dump the spectral files"
 
 
 
@@ -7262,28 +7262,46 @@ file_type_export_choice <- function() {
 
 ##### File name (export)
 set_file_name <- function() {
+    # Retrieve the peaklist file name from the entry...
     filename <- tclvalue(file_name)
+    # Create a copy for the subfolder name (for the spectral files)
+    filename_subfolder <- filename
+    # Add the date and time to the filename
+    current_date <- unlist(strsplit(as.character(Sys.time()), " "))[1]
+    current_date_split <- unlist(strsplit(current_date, "-"))
+    current_time <- unlist(strsplit(as.character(Sys.time()), " "))[2]
+    current_time_split <- unlist(strsplit(current_time, ":"))
+    final_date <- ""
+    for (x in 1:length(current_date_split)) {
+        final_date <- paste(final_date, current_date_split[x], sep="")
+    }
+    final_time <- ""
+    for (x in 1:length(current_time_split)) {
+        final_time <- paste(final_time, current_time_split[x], sep="")
+    }
+    final_date_time <- paste(final_date, final_time, sep = "_")
+    filename <- paste(filename, " (", final_date_time, ")", sep = "")
     # Add the extension if it is not present in the filename
     if (file_type_export == "csv") {
         if (length(grep(".csv", filename, fixed = TRUE)) == 1) {
             filename <- filename
-        }    else {filename <- paste (filename, ".csv", sep="")}
+        }    else {filename <- paste(filename, ".csv", sep="")}
     }
     if (file_type_export == "xlsx") {
         if (length(grep(".xlsx", filename, fixed = TRUE)) == 1) {
             filename <- filename
-        }    else {filename <- paste (filename, ".xlsx", sep="")}
+        }    else {filename <- paste(filename, ".xlsx", sep="")}
     }
     if (file_type_export == "xls") {
         if (length(grep(".xls", filename, fixed = TRUE)) == 1) {
             filename <- filename
-        }    else {filename <- paste (filename, ".xls", sep="")}
+        }    else {filename <- paste(filename, ".xls", sep="")}
     }
     # Set the value for displaying purposes
     filename_value <- filename
     #### Exit the function and put the variable into the R workspace
     .GlobalEnv$filename <- filename
-    .GlobalEnv$filename_value <- filename_value
+    .GlobalEnv$filename_subfolder <- filename_subfolder
 }
 
 ##### Library
@@ -8077,6 +8095,7 @@ database_dump_function <- function() {
 
 ##### Run the Spectral Typer
 run_spectral_typer_function <- function() {
+    setwd(output_folder)
     ############ Do not run if the spectra have not been imported or the peaks have not been picked
     if (!is.null(spectra_database) && !is.null(spectra_test) && !is.null(peaks_database) && !is.null(peaks_test)) {
         # Progress bar
@@ -8270,12 +8289,32 @@ dump_spectra_files_function <- function() {
     install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "XML"))
     ### Run only if there are spectra
     if (!is.null(spectra_database) && !is.null(peaks_database) && !is.null(spectra_test) && !is.null(peaks_test)) {
+        # Peak alignment only for export purposes
+        if (isMassPeaksList(peaks_database)) {
+            peaks_database_length <- length(peaks_database)
+        } else if (isMassPeaks(peaks_database)) {
+            peaks_database_length <- 1
+        }
+        if (isMassPeaksList(peaks_test)) {
+            peaks_test_length <- length(peaks_test)
+        } else if (isMassPeaks(peaks_test)) {
+            peaks_test_length <- 1
+        }
+        peaks_all <- append(peaks_database, peaks_test)
+        peaks_all <- align_and_filter_peaks(peaks_all, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, peak_filtering_frequency_threshold_percent = 0, low_intensity_peak_removal_threshold_percent = 0, reference_peaklist = NULL, spectra = NULL, alignment_iterations = 5, allow_parallelization = allow_parallelization)
+        peaks_database <- peaks_all[1:peaks_database_length]
+        peaks_test <- peaks_all[(peaks_database_length + 1):length(peaks_all)]
         # Get the filename from the entry (filename_subfolder)
-        filename_subfolder <- set_file_name()
+        set_file_name()
         # Go to the working directory and create a folder named 'Spectra files'
         spectra_files_subfolder <- file.path(output_folder, paste(filename_subfolder, "- Spectral files"))
         dir.create(spectra_files_subfolder)
         setwd(spectra_files_subfolder)
+        # Create the subfolder for database and for test
+        spectra_database_files_subfolder <- file.path(spectra_files_subfolder, "Database spectra")
+        spectra_test_files_subfolder <- file.path(spectra_files_subfolder, "Sample spectra")
+        dir.create(spectra_database_files_subfolder)
+        dir.create(spectra_test_files_subfolder)
         # Replace the sample path with the sample name in the metadata
         spectra_database <- replace_sample_name(spectra_database, spectra_format = spectra_format, allow_parallelization = allow_parallelization)
         spectra_test <- replace_sample_name(spectra_test, spectra_format = spectra_format, allow_parallelization = allow_parallelization)
@@ -8315,6 +8354,7 @@ dump_spectra_files_function <- function() {
         }
         # MSD
         if (spectra_output_format == "MSD") {
+            setwd(spectra_database_files_subfolder)
             if (isMassSpectrumList(spectra_database)) {
                 if (isMassPeaksList(peaks_database) && length(peaks_database) == length(spectra_database)) {
                     for (s in 1:length(spectra_database)) {
@@ -8332,6 +8372,7 @@ dump_spectra_files_function <- function() {
                     exportMsd(spectra_database, file = paste(spectra_database_name_vector, ".msd", sep = ""), force = TRUE)
                 }
             }
+            setwd(spectra_test_files_subfolder)
             if (isMassSpectrumList(spectra_test)) {
                 if (isMassPeaksList(peaks_test) && length(peaks_test) == length(spectra_test)) {
                     for (s in 1:length(spectra_test)) {
@@ -8350,6 +8391,7 @@ dump_spectra_files_function <- function() {
                 }
             }
         } else if (spectra_output_format == "TXT") {
+            setwd(spectra_database_files_subfolder)
             if (isMassSpectrumList(spectra_database)) {
                 if (isMassPeaksList(peaks_database) && length(peaks_database) == length(spectra_database)) {
                     for (s in 1:length(spectra_database)) {
@@ -8380,6 +8422,7 @@ dump_spectra_files_function <- function() {
                 write.table(spectra_txt, file = paste(spectra_database_name_vector, ".txt", sep = ""), row.names = FALSE, col.names = FALSE)
                 write.table(peaks_txt, file = paste(spectra_database_name_vector, " - Peaks.txt", sep = ""), row.names = FALSE, col.names = FALSE)
             }
+            setwd(spectra_test_files_subfolder)
             if (isMassSpectrumList(spectra_test)) {
                 if (isMassPeaksList(peaks_test) && length(peaks_test) == length(spectra_test)) {
                     for (s in 1:length(spectra_test)) {
@@ -8411,9 +8454,10 @@ dump_spectra_files_function <- function() {
                 write.table(peaks_txt, file = paste(spectra_test_name_vector, " - Peaks.txt", sep = ""), row.names = FALSE, col.names = FALSE)
             }
         }
+        # Go back to the output folder
+        setwd(output_folder)
         ### Messagebox
         tkmessageBox(title = "Spectra files dumped", message = "The spectra files have been succesfully dumped!", icon = "info")
-        
     } else {
         ### Messagebox
         tkmessageBox(title = "Spectra not loaded or Peaks not picked!", message = "No spectra have been imported yet or no peak picking has been performed!", icon = "warning")
@@ -8762,6 +8806,8 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
+
 
 
 
