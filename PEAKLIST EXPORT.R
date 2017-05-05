@@ -6811,7 +6811,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.05.0"
+R_script_version <- "2017.05.05.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -7396,7 +7396,7 @@ select_samples_function <- function() {
         spectra_input_type <- "file"
     }
     if (spectra_input_type == "folder") {
-        filepath_import_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be imported.\nIf there are spectral (imzML, txt, csv) files in the folder, each one of them should contain spectra from the same class.\nIf there are subfolders, each one of them should contain spectra from the same class as imzML/txt/csv files.", icon = "info")
+        filepath_import_select <- tkmessageBox(title = "Samples", message = "Select the folder for the spectra to be imported.\nIf there are spectral (imzML, txt, csv) files in the folder, each one of them should contain spectra from the same class.\nIf there are subfolders, each one of them should contain spectra from the same class as imzML/txt/csv files", icon = "info")
         filepath_import <- tclvalue(tkchooseDirectory())
         if (!nchar(filepath_import)) {
             tkmessageBox(message = "No folder selected")
@@ -7512,7 +7512,7 @@ peaks_deisotoping_choice <- function() {
 ##### Multicore processing
 allow_parallelization_choice <- function() {
     ##### Messagebox
-    tkmessageBox(title = "Parallel processing is resource hungry", message = "Parallel processing is resource hungry. By activating it, the computation becomes faster, but the program will eat a lot of RAM, possibly causing your computer to freeze. If you want to play safe, do not enable it.", icon = "warning")
+    tkmessageBox(title = "Parallel processing is resource hungry", message = "Parallel processing is resource hungry. By activating it, the computation becomes faster, but the program will eat a lot of RAM, possibly causing your computer to freeze. If you want to play safe, do not enable it", icon = "warning")
     # Catch the value from the menu
     allow_parallelization <- select.list(c("YES","NO"), title="Choose", multiple = FALSE, preselect = "NO")
     # Default
@@ -7592,6 +7592,12 @@ spectra_format_choice <- function() {
         spectra_format_value <- "imzML"
     } else {
         spectra_format_value <- spectra_format
+    }
+    # Advisory messages
+    if (spectra_format == "txt") {
+        tkmessageBox(title = "TXT format", message = "The TXT file should have two columns: the m/z values and the intensity values, separated by a tab and without any header", icon = "info")
+    } else if (spectra_format == "csv") {
+        tkmessageBox(title = "CSV format", message = "The CSV file should have two columns: the m/z values and the intensity values, separated by a comma and with a header", icon = "info")
     }
     # Escape the function
     .GlobalEnv$spectra_format <- spectra_format
@@ -8007,7 +8013,7 @@ dump_spectra_files_function <- function() {
 
 ##### Show info function
 show_info_function <- function() {
-    tkmessageBox(title = "Info", message = "This program exports a peaklist matrix from imzML files", icon = "info")
+    tkmessageBox(title = "Info", message = "This program exports a peaklist matrix from different spectral files", icon = "info")
 }
 
 
@@ -8290,3 +8296,4 @@ tkgrid(dump_spectra_files_button, row = 8, column = 5, padx = c(10, 10), pady = 
 tkgrid(end_session_button, row = 8, column = 6, padx = c(10, 10), pady = c(10, 10))
 tkgrid(download_updates_button, row = 1, column = 5, padx = c(10, 10), pady = c(10, 10))
 tkgrid(check_for_updates_value_label, row = 1, column = 6, padx = c(10, 10), pady = c(10, 10))
+
