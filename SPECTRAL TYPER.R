@@ -1,6 +1,8 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.05.03 ##################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.05.08 ##################
 
 
+# Clear the console
+#cat("\014")
 # Empty the workspace
 rm(list = ls())
 
@@ -246,6 +248,10 @@ matrix_add_class_and_sample <- function(signal_matrix, peaks = list(), class_lis
                 path_vector <- append(path_vector, peaks[[i]]@metaData$file[1])
             } else if (spectra_format == "brukerflex" || spectra_format == "xmass") {
                 path_vector <- append(path_vector, peaks[[i]]@metaData$sampleName[1])
+            } else if (spectra_format == "txt" || spectra_format == "TXT" || spectra_format == "text") {
+                path_vector <- append(path_vector, peaks[[i]]@metaData$file[1])
+            } else if (spectra_format == "csv" || spectra_format == "CSV") {
+                path_vector <- append(path_vector, peaks[[i]]@metaData$file[1])
             }
         }
     } else if (isMassPeaks(peaks)) {
@@ -253,6 +259,10 @@ matrix_add_class_and_sample <- function(signal_matrix, peaks = list(), class_lis
             path_vector <- append(path_vector, peaks@metaData$file[1])
         } else if (spectra_format == "brukerflex" || spectra_format == "xmass") {
             path_vector <- append(path_vector, peaks@metaData$sampleName[1])
+        } else if (spectra_format == "txt" || spectra_format == "TXT" || spectra_format == "text") {
+            path_vector <- append(path_vector, peaks@metaData$file[1])
+        } else if (spectra_format == "csv" || spectra_format == "CSV") {
+            path_vector <- append(path_vector, peaks@metaData$file[1])
         }
     }
     ##### File vector
@@ -267,6 +277,10 @@ matrix_add_class_and_sample <- function(signal_matrix, peaks = list(), class_lis
                 file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
             } else if (spectra_format == "brukerflex" || spectra_format == "xmass") {
                 file_vector <- append(file_vector, peaks[[i]]@metaData$sampleName[1])
+            } else if (spectra_format == "txt" || spectra_format == "TXT" || spectra_format == "text") {
+                file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
+            } else if (spectra_format == "csv" || spectra_format == "CSV") {
+                file_vector <- append(file_vector, peaks[[i]]@metaData$file[1])
             }
         }
     } else if (isMassPeaks(peaks)) {
@@ -274,6 +288,10 @@ matrix_add_class_and_sample <- function(signal_matrix, peaks = list(), class_lis
             file_vector <- append(file_vector, peaks@metaData$file[1])
         } else if (spectra_format == "brukerflex" || spectra_format == "xmass") {
             file_vector <- append(file_vector, peaks@metaData$sampleName[1])
+        } else if (spectra_format == "txt" || spectra_format == "TXT" || spectra_format == "text") {
+            file_vector <- append(file_vector, peaks@metaData$file[1])
+        } else if (spectra_format == "csv" || spectra_format == "CSV") {
+            file_vector <- append(file_vector, peaks@metaData$file[1])
         }
     }
     ################################## Only the sample
@@ -306,11 +324,11 @@ matrix_add_class_and_sample <- function(signal_matrix, peaks = list(), class_lis
         for (p in 1:length(class_vector)) {
             for (w in 1:length(class_list)) {
                 if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                    if (length(grep(paste("/", class_list[w], "/", sep = ""), class_vector[p], ignore.case = TRUE)) > 0) {
+                    if (length(grep(paste0("/", class_list[w], "/"), class_vector[p], ignore.case = TRUE)) > 0) {
                         class_vector[p] <- class_list[w]
                     }
                 } else if (Sys.info()[1] == "Windows") {
-                    if (length(grep(paste("\\\\", class_list[w], "\\\\", sep = ""), class_vector[p], ignore.case = TRUE)) > 0) {
+                    if (length(grep(paste0("\\\\", class_list[w], "\\\\"), class_vector[p], ignore.case = TRUE)) > 0) {
                         class_vector[p] <- class_list[w]
                     }
                 }
@@ -334,11 +352,11 @@ matrix_add_class_and_sample <- function(signal_matrix, peaks = list(), class_lis
         for (p in 1:length(class_vector)) {
             for (w in 1:length(class_list)) {
                 if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                    if (length(grep(paste("/", class_list[w], "/", sep = ""), class_vector[p], ignore.case = TRUE)) > 0) {
+                    if (length(grep(paste0("/", class_list[w], "/"), class_vector[p], ignore.case = TRUE)) > 0) {
                         class_vector[p] <- class_list[w]
                     }
                 } else if (Sys.info()[1] == "Windows") {
-                    if (length(grep(paste("\\\\", class_list[w], "\\\\", sep = ""), class_vector[p], ignore.case = TRUE)) > 0) {
+                    if (length(grep(paste0("\\\\", class_list[w], "\\\\"), class_vector[p], ignore.case = TRUE)) > 0) {
                         class_vector[p] <- class_list[w]
                     }
                 }
@@ -740,7 +758,7 @@ remove_low_intensity_peaks <- function(peaks, low_intensity_peak_removal_thresho
 
 
 ########################################################### SPECTRA FILES READER
-# This function reads all the files from a folder and returns only the imzML files or the fid files.
+# This function reads all the files from a folder and returns only the spectral files, discarding all the other files.
 read_spectra_files <- function(folder, spectra_format = "imzml", full_path = TRUE) {
     if (spectra_format == "imzml" || spectra_format == "imzML") {
         # Read all the files
@@ -761,6 +779,28 @@ read_spectra_files <- function(folder, spectra_format = "imzml", full_path = TRU
         for (i in 1:length(sample_directory_list_all_folders)) {
             if ((length(grep("fid", sample_directory_list_all_folders[i], ignore.case = TRUE)) == 1)) {
                 spectra_files <- append(spectra_files, sample_directory_list_all_folders[i])
+            }
+        }
+    } else if (spectra_format == "txt" || spectra_format == "TXT" || spectra_format == "text") {
+        # Read all the files
+        folder_all_files <- list.files(folder, full.names = full_path, recursive = TRUE)
+        # Create the empty vector in which only the imzML files will be listed
+        spectra_files <- character()
+        # Put the imzML files in the new vector discarding the ibd files
+        for (l in 1:length(folder_all_files)) {
+            if (length(grep(".txt", folder_all_files[l], fixed = TRUE)) == 1) {
+                spectra_files <- append(spectra_files, folder_all_files[l])
+            }
+        }
+    } else if (spectra_format == "csv" || spectra_format == "CSV") {
+        # Read all the files
+        folder_all_files <- list.files(folder, full.names = full_path, recursive = TRUE)
+        # Create the empty vector in which only the imzML files will be listed
+        spectra_files <- character()
+        # Put the imzML files in the new vector discarding the ibd files
+        for (l in 1:length(folder_all_files)) {
+            if (length(grep(".csv", folder_all_files[l], fixed = TRUE)) == 1) {
+                spectra_files <- append(spectra_files, folder_all_files[l])
             }
         }
     }
@@ -1127,9 +1167,9 @@ peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorit
                 distribution_type_name <- NULL
                 for (l in 1:length(class_list)) {
                     if (is.null(distribution_type_name)) {
-                        distribution_type_name <- paste(distribution_type[[l]], " - ", class_list[l], sep = "")
+                        distribution_type_name <- paste0(distribution_type[[l]], " - ", class_list[l])
                     } else {
-                        distribution_type_name <- paste(distribution_type_name, " , ", distribution_type[[l]], " - ", class_list[l], sep = "")
+                        distribution_type_name <- paste0(distribution_type_name, " , ", distribution_type[[l]], " - ", class_list[l])
                     }
                 }
                 peak_stat_matrix [p,1] <- paste(distribution_type_name)
@@ -1137,9 +1177,9 @@ peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorit
                 mean_intensity_name <- NULL
                 for (l in 1:length(class_list)) {
                     if (is.null(mean_intensity_name)) {
-                        mean_intensity_name <- paste(mean_intensity[[l]], " - ", class_list[l], sep = "")
+                        mean_intensity_name <- paste0(mean_intensity[[l]], " - ", class_list[l])
                     } else {
-                        mean_intensity_name <- paste(mean_intensity_name, " , ", mean_intensity[[l]], " - ", class_list[l], sep = "")
+                        mean_intensity_name <- paste0(mean_intensity_name, " , ", mean_intensity[[l]], " - ", class_list[l])
                     }
                 }
                 peak_stat_matrix [p,2] <- mean_intensity_name
@@ -1147,9 +1187,9 @@ peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorit
                 st_dev_name <- NULL
                 for (l in 1:length(class_list)) {
                     if (is.null(st_dev_name)) {
-                        st_dev_name <- paste(st_dev_intensity[[l]], " - ", class_list[l], sep = "")
+                        st_dev_name <- paste0(st_dev_intensity[[l]], " - ", class_list[l])
                     } else {
-                        st_dev_name <- paste(st_dev_name, " , ", st_dev_intensity[[l]], " - ", class_list[l], sep = "")
+                        st_dev_name <- paste0(st_dev_name, " , ", st_dev_intensity[[l]], " - ", class_list[l])
                     }
                 }
                 peak_stat_matrix [p,3] <- st_dev_name
@@ -1157,9 +1197,9 @@ peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorit
                 coeff_variation_name <- NULL
                 for (l in 1:length(class_list)) {
                     if (is.null(coeff_variation_name)) {
-                        coeff_variation_name <- paste(coeff_variation[[l]], " - ", class_list[l], sep = "")
+                        coeff_variation_name <- paste0(coeff_variation[[l]], " - ", class_list[l])
                     } else {
-                        coeff_variation_name <- paste(coeff_variation_name, " , ", coeff_variation[[l]], " - ", class_list[l], sep = "")
+                        coeff_variation_name <- paste0(coeff_variation_name, " , ", coeff_variation[[l]], " - ", class_list[l])
                     }
                 }
                 peak_stat_matrix [p,4] <- coeff_variation_name
@@ -1167,9 +1207,9 @@ peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorit
                 median_intensityensity_name <- NULL
                 for (l in 1:length(class_list)) {
                     if (is.null(median_intensityensity_name)) {
-                        median_intensityensity_name <- paste(median_intensityensity[[l]], " - ", class_list[l], sep = "")
+                        median_intensityensity_name <- paste0(median_intensityensity[[l]], " - ", class_list[l])
                     } else {
-                        median_intensityensity_name <- paste(median_intensityensity_name, " , ", median_intensityensity[[l]], " - ", class_list[l], sep = "")
+                        median_intensityensity_name <- paste0(median_intensityensity_name, " , ", median_intensityensity[[l]], " - ", class_list[l])
                     }
                 }
                 peak_stat_matrix [p,5] <- median_intensityensity_name
@@ -1177,9 +1217,9 @@ peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorit
                 inter_quartile_range_name <- NULL
                 for (l in 1:length(class_list)) {
                     if (is.null(inter_quartile_range_name)) {
-                        inter_quartile_range_name <- paste(inter_quartile_range[[l]], " - ", class_list[l], sep = "")
+                        inter_quartile_range_name <- paste0(inter_quartile_range[[l]], " - ", class_list[l])
                     } else {
-                        inter_quartile_range_name <- paste(inter_quartile_range_name, " , ", inter_quartile_range[[l]], " - ", class_list[l], sep = "")
+                        inter_quartile_range_name <- paste0(inter_quartile_range_name, " , ", inter_quartile_range[[l]], " - ", class_list[l])
                     }
                 }
                 peak_stat_matrix [p,6] <- inter_quartile_range_name
@@ -1187,9 +1227,9 @@ peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorit
                 spectra_counter_name <- NULL
                 for (l in 1:length(class_list)) {
                     if (is.null(spectra_counter_name)) {
-                        spectra_counter_name <- paste(spectra_counter[[l]], " - ", class_list[l], sep = "")
+                        spectra_counter_name <- paste0(spectra_counter[[l]], " - ", class_list[l])
                     } else {
-                        spectra_counter_name <- paste(spectra_counter_name, " , ", spectra_counter[[l]], " - ", class_list[l], sep = "")
+                        spectra_counter_name <- paste0(spectra_counter_name, " , ", spectra_counter[[l]], " - ", class_list[l])
                     }
                 }
                 peak_stat_matrix [p,7] <- spectra_counter_name
@@ -1199,7 +1239,7 @@ peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorit
                     if (is.null(class_name)) {
                         class_name <- class_list[l]
                     } else {
-                        class_name <- paste(class_name, " - ", class_list[l], sep = "")
+                        class_name <- paste0(class_name, " - ", class_list[l])
                     }
                 }
                 peak_stat_matrix [p,8] <- class_name
@@ -1513,6 +1553,58 @@ replace_sample_name <- function(spectra, spectra_format = "imzml", allow_paralle
             sample_name <- spectra@metaData$sampleName[1]
             # Put the name back into the spectra
             spectra@metaData$file <- sample_name
+        } else if (spectra_format == "txt" || spectra_format == "TXT" || spectra_format == "text") {
+            ### TXT
+            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                # Split the filepath at /
+                sample_name <- unlist(strsplit(spectra@metaData$file[1],"/"))
+                # The sample name is the last part of the path
+                sample_name <- sample_name[length(sample_name)]
+                # Detach the file extension
+                sample_name <- unlist(strsplit(sample_name, ".txt"))
+                sample_name <- sample_name[1]
+                # Put the name back into the spectra
+                spectra@metaData$file <- sample_name
+            } else if (Sys.info()[1] == "Windows") {
+                # Split the filepath at \
+                sample_name <- unlist(strsplit(spectra@metaData$file[1],"\\\\"))
+                # The sample name is the last part of the path
+                sample_name <- sample_name[length(sample_name)]
+                # Detach the file extension
+                sample_name <- unlist(strsplit(sample_name, ".txt"))
+                sample_name <- sample_name[1]
+                # Put the name back into the spectra
+                spectra@metaData$file <- sample_name
+            } else {
+                # Keep the name unaltered
+                sample_name <- spectra@metaData$file[1]
+            }
+        }  else if (spectra_format == "csv" || spectra_format == "CSV") {
+            ### TXT
+            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                # Split the filepath at /
+                sample_name <- unlist(strsplit(spectra@metaData$file[1],"/"))
+                # The sample name is the last part of the path
+                sample_name <- sample_name[length(sample_name)]
+                # Detach the file extension
+                sample_name <- unlist(strsplit(sample_name, ".csv"))
+                sample_name <- sample_name[1]
+                # Put the name back into the spectra
+                spectra@metaData$file <- sample_name
+            } else if (Sys.info()[1] == "Windows") {
+                # Split the filepath at \
+                sample_name <- unlist(strsplit(spectra@metaData$file[1],"\\\\"))
+                # The sample name is the last part of the path
+                sample_name <- sample_name[length(sample_name)]
+                # Detach the file extension
+                sample_name <- unlist(strsplit(sample_name, ".csv"))
+                sample_name <- sample_name[1]
+                # Put the name back into the spectra
+                spectra@metaData$file <- sample_name
+            } else {
+                # Keep the name unaltered
+                sample_name <- spectra@metaData$file[1]
+            }
         }
         ### Return
         return(spectra)
@@ -1560,7 +1652,7 @@ replace_sample_name <- function(spectra, spectra_format = "imzml", allow_paralle
 
 #################################################### SPECTRA GROUPING (CLASSES)
 # The functions takes a list of spectra (MALDIquant) and generates a list of representative spectra, averaging spectra according to the class they belong to, generating one average spectrum per class.
-group_spectra_class <- function(spectra, class_list, grouping_method = "mean", spectra_format = "imzml", class_in_file_path = TRUE, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"), allow_parallelization = FALSE) {
+group_spectra_class <- function(spectra, class_list, grouping_method = "mean", spectra_format = "imzml", class_in_file_path = TRUE, class_in_file_name = FALSE, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_iterations = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = "cubic", spectral_alignment_reference = "auto"), allow_parallelization = FALSE) {
     ##### Spectral preprocessing
     if (!is.null(preprocessing_parameters) && is.list(preprocessing_parameters) && length(preprocessing_parameters) > 0) {
         spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
@@ -1568,7 +1660,7 @@ group_spectra_class <- function(spectra, class_list, grouping_method = "mean", s
     ########## imzML
     if (spectra_format == "imzml" || spectra_format == "imzML") {
         ## REPLACE THE filepath PARAMETER FOR EACH SPECTRUM WITH THE CLASS
-        spectra <- replace_class_name(spectra, class_list = class_list, spectra_format = spectra_format, class_in_file_path = class_in_file_path)
+        spectra <- replace_class_name(spectra, class_list = class_list, spectra_format = spectra_format, class_in_file_path = class_in_file_path, class_in_file_name = class_in_file_name)
         # Put the filenames/classes in a vector
         # Create the empty vector
         class_vector <- character()
@@ -1684,17 +1776,51 @@ replace_sample_name_list <- function(spectra, spectra_format = "imzml", type = "
 ########################################################## CLASS NAME REPLACING
 # This function replaces the sample name field in the spectrum with the class the spectrum belongs to. If the filename contains the class, it replaces the filename with the class name, otherwise a class list symmetrical to the spectra must be provided.
 # The input can be both spectra or peaks (MALDIquant)
-replace_class_name <- function(spectra, class_list = NULL, class_in_file_path = TRUE, spectra_format = "imzml") {
+replace_class_name <- function(spectra, class_list = NULL, class_in_file_path = TRUE, class_in_file_name = FALSE, spectra_format = "imzml") {
     # If a class list is provided...
     if (!is.null(class_list)) {
-        # If the class name is in the name
-        if (class_in_file_path == TRUE) {
+        # If the class name is in the file path
+        if (class_in_file_path == TRUE && class_in_file_name == FALSE) {
             # Scroll the class list...
             for (w in 1:length(class_list)) {
                 # Scroll the spectra...
                 if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
                     for (i in 1:length(spectra)) {
                         # If there is a match between the file name and the class (since the class is a subfolder, it is better to match the /class/ for a stronger match)
+                        if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                            if (length(grep(paste0("/", class_list[w], "/"), spectra[[i]]@metaData$file[1], fixed = TRUE)) > 0) {
+                                # Replace the file name with the class name
+                                spectra[[i]]@metaData$file <- class_list[w]
+                            }
+                        } else if (Sys.info()[1] == "Windows") {
+                            if (length(grep(paste0("\\\\", class_list[w], "\\\\"), spectra[[i]]@metaData$file[1], fixed = TRUE)) > 0) {
+                                # Replace the file name with the class name
+                                spectra[[i]]@metaData$file <- class_list[w]
+                            }
+                        }
+                    }
+                } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
+                    if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                        if (length(grep(paste0("/", class_list[w], "/"), spectra@metaData$file[1], fixed = TRUE)) > 0) {
+                            # Replace the file name with the class name
+                            spectra@metaData$file <- class_list[w]
+                        }
+                    } else if (Sys.info()[1] == "Windows") {
+                        if (length(grep(paste0("\\\\", class_list[w], "\\\\"), spectra@metaData$file[1], fixed = TRUE)) > 0) {
+                            # Replace the file name with the class name
+                            spectra@metaData$file <- class_list[w]
+                        }
+                    }
+                }
+            }
+        } else if (class_in_file_path == FALSE && class_in_file_name == TRUE) {
+            # If the class name is in the file name
+            # Scroll the class list...
+            for (w in 1:length(class_list)) {
+                # Scroll the spectra...
+                if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+                    for (i in 1:length(spectra)) {
+                        # If there is a match between the file name and the class
                         if (length(grep(class_list[w], spectra[[i]]@metaData$file[1], fixed = TRUE)) > 0) {
                             # Replace the file name with the class name
                             spectra[[i]]@metaData$file <- class_list[w]
@@ -2412,7 +2538,7 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
         trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
         ###### Peak alignment
         # Fix the iteration number
-        if (alignment_iterations <= 0) {
+        if (alignment_iterations <= 0 || !is.numeric(alignment_iterations)) {
             alignment_iterations <- 5
         }
         # Initialize the variable
@@ -2422,10 +2548,10 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
             # If it is the first time that the alignment is run...
             if (is.null(peaks_aligned)) {
                 # Run the alignment
-                peaks_aligned <- binPeaks(peaks, method = "relaxed", tolerance = (tolerance_ppm/10^6))
+                peaks_aligned <- binPeaks(peaks, method = "strict", tolerance = (tolerance_ppm/10^6))
             } else {
                 # Otherwise run another alignment on the already aligned peaks
-                peaks_aligned <- binPeaks(peaks_aligned, method = "relaxed", tolerance = (tolerance_ppm/10^6))
+                peaks_aligned <- binPeaks(peaks_aligned, method = "strict", tolerance = (tolerance_ppm/10^6))
             }
         }
         ##### False positive removal
@@ -2645,7 +2771,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             if (!is.null(final_sample_matrix)) {
                 # Put the X at the beginning of the peak names
                 for (n in 1:length(colnames(final_sample_matrix))) {
-                    colnames(final_sample_matrix)[n] <- paste("X", colnames(final_sample_matrix)[n], sep = "")
+                    colnames(final_sample_matrix)[n] <- paste0("X", colnames(final_sample_matrix)[n])
                 }
                 ##### Predictions (spectra by spectra) (class, no probabilities)
                 if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
@@ -2665,7 +2791,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     rownames(result_matrix_model) <- names(spectra)
                 }
                 result_matrix_model[,1] <- cbind(predicted_classes)
-                colnames(result_matrix_model) <- paste("Predicted Class '", model_name, "'", sep = "")
+                colnames(result_matrix_model) <- paste0("Predicted Class '", model_name, "'")
                 ##### Add the result matrix to a global final matrix (the final result matrix is the patient matrix if it is still non existent)
                 if (is.null(final_result_matrix)) {
                     final_result_matrix <- as.data.frame(result_matrix_model)
@@ -2747,7 +2873,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 if (!is.null(sample_bin_matrix)) {
                     ### Put the X at the beginning of the peak names
                     for (n in 1:length(colnames(sample_bin_matrix))) {
-                        colnames(sample_bin_matrix)[n] <- paste("X", colnames(sample_bin_matrix)[n], sep = "")
+                        colnames(sample_bin_matrix)[n] <- paste0("X", colnames(sample_bin_matrix)[n])
                     }
                     ##### Predictions (AVG spectrum) (class, no probabilities)
                     if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
@@ -2761,7 +2887,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     result_matrix_model_bin <- matrix(nrow = 1, ncol = 1)
                     rownames(result_matrix_model_bin) <- names(spectra)[s]
                     result_matrix_model_bin[1,1] <- as.character(predicted_class_avg)
-                    colnames(result_matrix_model_bin) <- paste("Predicted Class '", model_name, "'", sep = "")
+                    colnames(result_matrix_model_bin) <- paste0("Predicted Class '", model_name, "'")
                 } else {
                     ### It is NULL if there are incompatibilities between the model features and the spectral features
                     result_matrix_model_bin <- NULL
@@ -2826,7 +2952,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             ########## HCA
             ### Initialize the model result matrix
             result_matrix_model <- matrix("class", nrow = length(spectra), ncol = 1)
-            colnames(result_matrix_model) <- paste("Predicted Class '", model_name, "'", sep = "")
+            colnames(result_matrix_model) <- paste0("Predicted Class '", model_name, "'")
             sample_name <- spectra[[1]]@metaData$file[1]
             if (is.null(names(spectra))) {
                 rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
@@ -2863,7 +2989,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 if (!is.null(sample_hca_matrix)) {
                     ### Put the X at the beginning of the peak names
                     for (x in 1:length(colnames(sample_hca_matrix))) {
-                        colnames(sample_hca_matrix)[x] <- paste("X", colnames(sample_hca_matrix)[x], sep = "")
+                        colnames(sample_hca_matrix)[x] <- paste0("X", colnames(sample_hca_matrix)[x])
                     }
                     ##### Predictions (AVG spectrum) (class, no probabilities)
                     if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
@@ -2936,7 +3062,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
             spectra_for_plotting <- list()
             ### Initialize the model result matrix
             result_matrix_model <- matrix("class", nrow = length(spectra), ncol = 1)
-            colnames(result_matrix_model) <- paste("Predicted Class '", model_name, "'", sep = "")
+            colnames(result_matrix_model) <- paste0("Predicted Class '", model_name, "'")
             sample_name <- spectra[[1]]@metaData$file[1]
             if (is.null(names(spectra))) {
                 rownames(result_matrix_model) <- rep(sample_name, nrow(result_matrix_model))
@@ -2975,7 +3101,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     if (!is.null(sample_clique_matrix)) {
                         ### Put the X at the beginning of the peak names
                         for (x in 1:length(colnames(sample_clique_matrix))) {
-                            colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
+                            colnames(sample_clique_matrix)[x] <- paste0("X", colnames(sample_clique_matrix)[x])
                         }
                         ##### Predictions (AVG spectrum) (class, no probabilities)
                         if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
@@ -3007,7 +3133,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     if (!is.null(sample_independent_matrix)) {
                         ### Put the X at the beginning of the peak names
                         for (x in 1:length(colnames(sample_independent_matrix))) {
-                            colnames(sample_independent_matrix)[x] <- paste("X", colnames(sample_independent_matrix)[x], sep = "")
+                            colnames(sample_independent_matrix)[x] <- paste0("X", colnames(sample_independent_matrix)[x])
                         }
                         ##### Predictions (AVG spectrum) (class, no probabilities)
                         if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
@@ -3102,7 +3228,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     if (!is.null(sample_clique_matrix)) {
                         ### Put the X at the beginning of the peak names
                         for (x in 1:length(colnames(sample_clique_matrix))) {
-                            colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
+                            colnames(sample_clique_matrix)[x] <- paste0("X", colnames(sample_clique_matrix)[x])
                         }
                         ##### Predictions (AVG spectrum) (class, no probabilities)
                         if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
@@ -3129,7 +3255,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     if (!is.null(sample_independent_matrix)) {
                         ### Put the X at the beginning of the peak names
                         for (x in 1:length(colnames(sample_independent_matrix))) {
-                            colnames(sample_independent_matrix)[x] <- paste("X", colnames(sample_independent_matrix)[x], sep = "")
+                            colnames(sample_independent_matrix)[x] <- paste0("X", colnames(sample_independent_matrix)[x])
                         }
                         ##### Predictions (AVG spectrum) (class, no probabilities)
                         if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
@@ -3206,7 +3332,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                     if (!is.null(sample_clique_matrix)) {
                         ### Put the X at the beginning of the peak names
                         for (x in 1:length(colnames(sample_clique_matrix))) {
-                            colnames(sample_clique_matrix)[x] <- paste("X", colnames(sample_clique_matrix)[x], sep = "")
+                            colnames(sample_clique_matrix)[x] <- paste0("X", colnames(sample_clique_matrix)[x])
                         }
                         ##### Predictions (class, no probabilities)
                         if (model_ID == "rf" || model_ID == "nbc" || model_ID == "knn" || model_ID == "nnet" || model_ID == "lda") {
@@ -3291,7 +3417,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
         if (!is.null(final_sample_matrix)) {
             # Put the X at the beginning of the peak names
             for (n in 1:length(colnames(final_sample_matrix))) {
-                name <- paste("X", colnames(final_sample_matrix)[n], sep = "")
+                name <- paste0("X", colnames(final_sample_matrix)[n])
                 colnames(final_sample_matrix)[n] <- name
             }
             # Predictions
@@ -3318,7 +3444,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
                 name_splitted <- unlist(strsplit(features_model[f],""))
                 feature_def <- name_splitted[2]
                 for (i in 3:length(name_splitted)) {
-                    feature_def <- paste(feature_def, name_splitted[i], sep = "")
+                    feature_def <- paste0(feature_def, name_splitted[i])
                 }
                 features_model[f] <- feature_def
             }
@@ -4435,13 +4561,13 @@ spectral_typer_score_hierarchical_distance <- function(spectra_database, spectra
             # Scroll the rows, assign the class based upon the distance, create the output matrix for results (create a function to apply to each matrix row)
             scoring_function <- function (x) {
                 if (x < 1) {
-                    x <- paste("YES (", round(as.numeric(x),3), ")", sep = "")
+                    x <- paste0("YES\n(", round(as.numeric(x),3), ")")
                 } else if (x >= 1 && x < 1.2) {
-                    x <- paste("NI (", round(as.numeric(x),3), ")", sep = "")
+                    x <- paste0("NI\n(", round(as.numeric(x),3), ")")
                 } else if (x >= 1.2) {
-                    x <- paste("NO (", round(as.numeric(x),3), ")", sep = "")
+                    x <- paste0("NO\n(", round(as.numeric(x),3), ")")
                 }
-                return (x)
+                return(x)
             }
             result_matrix <- apply(distance_matrix, MARGIN = c(1,2), FUN = function(x) scoring_function(x))
         } else if (normalization_method == "max") {
@@ -4456,13 +4582,13 @@ spectral_typer_score_hierarchical_distance <- function(spectra_database, spectra
             # Scroll the rows, assign the class based upon the distance, create the output matrix for results (create a function to apply to each matrix row)
             scoring_function <- function (x) {
                 if (x < 50) {
-                    x <- paste("YES (", round(as.numeric(x),3), ")", sep = "")
+                    x <- paste0("YES\n(", round(as.numeric(x),3), ")")
                 } else if (x >= 50 && x < 75) {
-                    x <- paste("NI (", round(as.numeric(x),3), ")", sep = "")
+                    x <- paste0("NI\n(", round(as.numeric(x),3), ")")
                 } else if (x >= 75) {
-                    x <- paste("NO (", round(as.numeric(x),3), ")", sep = "")
+                    x <- paste0("NO\n(", round(as.numeric(x),3), ")")
                 }
-                return (x)
+                return(x)
             }
             result_matrix <- apply(distance_matrix, MARGIN = c(1,2), FUN = function(x) scoring_function(x))
         }
@@ -5139,10 +5265,10 @@ spectral_typer_score_signal_intensity <- function(spectra_database, spectra_test
 
 
 ######################################### SPECTRAL TYPER SCORE: SIMILARITY INDEX
-# The function calculates the score for the Spectral Typer program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity symmetry via the similarity index computation.
+# The function calculates the score for the Spectral Typer program, by comparing the test peaklist with the database peaklist, in terms of peak matching and intensity symmetry via the similarity index computation. The similarity comparison can be weighed accounting for the variability (coefficient of variation) for each database entry and sample, provided by two lists (one for the database and one for the samples) returned from the spectral_variability_estimation function (each element of the list should be named with the same name as the relative entry, otherwise the order is taken for matching).
 # Each sample gets compared with each entry in the database, separately.
 # Parallel implemented.
-spectral_typer_score_similarity_index <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = NULL, peaks_filtering_percentage_threshold = 5, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tof_mode = "linear", intensity_correction_coefficient = 1, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = FALSE, allow_parallelization = FALSE) {
+spectral_typer_score_similarity_index <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = NULL, database_spectral_variability_list = list(), test_spectral_variability_list = list(), peaks_filtering_percentage_threshold = 5, low_intensity_percentage_threshold = 0.1, low_intensity_threshold_method = "element-wise", tof_mode = "linear", intensity_correction_coefficient = 1, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = FALSE, allow_parallelization = FALSE) {
     install_and_load_required_packages(c("MALDIquant", "stats", "parallel"))
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
@@ -5429,6 +5555,75 @@ spectral_typer_score_similarity_index <- function(spectra_database, spectra_test
 
 
 
+################################################ SPECTRAL VARIABILITY ESTIMATION
+# The function takes a list of spectra and calculates the variability within the spectral dataset provided, in terms of the mean of the coefficients of variation for all the signals.
+spectral_variability_estimation <- function(spectra, folder_list = NULL, peak_picking_SNR = 3, peak_picking_algorithm = "SuperSmoother", spectra_format = "xmass", peak_picking_mode = "all", signals_to_take = 25, tof_mode = "linear", peaks_deisotoping = FALSE, allow_parallelization = FALSE) {
+    ### Peak picking
+    if (peak_picking_mode == "most intense") {
+        peaks <- most_intense_signals(spectra, signals_to_take = signals_to_take, tof_mode = tof_mode)
+    } else if (peak_picking_mode == "all") {
+        peaks <- peak_picking(spectra, peak_picking_algorithm = peak_picking_algorithm, SNR = peak_picking_SNR, tof_mode = tof_mode, allow_parallelization = allow_parallelization, deisotope_peaklist = peaks_deisotoping)
+    }
+    peaks <- align_and_filter_peaks(peaks, peak_picking_algorithm = peak_picking_algorithm, tof_mode = tof_mode, peak_filtering_frequency_threshold_percent = 0, low_intensity_peak_removal_threshold_percent = 0)
+    ### Replace the name of the spectra/peaks with the class (to identify the spectra under the same entry)
+    peaks <- replace_class_name(peaks, class_list = folder_list, class_in_file_path = TRUE, class_in_file_name = FALSE, spectra_format = spectra_format)
+    spectra <- replace_class_name(spectra, class_list = folder_list, class_in_file_path = TRUE, class_in_file_name = FALSE, spectra_format = spectra_format)
+    ### Generate a list of intensity matrices, each element of the list being the intensity matrix of the database entry
+    intensity_matrix_list <- list()
+    for (f in 1:length(folder_list)) {
+        peaks_temp <- list()
+        spectra_temp <- list()
+        if (isMassSpectrumList(spectra) && isMassPeaksList(peaks)) {
+            for (s in 1:length(spectra)) {
+                if (spectra[[s]]@metaData$file == folder_list[f]) {
+                    spectra_temp <- append(spectra_temp, spectra[[s]])
+                }
+            }
+            for (p in 1:length(peaks)) {
+                if (peaks[[p]]@metaData$file == folder_list[f]) {
+                    peaks_temp <- append(peaks_temp, peaks[[p]])
+                }
+            }
+        } else if (isMassSpectrum(spectra) && isMassPeaks(peaks)) {
+            spectra_temp <- spectra
+            peaks_temp <- peaks
+        }
+        intensity_matrix_list[[folder_list[f]]] <- intensityMatrix(peaks_temp, spectra_temp)
+    }
+    ### Calculate the coefficient of variation for each element of the list
+    cv_list <- list()
+    for (i in 1:length(intensity_matrix_list)) {
+        intensity_matrix_temp <- intensity_matrix_list[[i]]
+        cv_vector <- numeric()
+        for (cl in 1:ncol(intensity_matrix_temp)) {
+            stdev_column <- sd(intensity_matrix_temp[, cl], na.rm = TRUE)
+            mean_column <- mean(intensity_matrix_temp[, cl], na.rm = TRUE)
+            cv_column <- stdev_column / mean_column * 100
+            cv_vector <- append(cv_vector, cv_column)
+        }
+        cv_list[[names(intensity_matrix_list)[i]]] <- mean(cv_vector)
+    }
+    ### Generate the matrix for the variability
+    cv_matrix <- matrix(0, nrow = length(cv_list), ncol = 1)
+    rownames(cv_matrix) <- names(cv_list)
+    colnames(cv_matrix) <- "Coefficient of variation %"
+    cv_matrix[, 1] <- cbind(unlist(cv_list))
+    ### Calculate the the mean of the CVs
+    estimated_intensity_tolerance_percent <- round(mean(unlist(cv_list)))
+    ### Return
+    return(list(cv_list = cv_list, estimated_intensity_tolerance_percent = estimated_intensity_tolerance_percent, cv_matrix = cv_matrix))
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
 #################################################### ADJACENCY MATRIX GENERATION
 # The function generates an adjacency matrix from a peak list matrix, in order to generate a graph. The matrix is computed first by generating a correlation matrix and then replacing the correlation coefficients with 0 or 1 according to a threshold value.
 generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "spearman", correlation_threshold = 0.90, pvalue_threshold = 0.05) {
@@ -5530,7 +5725,7 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
                 name_splitted <- unlist(strsplit(custom_feature_vector[f],""))
                 feature_def <- name_splitted [2]
                 for (i in 3:length(name_splitted)) {
-                    feature_def <- paste(feature_def, name_splitted[i], sep = "")
+                    feature_def <- paste0(feature_def, name_splitted[i])
                 }
                 custom_feature_vector[f] <- feature_def
             }
@@ -5960,7 +6155,7 @@ extract_feature_list_from_model_list <- function(filepath_R, model_list_object =
                 name_splitted <- unlist(strsplit(feature_vector[f],""))
                 feature_def <- name_splitted [2]
                 for (i in 3:length(name_splitted)) {
-                    feature_def <- paste(feature_def, name_splitted[i], sep = "")
+                    feature_def <- paste0(feature_def, name_splitted[i])
                 }
                 feature_vector[f] <- feature_def
             }
@@ -6707,13 +6902,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.04.4"
+R_script_version <- "2017.05.08.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
 script_file_name <- "SPECTRAL TYPER"
 # Change log
-change_log <- "1. Bugfix\n2. Added the possibility to dump the spectral files"
+change_log <- "1. Bugfix\n2. Added the possibility to dump the spectral files\n3. Variability estimation (mean signal CV)"
 
 
 
@@ -6769,6 +6964,9 @@ mass_range <- c(3000,15000)
 spectral_alignment <- FALSE
 spectral_alignment_algorithm <- NULL
 spectral_alignment_reference <- NULL
+estimated_intensity_tolerance_percent <- NULL
+test_spectral_variability <- NULL
+database_spectral_variability <- NULL
 peaks_deisotoping <- FALSE
 preprocessing_parameters <- list(mass_range = mass_range, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_iterations = baseline_subtraction_iterations, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of, spectral_alignment_algorithm = spectral_alignment_algorithm, spectral_alignment_reference = spectral_alignment_reference)
 
@@ -6801,6 +6999,8 @@ spectral_alignment_algorithm_value <- ""
 spectral_alignment_reference_value <- ""
 peaks_deisotoping_value <- "NO"
 preprocess_spectra_in_packages_of_value <- "0"
+intensity_tolerance_percent_value <- "80"
+estimated_intensity_tolerance_percent_value <- ""
 
 
 
@@ -7371,7 +7571,7 @@ quit_function <- function() {
 }
 
 ##### Exit
-end_session_function <- function () {
+end_session_function <- function() {
     q(save="no")
 }
 
@@ -7542,7 +7742,7 @@ low_intensity_peak_removal_threshold_method_choice <- function() {
 ##### Multicore processing
 allow_parallelization_choice <- function() {
     ##### Messagebox
-    tkmessageBox(title = "Parallel processing is resource hungry", message = "Parallel processing is resource hungry. By activating it, the computation becomes faster, but the program will eat a lot of RAM, possibly causing your computer to freeze. If you want to play safe, do not enable it.", icon = "warning")
+    tkmessageBox(title = "Parallel processing is resource hungry", message = "Parallel processing is resource hungry. By activating it, the computation becomes faster, but the program will eat a lot of RAM, possibly causing your computer to freeze. If you want to play safe, do not enable it", icon = "warning")
     # Catch the value from the menu
     allow_parallelization <- select.list(c("YES","NO"), title="Allow parallel computing", preselect = "NO")
     if (allow_parallelization == "YES") {
@@ -7705,22 +7905,22 @@ import_spectra_function <- function() {
                     load(filepath_database, envir = temporary_environment)
                     # Get the spectra for the database from the workspace
                     spectra_database <- get("spectra_database", pos = temporary_environment)
+                    # Get the database folder list for the database from the workspace
+                    database_folder_list <- get("database_folder_list", pos = temporary_environment)
                 } else {
                     spectra_database <- importBrukerFlex(filepath_database, massRange = mass_range)
+                    # Read the folder list (database class list)
+                    database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
                     # Write the path inside the list
                     for (x in 1:length(spectra_database)) {
                         spectra_database[[x]]@metaData$path <- filepath_database
-                    }
-                    # Read the folder list (database class list)
-                    database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                    # Store the folder list inside the list
-                    for (x in 1:length(spectra_database)) {
-                        spectra_database[[x]]@metaData$databaseFolders <- database_folder_list
                     }
                 }
                 # Progress bar
                 setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
                 spectra_test <- importBrukerFlex(filepath_test, massRange = mass_range)
+                # Read the sample folders
+                test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
                     spectra_test[[x]]@metaData$path <- filepath_test
@@ -7736,6 +7936,8 @@ import_spectra_function <- function() {
                     load(filepath_database, envir = temporary_environment)
                     # Get the spectra for the database from the workspace
                     spectra_database <- get("spectra_database", pos = temporary_environment)
+                    # Get the database folder list from the workspace
+                    database_folder_list <- get("database_folder_list", pos = temporary_environment)
                 } else {
                     spectra_database <- importBrukerFlex(filepath_database)
                     # Write the path inside the list
@@ -7744,14 +7946,12 @@ import_spectra_function <- function() {
                     }
                     # Read the folder list (database class list)
                     database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                    # Store the folder list inside the list
-                    for (x in 1:length(spectra_database)) {
-                        spectra_database[[x]]@metaData$databaseFolders <- database_folder_list
-                    }
                 }
                 # Progress bar
                 setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
                 spectra_test <- importBrukerFlex(filepath_test)
+                # Read the sample folders
+                test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
                     spectra_test[[x]]@metaData$path <- filepath_test
@@ -7770,6 +7970,8 @@ import_spectra_function <- function() {
                     load(filepath_database, envir = temporary_environment)
                     # Get the spectra for the database from the workspace
                     spectra_database <- get("spectra_database", pos = temporary_environment)
+                    # Get the database folder list from the workspace
+                    database_folder_list <- get("database_folder_list", pos = temporary_environment)
                 } else {
                     spectra_database <- importImzMl(filepath_database, massRange = mass_range)
                     # Write the path inside the list
@@ -7778,14 +7980,12 @@ import_spectra_function <- function() {
                     }
                     # Read the folder list (database class list)
                     database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                    # Store the folder list inside the list
-                    for (x in 1:length(spectra_database)) {
-                        spectra_database[[x]]@metaData$databaseFolders <- database_folder_list
-                    }
                 }
                 # Progress bar
                 setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
                 spectra_test <- importImzMl(filepath_test, massRange = mass_range)
+                # Read the sample folders
+                test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
                     spectra_test[[x]]@metaData$path <- filepath_test
@@ -7801,6 +8001,8 @@ import_spectra_function <- function() {
                     load(filepath_database, envir = temporary_environment)
                     # Get the spectra for the database from the workspace
                     spectra_database <- get("spectra_database", pos = temporary_environment)
+                    # Get the database folder list from the workspace
+                    database_folder_list <- get("database_folder_list", pos = temporary_environment)
                 } else {
                     spectra_database <- importImzMl(filepath_database)
                     # Write the path inside the list
@@ -7809,14 +8011,12 @@ import_spectra_function <- function() {
                     }
                     # Read the folder list (database class list)
                     database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                    # Store the folder list inside the list
-                    for (x in 1:length(spectra_database)) {
-                        spectra_database[[x]]@metaData$databaseFolders <- database_folder_list
-                    }
                 }
                 # Progress bar
                 setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
                 spectra_test <- importImzMl(filepath_test)
+                # Read the sample folders
+                test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
                     spectra_test[[x]]@metaData$path <- filepath_test
@@ -7834,6 +8034,17 @@ import_spectra_function <- function() {
         # Progress bar
         setTkProgressBar(import_progress_bar, value = 0.60, title = "Preprocessing sample spectra...", label = "60 %")
         spectra_test <- preprocess_spectra(spectra_test, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
+        # Progress bar
+        setTkProgressBar(import_progress_bar, value = 0.70, title = "Estimating spectral variability...", label = "70 %")
+        ### Estimate variability in the spectra before averaging the replicates
+        # Get the values from the entry
+        SNR <- tclvalue(SNR)
+        SNR <- as.numeric(SNR)
+        signals_to_take <- tclvalue(signals_to_take)
+        signals_to_take <- as.integer(signals_to_take)
+        # Run the functions
+        database_spectral_variability_list <- spectral_variability_estimation(spectra = spectra_database, folder_list = database_folder_list, peak_picking_SNR = SNR, peak_picking_algorithm = peak_picking_algorithm, spectra_format = spectra_format, peak_picking_mode = peak_picking_mode, signals_to_take = signals_to_take, tof_mode = tof_mode, peaks_deisotoping = peaks_deisotoping, allow_parallelization = allow_parallelization)
+        test_spectral_variability_list <- spectral_variability_estimation(spectra = spectra_test, folder_list = test_folder_list, peak_picking_SNR = SNR, peak_picking_algorithm = peak_picking_algorithm, spectra_format = spectra_format, peak_picking_mode = peak_picking_mode, signals_to_take = signals_to_take, tof_mode = tof_mode, peaks_deisotoping = peaks_deisotoping, allow_parallelization = allow_parallelization)
         ### Average the replicates
         # Progress bar
         setTkProgressBar(import_progress_bar, value = 0.80, title = "Further preprocessing...", label = "80 %")
@@ -7858,14 +8069,13 @@ import_spectra_function <- function() {
         } else {
             database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
         }
-        test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
         ### Spectra grouping (class for database)
         # Progress bar
         setTkProgressBar(import_progress_bar, value = 0.90, title = NULL, label = "90 %")
         if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
             spectra_database <- spectra_database
         } else {
-            spectra_database <- group_spectra_class(spectra_database, class_list = database_folder_list, spectra_format = spectra_format, grouping_method = "mean", class_in_file_path = TRUE, tof_mode = tof_mode, preprocessing_parameters = NULL, allow_parallelization = allow_parallelization)
+            spectra_database <- group_spectra_class(spectra_database, class_list = database_folder_list, spectra_format = spectra_format, grouping_method = "mean", class_in_file_path = TRUE, class_in_file_name = FALSE, tof_mode = tof_mode, preprocessing_parameters = NULL, allow_parallelization = allow_parallelization)
             spectra_database <- preprocess_spectra(spectra_database, tof_mode = tof_mode, preprocessing_parameters = preprocessing_parameters, allow_parallelization = allow_parallelization)
         }
         # Number of samples
@@ -7880,6 +8090,8 @@ import_spectra_function <- function() {
         .GlobalEnv$database_folder_list <- database_folder_list
         .GlobalEnv$test_folder_list <- test_folder_list
         .GlobalEnv$number_of_samples <- number_of_samples
+        .GlobalEnv$database_spectral_variability_list <- database_spectral_variability_list
+        .GlobalEnv$test_spectral_variability_list <- test_spectral_variability_list
         # Progress bar
         setTkProgressBar(import_progress_bar, value = 1.00, title = NULL, label = "100 %")
         close(import_progress_bar)
@@ -8003,7 +8215,7 @@ database_dump_function <- function() {
         setTkProgressBar(db_progress_bar, value = 0.15, title = NULL, label = "15 %")
         ########## Dump the RData containing the list of the spectra and peaks in the database, along with the preprocessing parameters
         database_filename <- paste(filename_peaklist, " - Database.RData", sep = "")
-        save(peaks_database, spectra_database, file = database_filename)
+        save(peaks_database, spectra_database, database_folder_list, file = database_filename)
         # Progress bar
         setTkProgressBar(db_progress_bar, value = 0.50, title = NULL, label = "50 %")
         ##### Generate the output filename (based upon the filename)
@@ -8140,7 +8352,7 @@ run_spectral_typer_function <- function() {
         # Progress bar
         setTkProgressBar(st_progress_bar, value = 0.60, title = NULL, label = "60 %")
         if ("similarity index" %in% similarity_criteria) {
-            score_si_matrix <- spectral_typer_score_similarity_index(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
+            score_si_matrix <- spectral_typer_score_similarity_index(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, database_spectral_variability_list = database_spectral_variability_list, test_spectral_variability_list = test_spectral_variability_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
         }
         ############### INTENSITY
         # Progress bar
@@ -8154,47 +8366,75 @@ run_spectral_typer_function <- function() {
         # Parameters vector
         parameters_vector <- c(file_type_export, filepath_database, filepath_test, mass_range_value, tof_mode_value, spectra_format_value, preprocess_spectra_in_packages_of_value, peak_picking_mode, peak_picking_algorithm_value, signals_to_take_value, intensity_tolerance_percent_value, similarity_criteria_value, intensity_correction_coefficient_value, SNR_value, peaks_filtering_threshold_percent_value, low_intensity_peak_removal_percentage_threshold_value, average_replicates_in_database_value, average_replicates_in_test_value, score_only_value, spectra_path_output_value)
         names(parameters_vector) <- c("File type", "Database folder", "Samples folder", "Mass range", "TOF mode", "Spectra format", "Preprocess spectra in packages of", "Peak picking mode", "Peak picking algorithm", "Most intense signals taken", "Intensity tolerance percent", "Similarity criteria", "Intensity correction coefficient", "Signal-to-noise ratio", "Peaks filtering threshold percentage", "Low intensity peaks removal threshold percent", "Average replicates in the database", "Average replicates in the samples", "Score only", "Spectra path in the output")
-        # Fill in the matrices (the number of columns must be the same for rbind)
+        ### Fill in the matrices (the number of columns must be the same for rbind)
+        # Correlation
         if (!is.null(score_correlation_matrix)) {
             parameters_matrix_correlation <- matrix("", nrow = length(parameters_vector), ncol = ncol(score_correlation_matrix))
             parameters_matrix_correlation[,1] <- cbind(parameters_vector)
             rownames(parameters_matrix_correlation) <- names(parameters_vector)
         }
+        # HCA
         if (!is.null(score_hca)) {
             score_hca_matrix <- score_hca$result_matrix
             parameters_matrix_hca <- matrix("", nrow = length(parameters_vector), ncol = ncol(score_hca_matrix))
             parameters_matrix_hca[,1] <- cbind(parameters_vector)
             rownames(parameters_matrix_hca) <- names(parameters_vector)
         }
+        # Similarity index
         if (!is.null(score_si_matrix)) {
             parameters_matrix_si <- matrix("", nrow = length(parameters_vector), ncol = ncol(score_si_matrix))
             parameters_matrix_si[,1] <- cbind(parameters_vector)
             rownames(parameters_matrix_si) <- names(parameters_vector)
         }
+        # Intensity
         if (!is.null(score_intensity_matrix)) {
             parameters_matrix_intensity <- matrix("", nrow = length(parameters_vector), ncol = ncol(score_intensity_matrix))
             parameters_matrix_intensity[,1] <- cbind(parameters_vector)
             rownames(parameters_matrix_intensity) <- names(parameters_vector)
         }
+        # CV matrix
+        if (!is.null(database_spectral_variability_list)) {
+            database_cv_matrix <- database_spectral_variability_list$cv_matrix
+        } else {
+            database_cv_matrix <- NULL
+        }
+        if (!is.null(test_spectral_variability_list)) {
+            test_cv_matrix <- test_spectral_variability_list$cv_matrix
+        } else {
+            test_cv_matrix <- NULL
+        }
         #### Exit the function and put the variable into the R workspace
+        # HCA
         if (!is.null(score_hca)) {
             score_hca_matrix <- score_hca$result_matrix
             .GlobalEnv$score_hca_matrix_results <- rbind(score_hca_matrix, parameters_matrix_hca)
         }
+        # Similarity Index
         if (!is.null(score_si_matrix)) {
             .GlobalEnv$score_si_matrix_results <- rbind(score_si_matrix, parameters_matrix_si)
         }
+        # Intensity
         if (!is.null(score_intensity_matrix)) {
             .GlobalEnv$score_intensity_matrix_results <- rbind(score_intensity_matrix, parameters_matrix_intensity)
         }
+        # Correlation
         if (!is.null(score_correlation_matrix)) {
             .GlobalEnv$score_correlation_matrix_results <- rbind(score_correlation_matrix, parameters_matrix_correlation)
         }
-        # Save the files (CSV)
+        # CV matrix
+        if (!is.null(database_cv_matrix)) {
+            .GlobalEnv$database_cv_matrix <- database_cv_matrix
+        }
+        if (!is.null(test_cv_matrix)) {
+            .GlobalEnv$test_cv_matrix <- test_cv_matrix
+        }
+        ### Save the files (CSV)
         if (file_type_export == "csv") {
+            # Intensity
             if (!is.null(score_intensity_matrix)) {
-                write.csv(score_intensity_matrix_results, file = paste("int_", filename, sep=""))
+                write.csv(score_intensity_matrix_results, file = paste0("INT_", filename))
             }
+            # HCA
             if (!is.null(score_hca)) {
                 # Dump the hca plot
                 #png(filename="hca.png", width = 1900, height = 1280)
@@ -8203,26 +8443,30 @@ run_spectral_typer_function <- function() {
                 if (scaling_factor > 3) {
                     scaling_factor <- 3
                 }
-                ggsave(plot = score_hca$hca_dendrogram, device="png", filename = paste(filename, "- hca.png", sep = ""), width = 12.8, height = 7.2, units="in", dpi = 300, scale = scaling_factor)
+                ggsave(plot = score_hca$hca_dendrogram, device = "png", filename = paste0(filename, "- hca.png"), width = 12.8, height = 7.2, units = "in", dpi = 300, scale = scaling_factor)
                 #savePlot(filename="hca.png", type="png")
                 #dev.print(X11, file="hca.png", width = 1900, height = 1280)
                 #dev.off()
-                write.csv(score_hca_matrix_results, file = paste("hca_", filename, sep=""))
+                write.csv(score_hca_matrix_results, file = paste0("HCA_", filename))
             }
+            # Correlation
             if (!is.null(score_correlation_matrix)) {
-                write.csv(score_correlation_matrix_results, file = paste("corr_", filename, sep=""))
+                write.csv(score_correlation_matrix_results, file = paste0("CORR_", filename))
             }
+            # Similarity index
             if (!is.null(score_si_matrix)) {
-                write.csv(score_si_matrix_results, file = paste("si_", filename, sep=""))
+                write.csv(score_si_matrix_results, file = paste0("SI_", filename))
             }
-        }
-        # Save the files (Excel)
-        if (file_type_export == "xlsx" || file_type_export == "xls") {
-            # Check if PERL is installed by using the built in function, for WriteXLS package
-            #perl_installed <- testPerl(verbose = FALSE)
-            #if (perl_installed == FALSE) {
-            #tkmessageBox(title = "Perl", message = "The software PERL has not been found on the computer. Please install the Perl software from\nhttps://www.perl.org/get.html\nand restart the R session", icon = "warning")
-            #}
+            # CV matrix
+            if (!is.null(database_cv_matrix)) {
+                write.csv(database_cv_matrix, file = paste0("DB-CV_", filename))
+            }
+            if (!is.null(test_cv_matrix)) {
+                write.csv(test_cv_matrix, file = paste0("TEST-CV_", filename))
+            }
+        } else if (file_type_export == "xlsx" || file_type_export == "xls") {
+            ### Save the files (Excel)
+            # Intensity
             if (!is.null(score_intensity_matrix)) {
                 # Convert it to a data frame
                 score_intensity_matrix_results <- as.data.frame(score_intensity_matrix_results)
@@ -8230,9 +8474,9 @@ run_spectral_typer_function <- function() {
                 unique_row_names <- make.names(rownames(score_intensity_matrix_results), unique = TRUE)
                 rownames(score_intensity_matrix_results) <- unique_row_names
                 # Export
-                writeWorksheetToFile(file = paste("int_", filename, sep=""), data = score_intensity_matrix_results, sheet = "Scores - Intensity", clearSheets = TRUE, rownames = rownames(score_intensity_matrix_results))
-                
+                writeWorksheetToFile(file = paste0("INT_", filename), data = score_intensity_matrix_results, sheet = "Scores - Intensity", clearSheets = TRUE, rownames = rownames(score_intensity_matrix_results))
             }
+            # HCA
             if (!is.null(score_hca)) {
                 # Dump the hca plot
                 #png(filename="hca.png", width = 1900, height = 1280)
@@ -8241,7 +8485,7 @@ run_spectral_typer_function <- function() {
                 if (scaling_factor > 3) {
                     scaling_factor <- 3
                 }
-                ggsave(plot = score_hca$hca_dendrogram, device="png", filename="hca.png", width = 12.8, height = 7.2, units="in", dpi = 300, scale = scaling_factor)
+                ggsave(plot = score_hca$hca_dendrogram, device = "png", filename = paste0(filename, " - hca.png"), width = 12.8, height = 7.2, units = "in", dpi = 300, scale = scaling_factor)
                 #savePlot(filename="hca.png", type="png")
                 #dev.print(X11, file="hca.png", width = 1900, height = 1280)
                 #dev.off()
@@ -8251,8 +8495,9 @@ run_spectral_typer_function <- function() {
                 unique_row_names <- make.names(rownames(score_hca_matrix_results), unique = TRUE)
                 rownames(score_hca_matrix_results) <- unique_row_names
                 # Export
-                writeWorksheetToFile(file = paste("hca_", filename, sep=""), data = score_hca_matrix_results, sheet = "Scores - HCA", clearSheets = TRUE, rownames = rownames(score_hca_matrix_results))
+                writeWorksheetToFile(file = paste0("HCA_", filename), data = score_hca_matrix_results, sheet = "Scores - HCA", clearSheets = TRUE, rownames = rownames(score_hca_matrix_results))
             }
+            # Correlation
             if (!is.null(score_correlation_matrix)) {
                 # Convert it to a data frame
                 score_correlation_matrix_results <- as.data.frame(score_correlation_matrix_results)
@@ -8260,8 +8505,9 @@ run_spectral_typer_function <- function() {
                 unique_row_names <- make.names(rownames(score_correlation_matrix_results), unique = TRUE)
                 rownames(score_correlation_matrix_results) <- unique_row_names
                 # Export
-                writeWorksheetToFile(file = paste("corr_", filename, sep=""), data = score_correlation_matrix_results, sheet = "Scores - Correlation", clearSheets = TRUE, rownames = rownames(score_correlation_matrix_results))
+                writeWorksheetToFile(file = paste0("CORR_", filename), data = score_correlation_matrix_results, sheet = "Scores - Correlation", clearSheets = TRUE, rownames = rownames(score_correlation_matrix_results))
             }
+            # Similarity index
             if (!is.null(score_si_matrix)) {
                 # Convert it to a data frame
                 score_si_matrix_results <- as.data.frame(score_si_matrix_results)
@@ -8269,14 +8515,33 @@ run_spectral_typer_function <- function() {
                 unique_row_names <- make.names(rownames(score_si_matrix_results), unique = TRUE)
                 rownames(score_si_matrix_results) <- unique_row_names
                 # Export
-                writeWorksheetToFile(file = paste("si_", filename, sep=""), data = score_si_matrix_results, sheet = "Scores - Similarity Index", clearSheets = TRUE, rownames = rownames(score_si_matrix_results))
+                writeWorksheetToFile(file = paste0("SI_", filename), data = score_si_matrix_results, sheet = "Scores - Similarity Index", clearSheets = TRUE, rownames = rownames(score_si_matrix_results))
+            }
+            # CV matrix
+            if (!is.null(database_cv_matrix)) {
+                # Convert it to a data frame
+                database_cv_matrix <- as.data.frame(database_cv_matrix)
+                # Generate unique row names
+                unique_row_names <- make.names(rownames(database_cv_matrix), unique = TRUE)
+                rownames(database_cv_matrix) <- unique_row_names
+                # Export
+                writeWorksheetToFile(file = paste0("DB-CV_", filename), data = database_cv_matrix, sheet = "Database CV", clearSheets = TRUE, rownames = rownames(database_cv_matrix))
+            }
+            if (!is.null(test_cv_matrix)) {
+                # Convert it to a data frame
+                test_cv_matrix <- as.data.frame(test_cv_matrix)
+                # Generate unique row names
+                unique_row_names <- make.names(rownames(test_cv_matrix), unique = TRUE)
+                rownames(test_cv_matrix) <- unique_row_names
+                # Export
+                writeWorksheetToFile(file = paste0("TEST-CV_", filename), data = test_cv_matrix, sheet = "Samples CV", clearSheets = TRUE, rownames = rownames(test_cv_matrix))
             }
         }
         # Progress bar
         setTkProgressBar(st_progress_bar, value = 1.00, title = NULL, label = "100 %")
         close(st_progress_bar)
         ### Messagebox
-        tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity Pearson's correlation coefficient\nIntMtch: signal intensity matching\nsl: slope of the regression curve\nns: number of signals\nSI: Similarity Index\n\n\nFit = number of sample-database matching signals / number of signals in the sample\nRetrofit = number of database-sample matching signals / number of signals in the database entry", icon = "info")
+        tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity correlation coefficient\nIntMtch: signal intensity matching\nsl: slope of the regression curve\nns: number of signals\nSI: Similarity Index\n\n\nFit = number of sample-database matching signals / number of signals in the sample\nRetrofit = number of database-sample matching signals / number of signals in the database entry", icon = "info")
     } else if (is.null(spectra_database) || is.null(spectra_test) || is.null(peaks_database) || is.null(peaks_test)) {
         ### Messagebox
         tkmessageBox(title = "Something is wrong", message = "Some elements are needed to perform this operation: make sure that the spectra have been imported and the peak picking process has been performed", icon = "warning")
@@ -8495,24 +8760,15 @@ intensity_tolerance_percent <- tclVar("")
 
 ######################## GUI
 
-# Get system info (Platform - Release - Version (- Linux Distro))
+### Get system info (Platform - Release - Version (- Linux Distro))
 system_os = Sys.info()[1]
 os_release = Sys.info()[2]
 os_version = Sys.info()[3]
 
 ### Get the screen resolution
-# Windows
-if (system_os == "Windows") {
-    # Windows 7
-    if (length(grep("7", os_release, fixed = TRUE)) > 0) {
-        # Get system info
-        screen_height <- system("wmic desktopmonitor get screenheight", intern = TRUE)
-        screen_width <- system("wmic desktopmonitor get screenwidth", intern = TRUE)
-        # Retrieve the values
-        screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
-        screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
-    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
-        # Windows 10
+try({
+    # Windows
+    if (system_os == "Windows") {
         # Get system info
         screen_info <- system("wmic path Win32_VideoController get VideoModeDescription", intern = TRUE)[2]
         # Get the resolution
@@ -8520,46 +8776,55 @@ if (system_os == "Windows") {
         # Retrieve the values
         screen_height <- as.numeric(screen_resolution[2])
         screen_width <- as.numeric(screen_resolution[1])
+    } else if (system_os == "Linux") {
+        # Get system info
+        screen_info <- system("xdpyinfo -display :0", intern = TRUE)
+        # Get the resolution
+        screen_resolution <- screen_info[which(screen_info == "screen #0:") + 1]
+        screen_resolution <- unlist(strsplit(screen_resolution, "dimensions: ")[1])
+        screen_resolution <- unlist(strsplit(screen_resolution, "pixels"))[2]
+        # Retrieve the wto dimensions...
+        screen_width <- as.numeric(unlist(strsplit(screen_resolution, "x"))[1])
+        screen_height <- as.numeric(unlist(strsplit(screen_resolution, "x"))[2])
     }
-} else if (system_os == "Linux") {
-    # Get system info
-    screen_info <- system("xdpyinfo -display :0", intern = TRUE)
-    # Get the resolution
-    screen_resolution <- screen_info[which(screen_info == "screen #0:") + 1]
-    screen_resolution <- unlist(strsplit(screen_resolution, "dimensions: ")[1])
-    screen_resolution <- unlist(strsplit(screen_resolution, "pixels"))[2]
-    # Retrieve the wto dimensions...
-    screen_width <- as.numeric(unlist(strsplit(screen_resolution, "x"))[1])
-    screen_height <- as.numeric(unlist(strsplit(screen_resolution, "x"))[2])
-}
+}, silent = TRUE)
+
 
 
 ### FONTS
 # Default sizes (determined on a 1680x1050 screen) (in order to make them adjust to the size screen, the screen resolution should be retrieved)
 title_font_size <- 18
 other_font_size <- 9
+
+# Adjust fonts size according to the pixel number
+try({
+    # Windows
+    if (system_os == "Windows") {
+        # Determine the font size according to the resolution
+        total_number_of_pixels <- screen_width * screen_height
+        # Determine the scaling factor (according to a complex formula)
+        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    } else if (system_os == "Linux") {
+        # Linux
+        # Determine the font size according to the resolution
+        total_number_of_pixels <- screen_width * screen_height
+        # Determine the scaling factor (according to a complex formula)
+        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    } else if (system_os == "Darwin") {
+        # macOS
+        print("Using default font sizes...")
+    }
+}, silent = TRUE)
+
+# Define the fonts
 # Windows
 if (system_os == "Windows") {
-    # Windows 7
-    if (length(grep("7", os_release, fixed = TRUE)) > 0) {
-        # Determine the font size according to the resolution
-        total_number_of_pixels <- screen_width * screen_height
-        # Determine the scaling factor (according to a complex formula)
-        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
-        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
-        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
-        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
-    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
-        # Windows 10
-        # Determine the font size according to the resolution
-        total_number_of_pixels <- screen_width * screen_height
-        # Determine the scaling factor (according to a complex formula)
-        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
-        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
-        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
-        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
-    }
-    # Define the fonts
     garamond_title_bold = tkfont.create(family = "Garamond", size = title_font_size, weight = "bold")
     garamond_other_normal = tkfont.create(family = "Garamond", size = other_font_size, weight = "normal")
     arial_title_bold = tkfont.create(family = "Arial", size = title_font_size, weight = "bold")
@@ -8573,20 +8838,13 @@ if (system_os == "Windows") {
     entry_font = trebuchet_other_normal
     button_font = trebuchet_other_bold
 } else if (system_os == "Linux") {
-    # Linux
-    # Determine the font size according to the resolution
-    total_number_of_pixels <- screen_width * screen_height
-    # Determine the scaling factor (according to a complex formula)
-    scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
-    scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
-    title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
-    other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    #Linux
     # Ubuntu
     if (length(grep("Ubuntu", os_version, ignore.case = TRUE)) > 0) {
         # Define the fonts
-        ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = title_font_size, weight = "bold")
-        ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "normal")
-        ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "bold")
+        ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = (title_font_size + 2), weight = "bold")
+        ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = (other_font_size + 1), weight = "normal")
+        ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = (other_font_size + 1), weight = "bold")
         liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
         liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
         liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
@@ -8594,13 +8852,12 @@ if (system_os == "Windows") {
         bitstream_charter_other_normal = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "normal")
         bitstream_charter_other_bold = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "bold")
         # Use them in the GUI
-        title_font = bitstream_charter_title_bold
-        label_font = bitstream_charter_other_normal
-        entry_font = bitstream_charter_other_normal
-        button_font = bitstream_charter_other_bold
+        title_font = ubuntu_title_bold
+        label_font = ubuntu_other_normal
+        entry_font = ubuntu_other_normal
+        button_font = ubuntu_other_bold
     } else if (length(grep("Fedora", os_version, ignore.case = TRUE)) > 0) {
         # Fedora
-        # Define the fonts
         cantarell_title_bold = tkfont.create(family = "Cantarell", size = title_font_size, weight = "bold")
         cantarell_other_normal = tkfont.create(family = "Cantarell", size = other_font_size, weight = "normal")
         cantarell_other_bold = tkfont.create(family = "Cantarell", size = other_font_size, weight = "bold")
@@ -8614,7 +8871,6 @@ if (system_os == "Windows") {
         button_font = cantarell_other_bold
     } else {
         # Other linux distros
-        # Define the fonts
         liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
         liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
         liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
@@ -8626,7 +8882,6 @@ if (system_os == "Windows") {
     }
 } else if (system_os == "Darwin") {
     # macOS
-    # Define the fonts
     helvetica_title_bold = tkfont.create(family = "Helvetica", size = title_font_size, weight = "bold")
     helvetica_other_normal = tkfont.create(family = "Helvetica", size = other_font_size, weight = "normal")
     helvetica_other_bold = tkfont.create(family = "Helvetica", size = other_font_size, weight = "bold")
@@ -8636,6 +8891,7 @@ if (system_os == "Windows") {
     entry_font = helvetica_other_normal
     button_font = helvetica_other_bold
 }
+
 
 
 # The "area" where we will put our input lines
@@ -8752,7 +9008,7 @@ check_for_updates_value_label <- tklabel(window, text = check_for_updates_value,
 
 
 #### Geometry manager
-tkgrid(title_label, row = 1, column = 1, padx = c(20, 20), pady = c(20, 20), columnspan = 4)
+tkgrid(title_label, row = 1, column = 1, padx = c(5, 5), pady = c(5, 5), columnspan = 4)
 tkgrid(download_updates_button, row = 1, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(check_for_updates_value_label, row = 1, column = 6, padx = c(5, 5), pady = c(5, 5))
 tkgrid(spectra_format_entry, row = 2, column = 1, padx = c(5, 5), pady = c(5, 5))
@@ -8805,13 +9061,6 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
-
-
-
-
-
-
-
 
 
 
