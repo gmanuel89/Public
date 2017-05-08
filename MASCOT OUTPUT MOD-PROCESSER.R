@@ -1,19 +1,23 @@
 #################### MASCOT OUTPUT MOD-PROCESSER ####################
 
 
+# Clear the console
+#cat("\014")
+# Empty the workspace
+rm(list = ls())
 
 
 
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.04.27.0"
+R_script_version <- "2017.05.08.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MASCOT%20OUTPUT%20MOD-PROCESSER.R"
 ### Name of the file when downloaded
 script_file_name <- "MASCOT OUTPUT MOD-PROCESSER"
 # Change log
-change_log <- "1. New software!\n2. Bugfix"
+change_log <- "1. Bugfix"
 
 
 
@@ -215,7 +219,7 @@ check_for_updates_function <- function() {
             if (is.null(online_version_number)) {
                 # The version number could not be ckecked due to internet problems
                 # Update the label
-                check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked: connection problems", sep = "")
+                check_for_updates_value <- paste("Version: ", R_script_version, "\nUpdates not checked:\nconnection problems", sep = "")
             } else {
                 if (update_available == TRUE) {
                     # Update the label
@@ -315,22 +319,37 @@ image_file_type_export_choice <- function() {
 
 ##### File import
 file_import_function <- function() {
-    filepath_import_select <- tkmessageBox(title = "Input file", message = "Select the Mascot output file", icon = "info")
+    tkmessageBox(title = "Input file", message = "Select the Mascot output file", icon = "info")
     input_file <- tclvalue(tkgetOpenFile(filetypes = "{{Comma Separated Value files} {.csv}}"))
     if (!nchar(input_file)) {
         tkmessageBox(message = "No file selected")
     } else {
         tkmessageBox(message = paste("The following file will be read:\n\n", input_file))
     }
+    # Import data only if a file path is specified
     if (input_file != "") {
         #################### IMPORT THE DATA FROM THE FILE
-        ##### XLS or XLSX
-        if (length(grep(".xls", input_file, fixed = TRUE)) > 0 || length(grep(".xlsx", input_file, fixed = TRUE)) > 0) {
-            input_data <- readWorksheetFromFile(input_file, sheet = 1)
-            input_data <- as.data.frame(input_data)
-        } else if (length(grep(".csv", input_file, fixed = TRUE)) > 0) {
-            ##### CSV
-            input_data <- read.csv(input_file, header = TRUE, sep = ",")
+        ### Remove all the lines that are not the desired lines (the useless header)
+        input_file_lines <- readLines(input_file)
+        # Start to read from the matrix header: "prot_hit"
+        input_file_header_line_number <- 0
+        for (l in 1:length(input_file_lines)) {
+            if (startsWith(input_file_lines[l], "prot_hit")) {
+                input_file_header_line_number <- l
+                break
+            }
+        }
+        # Keep only the selected lines
+        if (input_file_header_line_number > 0) {
+            final_input_file_lines <- input_file_lines[input_file_header_line_number : length(input_file_lines)]
+        } else {
+            final_input_file_lines <- character()
+        }
+        # Read the CSV file from the lines
+        if (length(final_input_file_lines) > 0) {
+            input_data <- read.csv(text = final_input_file_lines, header = TRUE)
+        } else {
+            input_data <- NULL
         }
         ### Retrieve the input file name
         input_filename <- NULL
@@ -349,7 +368,12 @@ file_import_function <- function() {
         .GlobalEnv$input_file <- input_file
         .GlobalEnv$input_filename <- input_filename
         .GlobalEnv$input_data <- input_data
-        tkmessageBox(title = "File imported", message = "The file has been successfully imported!", icon = "info")
+        # Message
+        if (!is.null(input_data)) {
+            tkmessageBox(title = "File imported", message = "The file has been successfully imported!", icon = "info")
+        } else {
+            tkmessageBox(title = "File not imported", message = "The file could not be imported! Check the file structure and re-import it!", icon = "warning")
+        }
     } else {
         # Escape the function
         .GlobalEnv$input_file <- input_file
@@ -386,7 +410,22 @@ run_mascot_output_modprocesser_function <- function() {
     setTkProgressBar(program_progress_bar, value = 0, title = NULL, label = "0 %")
     # Go to the working directory
     setwd(output_folder)
-    if (input_file != "") {
+    # Check if all the columns are present
+    columns_needed <- c("pep_var_mod", "pep_ident", "pep_homol", "pep_score", "prot_acc", "pep_seq", "pep_var_mod_pos")
+    all_the_columns_are_present <- all(columns_needed %in% colnames(input_data))
+    missing_columns_value <- NULL
+    missing_columns <- columns_needed[columns_needed %in% colnames(input_data) == FALSE]
+    if (length(missing_columns) > 0) {
+        for (m in 1:length(missing_columns)) {
+            if (is.null(missing_columns_value)) {
+                missing_columns_value <- missing_columns[m]
+            } else {
+                missing_columns_value <- paste0(missing_columns_value, "\n", missing_columns[m])
+            }
+        }
+    }
+    # Run only if there is data and the data is correct
+    if (input_file != "" && !is.null(input_data) && all_the_columns_are_present == TRUE) {
         ##### Automatically create a subfolder with all the results
         ## Check if such subfolder exists
         list_of_directories <- list.dirs(output_folder, full.names = FALSE, recursive = FALSE)
@@ -446,7 +485,7 @@ run_mascot_output_modprocesser_function <- function() {
         
         
         # Progress bar
-        setTkProgressBar(program_progress_bar, value = 0.05, title = NULL, label = "5 %")
+        setTkProgressBar(program_progress_bar, value = 0.05, title = "Data split...", label = "5 %")
         
         
         ########## DATA SPLIT: MODIFIED vs NON-MODIFIED
@@ -459,7 +498,7 @@ run_mascot_output_modprocesser_function <- function() {
         
         
         # Progress bar
-        setTkProgressBar(program_progress_bar, value = 0.10, title = NULL, label = "10 %")
+        setTkProgressBar(program_progress_bar, value = 0.10, title = "Determining homology and identity...", label = "10 %")
         
         
         ########## IDENTITY
@@ -498,7 +537,7 @@ run_mascot_output_modprocesser_function <- function() {
         modified_peptides_df <- modified_peptides_df[modified_peptides_df$identity != "discard", ]
         
         # Progress bar
-        setTkProgressBar(program_progress_bar, value = 0.20, title = NULL, label = "20 %")
+        setTkProgressBar(program_progress_bar, value = 0.20, title = "Discarding non-modified duplicates...", label = "20 %")
         
         
         ########## REMOVE DUPLICATES (NON-MOD)
@@ -515,7 +554,7 @@ run_mascot_output_modprocesser_function <- function() {
         non_modified_peptides_df <- non_modified_peptides_df[order(non_modified_peptides_df$pep_score, non_modified_peptides_df$identity, non_modified_peptides_df$prot_acc, decreasing = TRUE), ]
         
         # Progress bar
-        setTkProgressBar(program_progress_bar, value = 0.40, title = NULL, label = "40 %")
+        setTkProgressBar(program_progress_bar, value = 0.40, title = "Discarding modified duplicates...", label = "40 %")
         
         
         ########## REMOVE DUPLICATES (MOD)
@@ -532,7 +571,7 @@ run_mascot_output_modprocesser_function <- function() {
         modified_peptides_df <- modified_peptides_df[order(modified_peptides_df$pep_score, modified_peptides_df$identity, modified_peptides_df$prot_acc, decreasing = TRUE), ]
         
         # Progress bar
-        setTkProgressBar(program_progress_bar, value = 0.60, title = NULL, label = "60 %")
+        setTkProgressBar(program_progress_bar, value = 0.60, title = "Discarding modified sequence duplicates...", label = "60 %")
         
         
         ########## REMOVE SEQUENCE DUPLICATES (MOD)
@@ -548,7 +587,7 @@ run_mascot_output_modprocesser_function <- function() {
         modified_peptides_df_sequences <- modified_peptides_df_sequences[order(modified_peptides_df_sequences$pep_score, modified_peptides_df_sequences$identity, modified_peptides_df_sequences$prot_acc, decreasing = TRUE), ]
         
         # Progress bar
-        setTkProgressBar(program_progress_bar, value = 0.80, title = NULL, label = "80 %")
+        setTkProgressBar(program_progress_bar, value = 0.80, title = "Saving files...", label = "80 %")
         
         
         ########## SAVE FILES
@@ -583,14 +622,24 @@ run_mascot_output_modprocesser_function <- function() {
         }
         
         # Progress bar
-        setTkProgressBar(program_progress_bar, value = 1.00, title = NULL, label = "100 %")
+        setTkProgressBar(program_progress_bar, value = 1.00, title = "Done!", label = "100 %")
         close(program_progress_bar)
+        
+        
+        # Go to the working directory
+        setwd(output_folder)
         
         
         tkmessageBox(title = "Success!", message = "The process has successfully finished!", icon = "info")
     } else {
-        ########## NO INPUT FILE
-        tkmessageBox(title = "No input file selected!", message = "No input file has been selected!", icon = "warning")
+        if (input_file == "" || is.null(input_data)) {
+            ########## NO INPUT FILE
+            tkmessageBox(title = "No input file selected!", message = "No input file has been selected!", icon = "warning")
+        }
+        if (all_the_columns_are_present == FALSE) {
+            ########## MISSING DATA
+            tkmessageBox(title = "Missing data!", message = paste0("Some data is missing from the selected input file!\n\n\n", missing_columns_value), icon = "warning")
+        }
     }
 }
 
@@ -624,18 +673,9 @@ os_release = Sys.info()[2]
 os_version = Sys.info()[3]
 
 ### Get the screen resolution
-# Windows
-if (system_os == "Windows") {
-    # Windows 7
-    if (length(grep("7", os_release, fixed = TRUE)) > 0) {
-        # Get system info
-        screen_height <- system("wmic desktopmonitor get screenheight", intern = TRUE)
-        screen_width <- system("wmic desktopmonitor get screenwidth", intern = TRUE)
-        # Retrieve the values
-        screen_height <- as.numeric(screen_height[-c(1, length(screen_height))])
-        screen_width <- as.numeric(screen_width[-c(1, length(screen_width))])
-    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
-        # Windows 10
+try({
+    # Windows
+    if (system_os == "Windows") {
         # Get system info
         screen_info <- system("wmic path Win32_VideoController get VideoModeDescription", intern = TRUE)[2]
         # Get the resolution
@@ -643,46 +683,55 @@ if (system_os == "Windows") {
         # Retrieve the values
         screen_height <- as.numeric(screen_resolution[2])
         screen_width <- as.numeric(screen_resolution[1])
+    } else if (system_os == "Linux") {
+        # Get system info
+        screen_info <- system("xdpyinfo -display :0", intern = TRUE)
+        # Get the resolution
+        screen_resolution <- screen_info[which(screen_info == "screen #0:") + 1]
+        screen_resolution <- unlist(strsplit(screen_resolution, "dimensions: ")[1])
+        screen_resolution <- unlist(strsplit(screen_resolution, "pixels"))[2]
+        # Retrieve the wto dimensions...
+        screen_width <- as.numeric(unlist(strsplit(screen_resolution, "x"))[1])
+        screen_height <- as.numeric(unlist(strsplit(screen_resolution, "x"))[2])
     }
-} else if (system_os == "Linux") {
-    # Get system info
-    screen_info <- system("xdpyinfo -display :0", intern = TRUE)
-    # Get the resolution
-    screen_resolution <- screen_info[which(screen_info == "screen #0:") + 1]
-    screen_resolution <- unlist(strsplit(screen_resolution, "dimensions: ")[1])
-    screen_resolution <- unlist(strsplit(screen_resolution, "pixels"))[2]
-    # Retrieve the wto dimensions...
-    screen_width <- as.numeric(unlist(strsplit(screen_resolution, "x"))[1])
-    screen_height <- as.numeric(unlist(strsplit(screen_resolution, "x"))[2])
-}
+}, silent = TRUE)
+
 
 
 ### FONTS
 # Default sizes (determined on a 1680x1050 screen) (in order to make them adjust to the size screen, the screen resolution should be retrieved)
-title_font_size <- 24
-other_font_size <- 11
+title_font_size <- 18
+other_font_size <- 9
+
+# Adjust fonts size according to the pixel number
+try({
+    # Windows
+    if (system_os == "Windows") {
+        # Determine the font size according to the resolution
+        total_number_of_pixels <- screen_width * screen_height
+        # Determine the scaling factor (according to a complex formula)
+        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    } else if (system_os == "Linux") {
+        # Linux
+        # Determine the font size according to the resolution
+        total_number_of_pixels <- screen_width * screen_height
+        # Determine the scaling factor (according to a complex formula)
+        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
+        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
+        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
+        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    } else if (system_os == "Darwin") {
+        # macOS
+        print("Using default font sizes...")
+    }
+}, silent = TRUE)
+
+# Define the fonts
 # Windows
 if (system_os == "Windows") {
-    # Windows 7
-    if (length(grep("7", os_release, fixed = TRUE)) > 0) {
-        # Determine the font size according to the resolution
-        total_number_of_pixels <- screen_width * screen_height
-        # Determine the scaling factor (according to a complex formula)
-        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
-        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
-        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
-        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
-    } else if (length(grep("10", os_release, fixed = TRUE)) > 0) {
-        # Windows 10
-        # Determine the font size according to the resolution
-        total_number_of_pixels <- screen_width * screen_height
-        # Determine the scaling factor (according to a complex formula)
-        scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
-        scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
-        title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
-        other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
-    }
-    # Define the fonts
     garamond_title_bold = tkfont.create(family = "Garamond", size = title_font_size, weight = "bold")
     garamond_other_normal = tkfont.create(family = "Garamond", size = other_font_size, weight = "normal")
     arial_title_bold = tkfont.create(family = "Arial", size = title_font_size, weight = "bold")
@@ -696,20 +745,13 @@ if (system_os == "Windows") {
     entry_font = trebuchet_other_normal
     button_font = trebuchet_other_bold
 } else if (system_os == "Linux") {
-    # Linux
-    # Determine the font size according to the resolution
-    total_number_of_pixels <- screen_width * screen_height
-    # Determine the scaling factor (according to a complex formula)
-    scaling_factor_title_font <- as.numeric((0.03611 * total_number_of_pixels) + 9803.1254)
-    scaling_factor_other_font <- as.numeric((0.07757 * total_number_of_pixels) + 23529.8386)
-    title_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_title_font))
-    other_font_size <- as.integer(round(total_number_of_pixels / scaling_factor_other_font))
+    #Linux
     # Ubuntu
     if (length(grep("Ubuntu", os_version, ignore.case = TRUE)) > 0) {
         # Define the fonts
-        ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = title_font_size, weight = "bold")
-        ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "normal")
-        ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = other_font_size, weight = "bold")
+        ubuntu_title_bold = tkfont.create(family = "Ubuntu", size = (title_font_size + 2), weight = "bold")
+        ubuntu_other_normal = tkfont.create(family = "Ubuntu", size = (other_font_size + 1), weight = "normal")
+        ubuntu_other_bold = tkfont.create(family = "Ubuntu", size = (other_font_size + 1), weight = "bold")
         liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
         liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
         liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
@@ -717,13 +759,12 @@ if (system_os == "Windows") {
         bitstream_charter_other_normal = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "normal")
         bitstream_charter_other_bold = tkfont.create(family = "Bitstream Charter", size = other_font_size, weight = "bold")
         # Use them in the GUI
-        title_font = bitstream_charter_title_bold
-        label_font = bitstream_charter_other_normal
-        entry_font = bitstream_charter_other_normal
-        button_font = bitstream_charter_other_bold
+        title_font = ubuntu_title_bold
+        label_font = ubuntu_other_normal
+        entry_font = ubuntu_other_normal
+        button_font = ubuntu_other_bold
     } else if (length(grep("Fedora", os_version, ignore.case = TRUE)) > 0) {
         # Fedora
-        # Define the fonts
         cantarell_title_bold = tkfont.create(family = "Cantarell", size = title_font_size, weight = "bold")
         cantarell_other_normal = tkfont.create(family = "Cantarell", size = other_font_size, weight = "normal")
         cantarell_other_bold = tkfont.create(family = "Cantarell", size = other_font_size, weight = "bold")
@@ -737,7 +778,6 @@ if (system_os == "Windows") {
         button_font = cantarell_other_bold
     } else {
         # Other linux distros
-        # Define the fonts
         liberation_title_bold = tkfont.create(family = "Liberation Sans", size = title_font_size, weight = "bold")
         liberation_other_normal = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "normal")
         liberation_other_bold = tkfont.create(family = "Liberation Sans", size = other_font_size, weight = "bold")
@@ -749,7 +789,6 @@ if (system_os == "Windows") {
     }
 } else if (system_os == "Darwin") {
     # macOS
-    # Define the fonts
     helvetica_title_bold = tkfont.create(family = "Helvetica", size = title_font_size, weight = "bold")
     helvetica_other_normal = tkfont.create(family = "Helvetica", size = other_font_size, weight = "normal")
     helvetica_other_bold = tkfont.create(family = "Helvetica", size = other_font_size, weight = "bold")
