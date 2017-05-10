@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.05.09 ##################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.05.10 ##################
 
 
 # Clear the console
@@ -323,14 +323,8 @@ matrix_add_class_and_sample <- function(signal_matrix, peaks = list(), class_lis
         class_vector <- path_vector
         for (p in 1:length(class_vector)) {
             for (w in 1:length(class_list)) {
-                if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                    if (length(grep(paste0("/", class_list[w], "/"), class_vector[p], ignore.case = TRUE)) > 0) {
-                        class_vector[p] <- class_list[w]
-                    }
-                } else if (Sys.info()[1] == "Windows") {
-                    if (length(grep(paste0("\\\\", class_list[w], "\\\\"), class_vector[p], ignore.case = TRUE)) > 0) {
-                        class_vector[p] <- class_list[w]
-                    }
+                if (length(grep(paste0("/", class_list[w], "/"), class_vector[p], ignore.case = TRUE)) > 0) {
+                    class_vector[p] <- class_list[w]
                 }
             }
         }
@@ -351,14 +345,8 @@ matrix_add_class_and_sample <- function(signal_matrix, peaks = list(), class_lis
         class_vector <- path_vector
         for (p in 1:length(class_vector)) {
             for (w in 1:length(class_list)) {
-                if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                    if (length(grep(paste0("/", class_list[w], "/"), class_vector[p], ignore.case = TRUE)) > 0) {
-                        class_vector[p] <- class_list[w]
-                    }
-                } else if (Sys.info()[1] == "Windows") {
-                    if (length(grep(paste0("\\\\", class_list[w], "\\\\"), class_vector[p], ignore.case = TRUE)) > 0) {
-                        class_vector[p] <- class_list[w]
-                    }
+                if (length(grep(paste0("/", class_list[w], "/"), class_vector[p], ignore.case = TRUE)) > 0) {
+                    class_vector[p] <- class_list[w]
                 }
             }
         }
@@ -1639,30 +1627,15 @@ replace_sample_name <- function(spectra, spectra_format = "imzml", allow_paralle
     name_replacing_subfunction <- function(spectra, spectra_format) {
         ### imzML
         if (spectra_format == "imzml" || spectra_format == "imzML") {
-            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                # Split the filepath at /
-                sample_name <- unlist(strsplit(spectra@metaData$file[1],"/"))
-                # The sample name is the last part of the path
-                sample_name <- sample_name[length(sample_name)]
-                # Detach the file extension
-                sample_name <- unlist(strsplit(sample_name, ".imzML"))
-                sample_name <- sample_name[1]
-                # Put the name back into the spectra
-                spectra@metaData$file <- sample_name
-            } else if (Sys.info()[1] == "Windows") {
-                # Split the filepath at \
-                sample_name <- unlist(strsplit(spectra@metaData$file[1],"\\\\"))
-                # The sample name is the last part of the path
-                sample_name <- sample_name[length(sample_name)]
-                # Detach the file extension
-                sample_name <- unlist(strsplit(sample_name, ".imzML"))
-                sample_name <- sample_name[1]
-                # Put the name back into the spectra
-                spectra@metaData$file <- sample_name
-            } else {
-                # Keep the name unaltered
-                sample_name <- spectra@metaData$file[1]
-            }
+            # Split the filepath at /
+            sample_name <- unlist(strsplit(spectra@metaData$file[1],"/"))
+            # The sample name is the last part of the path
+            sample_name <- sample_name[length(sample_name)]
+            # Detach the file extension
+            sample_name <- unlist(strsplit(sample_name, ".imzML"))
+            sample_name <- sample_name[1]
+            # Put the name back into the spectra
+            spectra@metaData$file <- sample_name
         } else if (spectra_format == "brukerflex" || spectra_format == "xmass") {
         ### Xmass
             sample_name <- spectra@metaData$sampleName[1]
@@ -1670,56 +1643,26 @@ replace_sample_name <- function(spectra, spectra_format = "imzml", allow_paralle
             spectra@metaData$file <- sample_name
         } else if (spectra_format == "txt" || spectra_format == "TXT" || spectra_format == "text") {
             ### TXT
-            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                # Split the filepath at /
-                sample_name <- unlist(strsplit(spectra@metaData$file[1],"/"))
-                # The sample name is the last part of the path
-                sample_name <- sample_name[length(sample_name)]
-                # Detach the file extension
-                sample_name <- unlist(strsplit(sample_name, ".txt"))
-                sample_name <- sample_name[1]
-                # Put the name back into the spectra
-                spectra@metaData$file <- sample_name
-            } else if (Sys.info()[1] == "Windows") {
-                # Split the filepath at \
-                sample_name <- unlist(strsplit(spectra@metaData$file[1],"\\\\"))
-                # The sample name is the last part of the path
-                sample_name <- sample_name[length(sample_name)]
-                # Detach the file extension
-                sample_name <- unlist(strsplit(sample_name, ".txt"))
-                sample_name <- sample_name[1]
-                # Put the name back into the spectra
-                spectra@metaData$file <- sample_name
-            } else {
-                # Keep the name unaltered
-                sample_name <- spectra@metaData$file[1]
-            }
-        }  else if (spectra_format == "csv" || spectra_format == "CSV") {
+            # Split the filepath at /
+            sample_name <- unlist(strsplit(spectra@metaData$file[1],"/"))
+            # The sample name is the last part of the path
+            sample_name <- sample_name[length(sample_name)]
+            # Detach the file extension
+            sample_name <- unlist(strsplit(sample_name, ".txt"))
+            sample_name <- sample_name[1]
+            # Put the name back into the spectra
+            spectra@metaData$file <- sample_name
+        } else if (spectra_format == "csv" || spectra_format == "CSV") {
             ### TXT
-            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                # Split the filepath at /
-                sample_name <- unlist(strsplit(spectra@metaData$file[1],"/"))
-                # The sample name is the last part of the path
-                sample_name <- sample_name[length(sample_name)]
-                # Detach the file extension
-                sample_name <- unlist(strsplit(sample_name, ".csv"))
-                sample_name <- sample_name[1]
-                # Put the name back into the spectra
-                spectra@metaData$file <- sample_name
-            } else if (Sys.info()[1] == "Windows") {
-                # Split the filepath at \
-                sample_name <- unlist(strsplit(spectra@metaData$file[1],"\\\\"))
-                # The sample name is the last part of the path
-                sample_name <- sample_name[length(sample_name)]
-                # Detach the file extension
-                sample_name <- unlist(strsplit(sample_name, ".csv"))
-                sample_name <- sample_name[1]
-                # Put the name back into the spectra
-                spectra@metaData$file <- sample_name
-            } else {
-                # Keep the name unaltered
-                sample_name <- spectra@metaData$file[1]
-            }
+            # Split the filepath at /
+            sample_name <- unlist(strsplit(spectra@metaData$file[1],"/"))
+            # The sample name is the last part of the path
+            sample_name <- sample_name[length(sample_name)]
+            # Detach the file extension
+            sample_name <- unlist(strsplit(sample_name, ".csv"))
+            sample_name <- sample_name[1]
+            # Put the name back into the spectra
+            spectra@metaData$file <- sample_name
         }
         ### Return
         return(spectra)
@@ -1902,29 +1845,15 @@ replace_class_name <- function(spectra, class_list = NULL, class_in_file_path = 
                 if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
                     for (i in 1:length(spectra)) {
                         # If there is a match between the file name and the class (since the class is a subfolder, it is better to match the /class/ for a stronger match)
-                        if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                            if (length(grep(paste0("/", class_list[w], "/"), spectra[[i]]@metaData$file[1], fixed = TRUE)) > 0) {
-                                # Replace the file name with the class name
-                                spectra[[i]]@metaData$file <- class_list[w]
-                            }
-                        } else if (Sys.info()[1] == "Windows") {
-                            if (length(grep(paste0("\\\\", class_list[w], "\\\\"), spectra[[i]]@metaData$file[1], fixed = TRUE)) > 0) {
-                                # Replace the file name with the class name
-                                spectra[[i]]@metaData$file <- class_list[w]
-                            }
+                        if (length(grep(paste0("/", class_list[w], "/"), spectra[[i]]@metaData$file[1], fixed = TRUE)) > 0) {
+                            # Replace the file name with the class name
+                            spectra[[i]]@metaData$file <- class_list[w]
                         }
                     }
                 } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
-                    if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                        if (length(grep(paste0("/", class_list[w], "/"), spectra@metaData$file[1], fixed = TRUE)) > 0) {
-                            # Replace the file name with the class name
-                            spectra@metaData$file <- class_list[w]
-                        }
-                    } else if (Sys.info()[1] == "Windows") {
-                        if (length(grep(paste0("\\\\", class_list[w], "\\\\"), spectra@metaData$file[1], fixed = TRUE)) > 0) {
-                            # Replace the file name with the class name
-                            spectra@metaData$file <- class_list[w]
-                        }
+                    if (length(grep(paste0("/", class_list[w], "/"), spectra@metaData$file[1], fixed = TRUE)) > 0) {
+                        # Replace the file name with the class name
+                        spectra@metaData$file <- class_list[w]
                     }
                 }
             }
@@ -7600,7 +7529,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.10.1"
+R_script_version <- "2017.05.10.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -9648,6 +9577,7 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
