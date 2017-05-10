@@ -570,7 +570,7 @@ matrix_add_thy <- function(signal_matrix, peaks, spectra_format = "imzml") {
 # If the method is selected to be "element-wise", each element of the peaklist is evaluated, and the intensity threshold is calculated over the peaks of only that element. Otherwise, if "whole" is selected, the threshold is calculated on all the peaks in the dataset.
 remove_low_intensity_peaks <- function(peaks, low_intensity_peak_removal_threshold_percent = 0.1, low_intensity_peak_removal_threshold_method = "element-wise", allow_parallelization = FALSE) {
     ### Load the required libraries
-    install_and_load_required_packages(c("parallel", "MALDIquant"))
+    install_and_load_required_packages(c("parallel", "MALDIquant", "XML"))
     ### Fix the percentage value
     if (low_intensity_peak_removal_threshold_percent < 0) {
         low_intensity_peak_removal_threshold_percent <- 0
@@ -810,7 +810,7 @@ read_spectra_files <- function(folder, spectra_format = "imzml", full_path = TRU
 ######################### REPLACE THE SNR WITH THE STDEV IN THE PEAKS
 # This function computes the standard deviation of each peak of an average spectrum peaklist, by replacing the existing SNR slot with the SD or CV: all the peaks (average and dataset) are aligned and each peak of the average peaklist is searched across the dataset thanks to the intensity matrix.
 replace_SNR_in_avg_peaklist <- function (spectra, peak_picking_algorithm = "SuperSmoother", SNR = 5, tof_mode = "linear", tolerance_ppm = 2000, spectra_format = "imzml", replace_snr_with = "std") {
-    install_and_load_required_packages(c("MALDIquant", "stats"))
+    install_and_load_required_packages(c("MALDIquant", "XML", "stats"))
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     # Check if it is not a single spectrum
@@ -943,7 +943,7 @@ outliers_removal <- function (v, replace_with = "") {
 # It returns a NULL value if the peak statistics cannot be performed.
 peak_statistics <- function(spectra, peaks = NULL, SNR = 3, peak_picking_algorithm = "SuperSmoother", class_list = NULL, class_in_file_path = TRUE, tof_mode = "linear", spectra_format = "imzml", exclude_spectra_without_peak = FALSE, alignment_iterations = 5, peak_filtering_frequency_threshold_percent = 25, remove_outliers = TRUE, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element_wise") {
     ########## Load the required libraries
-    install_and_load_required_packages(c("MALDIquant", "stats"))
+    install_and_load_required_packages(c("MALDIquant", "XML", "stats"))
     ########## Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     ########## Define the tolerance in PPM
@@ -1520,7 +1520,7 @@ replace_backslash <- function(spectra, allow_parallelization = FALSE) {
     ### Load required packages
     install_and_load_required_packages("parallel")
     ##### Function for lapply
-    name_replacing_subfunction <- function(spectra) {
+    backslash_replacing_subfunction <- function(spectra) {
         if (Sys.info()[1] == "Windows") {
             # Replace the backslash with the forward slash
             spectra@metaData$file <- gsub("([\\])", "/", spectra@metaData$file[1])
@@ -1536,7 +1536,7 @@ replace_backslash <- function(spectra, allow_parallelization = FALSE) {
             cpu_thread_number <- detectCores(logical = TRUE)
             if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
                 cpu_thread_number <- cpu_thread_number / 2
-                spectra <- mclapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra), mc.cores = cpu_thread_number)
+                spectra <- mclapply(spectra, FUN = function(spectra) backslash_replacing_subfunction(spectra), mc.cores = cpu_thread_number)
             } else if (Sys.info()[1] == "Windows") {
                 cpu_thread_number <- cpu_thread_number - 1
                 # Make the CPU cluster for parallelisation
@@ -1546,16 +1546,16 @@ replace_backslash <- function(spectra, allow_parallelization = FALSE) {
                 # Pass the variables to the cluster for running the function
                 clusterExport(cl = cl, varlist = c("spectra", "spectra_format"), envir = environment())
                 # Apply the multicore function
-                spectra <- parLapply(cl, spectra, fun = function(spectra) name_replacing_subfunction(spectra))
+                spectra <- parLapply(cl, spectra, fun = function(spectra) backslash_replacing_subfunction(spectra))
                 stopCluster(cl)
             } else {
-                spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra))
+                spectra <- lapply(spectra, FUN = function(spectra) backslash_replacing_subfunction(spectra))
             }
         } else {
-            spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra))
+            spectra <- lapply(spectra, FUN = function(spectra) backslash_replacing_subfunction(spectra))
         }
     } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
-        spectra <- name_replacing_subfunction(spectra)
+        spectra <- backslash_replacing_subfunction(spectra)
     }
     ### Return
     return(spectra)
@@ -1572,7 +1572,7 @@ replace_backslash <- function(spectra, allow_parallelization = FALSE) {
 
 
 ################################################################# IMPORT SPECTRA
-import_spectra <- function(filepath, spectra_format = "imzml", mass_range = NULL, allow_parallelization = FALSE) {
+import_spectra <- function(filepath, spectra_format = "imzml", mass_range = NULL, allow_parallelization = FALSE, spectral_names = "name", replace_sample_name_field = TRUE) {
     ### Load the packages
     install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign", "XML", "parallel"))
     ### imzML
@@ -1615,7 +1615,7 @@ import_spectra <- function(filepath, spectra_format = "imzml", mass_range = NULL
     ### Replace the backslash on Windows
     spectra <- replace_backslash(spectra, allow_parallelization = allow_parallelization)
     ### Identify the spectra by setting the names to the spectral list
-    spectra <- replace_sample_name_list(spectra, spectra_format = spectra_format, type = "number")
+    spectra <- replace_sample_name_list(spectra, spectra_format = spectra_format, type = spectral_names, replace_sample_name_field = replace_sample_name_field)
     ### Return
     return(spectra)
 }
@@ -1790,31 +1790,53 @@ group_spectra_class <- function(spectra, class_list, grouping_method = "mean", s
 
 
 ################################################# SAMPLE NAME REPLACING
-# This function replaces the sample name field in the spectrum (if it is NULL) with the actual sample name (keeping only the last part of the file path and discarding the folder tree) and puts the sample name as the name of the list element, so that names(spectra) is not NULL and a better identification of the spectra is obtained (through a unique name)
+# This function puts the sample name or a unique ID number (corresponding to the list entry number) as the name of the list element, so that names(spectra) is not NULL and a better identification of the spectra is obtained (through a unique name). Moreover, the function can replace the sample name field in the spectrum with the actual sample name (keeping only the last part of the file path and discarding the folder tree) (with the replace_sample_name function).
 # The input can be both spectra or peaks (MALDIquant)
-replace_sample_name_list <- function(spectra, spectra_format = "imzml", type = "number") {
+replace_sample_name_list <- function(spectra, spectra_format = "imzml", type = "number", replace_sample_name_field = TRUE) {
     ##### Replace the list names only if NULL
     if (is.null(names(spectra))) {
         ########## SAMPLE NAME
         if (type == "name") {
-            ##### Replace the metaData$file with the name with the replace_sample_name() function
-            spectra <- replace_sample_name(spectra, spectra_format = spectra_format, allow_parallelization = FALSE)
-            ##### More spectra
-            if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
-                # Generate a vector with all the spectra names
-                spectra_names_vector <- character()
-                for (s in 1:length(spectra)) {
-                    spectra_names_vector <- append(spectra_names_vector, spectra[[s]]@metaData$file)
+            ##### Replace also the metaData$file with the sample name
+            if (replace_sample_name_field == TRUE) {
+                spectra <- replace_sample_name(spectra, spectra_format = spectra_format, allow_parallelization = FALSE)
+                ##### More spectra
+                if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+                    # Generate a vector with all the spectra names
+                    spectra_names_vector <- character()
+                    for (s in 1:length(spectra)) {
+                        spectra_names_vector <- append(spectra_names_vector, spectra[[s]]@metaData$file)
+                    }
+                    # Extract the unique values
+                    if (length(spectra_names_vector) != length(unique(spectra_names_vector))) {
+                        spectra_names_vector <- make.names(spectra_names_vector, unique = TRUE)
+                    }
+                    # Fix the spectral list names
+                    names(spectra) <- spectra_names_vector
+                } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
+                    ##### One spectrum
+                    spectra <- spectra
                 }
-                # Extract the unique values
-                if (length(spectra_names_vector) != length(unique(spectra_names_vector))) {
-                    spectra_names_vector <- make.names(spectra_names_vector, unique = TRUE)
+            } else {
+                # Create a temporary spectral list for name replacing
+                spectra_temp <- replace_sample_name(spectra, spectra_format = spectra_format, allow_parallelization = FALSE)
+                ##### More spectra
+                if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+                    # Generate a vector with all the spectra names
+                    spectra_names_vector <- character()
+                    for (s in 1:length(spectra)) {
+                        spectra_names_vector <- append(spectra_names_vector, spectra_temp[[s]]@metaData$file)
+                    }
+                    # Extract the unique values
+                    if (length(spectra_names_vector) != length(unique(spectra_names_vector))) {
+                        spectra_names_vector <- make.names(spectra_names_vector, unique = TRUE)
+                    }
+                    # Fix the spectral list names
+                    names(spectra) <- spectra_names_vector
+                } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
+                    ##### One spectrum
+                    spectra <- spectra
                 }
-                # Fix the spectral list names
-                names(spectra) <- spectra_names_vector
-            } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
-                ##### One spectrum
-                spectra <- spectra
             }
         } else if (type == "number") {
             ########## NUMBER
@@ -1969,7 +1991,7 @@ replace_class_name <- function(spectra, class_list = NULL, class_in_file_path = 
 # If an algorithm is set to NULL, that preprocessing step will not be performed.
 preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_algorithm_parameter = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "auto"), allow_parallelization = FALSE) {
     ##### Load the required libraries
-    install_and_load_required_packages(c("MALDIquant", "parallel"))
+    install_and_load_required_packages(c("MALDIquant", "XML", "parallel"))
     ##### Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     ##### Extract the parameters from the input list
@@ -2252,7 +2274,7 @@ align_spectra <- function(spectra, spectral_alignment_algorithm = "cubic", spect
 # This function takes a list of spectra (MALDIquant) as input and returns the average spectrum of the provided dataset with bars onto the peaks, after calculating the standard deviation.
 average_spectrum_bars <- function(spectra, SNR = 5, peak_picking_algorithm = "SuperSmoother", tolerance_ppm = 2000, mass_range_plot = c(4000,15000), graph_title = "Spectrum", average_spectrum_color = "black", peak_points = "yes", points_color = "red", bar_width = 40, bar_color = "blue") {
     # Load the required libraries
-    install_and_load_required_packages("MALDIquant")
+    install_and_load_required_packages(c("MALDIquant", "XML"))
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     # Generate the average spectrum
@@ -2326,7 +2348,7 @@ average_spectrum_bars <- function(spectra, SNR = 5, peak_picking_algorithm = "Su
 # This function returns a peak list containing only the most intense peaks per spectrum. If the input is a list of spectra, the function computes the peak picking and keeps only the most intense ones, if it's a list of peaklists, it applies the filtering function directly on the peaks.
 most_intense_signals <- function(spectra, signals_to_take = 20, tof_mode = "linear", peak_picking_algorithm = "SuperSmoother", allow_parallelization = FALSE, deisotope_peaklist = FALSE) {
     # Load the required libraries
-    install_and_load_required_packages(c("parallel", "MALDIquant"))
+    install_and_load_required_packages(c("parallel", "MALDIquant", "XML"))
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     ####################################################### PICKING FUNCTION
@@ -2398,7 +2420,7 @@ most_intense_signals <- function(spectra, signals_to_take = 20, tof_mode = "line
 # This function averages the spectra contained in the same folder (more suitable for brukerflex format)
 average_replicates_by_folder <- function(spectra, folder, spectra_format = "brukerflex", averaging_method = "mean") {
     # Load the required libraries
-    install_and_load_required_packages("MALDIquant")
+    install_and_load_required_packages(c("MALDIquant", "XML"))
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     # Count the number of spectra
@@ -2490,7 +2512,7 @@ average_replicates_by_folder <- function(spectra, folder, spectra_format = "bruk
 # This function takes a list of spectra (MALDIquant) and computes the peak picking.
 peak_picking <- function(spectra, peak_picking_algorithm = "SuperSmoother", tof_mode = "linear", SNR = 3, allow_parallelization = FALSE, deisotope_peaklist = FALSE) {
     ########## Load the required libraries
-    install_and_load_required_packages(c("MALDIquant", "parallel"))
+    install_and_load_required_packages(c("MALDIquant", "parallel", "XML"))
     ##### TOF-MODE
     if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
         half_window_size <- 20
@@ -2547,7 +2569,7 @@ peak_picking <- function(spectra, peak_picking_algorithm = "SuperSmoother", tof_
 # This function takes a list of peaks (MALDIquant) and returns the same peak list without isotopic clusters, only monoisotopic peaks.
 deisotope_peaks <- function(peaks, pattern_model_correlation = 0.95, isotopic_tolerance = 10^(-4), isotope_pattern_distance = 1.00235, isotopic_pattern_size = 3L:5L, allow_parallelization = FALSE) {
     ##### Load the required packages
-    install_and_load_required_packages(c("MALDIquant", "parallel"))
+    install_and_load_required_packages(c("MALDIquant", "parallel", "XML"))
     ##### Multiple peaks
     if (isMassPeaksList(peaks)) {
         ##### Multiple cores
@@ -2600,7 +2622,7 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
     ########## Align only if there are many peaklists
     if (isMassPeaksList(peaks)) {
         ##### Load the required libraries
-        install_and_load_required_packages(c("MALDIquant", "parallel"))
+        install_and_load_required_packages(c("MALDIquant", "parallel", "XML"))
         ##### Rename the trim function
         trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
         ###### Peak alignment
@@ -3598,7 +3620,7 @@ single_model_classification_of_spectra <- function(spectra, model_x, model_name 
 # It outputs NULL values if the classification cannot be performed due to incompatibilities between the model features and the spectral features.
 spectral_classification <- function(spectra_path, filepath_R, model_list_object = "model_list", classification_mode = c("pixel", "profile"), peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, preprocessing_parameters = list(mass_range = c(4000,15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_algorithm_parameter = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL), tof_mode = "linear", allow_parallelization = FALSE, decision_method_ensemble = "majority", vote_weights_ensemble = "equal", pixel_grouping = c("single", "moving window average", "graph", "hca"), moving_window_size = 5, number_of_hca_nodes = 10, number_of_spectra_partitions_graph = 1, partitioning_method_graph = "space", correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.95, pvalue_threshold_for_adjacency_matrix = 0.05, max_GA_generations = 10, iterations_with_no_change_GA = 5, seed = 12345, classification_mode_graph = c("average spectra", "single spectra clique"), features_to_use_for_graph = c("all", "model"), plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name"), progress_bar = NULL) {
     ### Install and load the required packages
-    install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign","stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda", "caret", "nnet"))
+    install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign", "XML", "stats", "parallel", "kernlab", "MASS", "klaR", "pls", "randomForest", "lda", "caret", "nnet"))
     ### Defaults
     if (pixel_grouping == "") {
         pixel_grouping <- "single"
@@ -5054,7 +5076,7 @@ model_ensemble_training_and_tuning <- function(peaklist_feature_selection, non_f
 # Each sample gets compared with all the entries in the database, simultaneously.
 spectral_typer_score_hierarchical_distance <- function(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = NULL, peaks_filtering_percentage_threshold = 5, low_intensity_percentage_threshold = 0, low_intensity_threshold_method = "element-wise", tof_mode = "linear", spectra_path_output = TRUE, score_only = TRUE, spectra_format = "brukerflex", normalize_distances = TRUE, normalization_method = "sum", hierarchical_distance_method = "euclidean", allow_parallelization = FALSE) {
     # Load the required libraries
-    install_and_load_required_packages(c("MALDIquant", "stats", "ggplot2", "ggdendro"))
+    install_and_load_required_packages(c("MALDIquant", "XML", "stats", "ggplot2", "ggdendro"))
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     ### Tolerance
@@ -5087,28 +5109,24 @@ spectral_typer_score_hierarchical_distance <- function(spectra_database, spectra
     peaks_test <- replace_sample_name(peaks_test, spectra_format = spectra_format)
     peaks_database <- replace_class_name(peaks_database,  class_list = class_list_library, spectra_format = spectra_format)
     ####### Create the sample vector
-    sample_vector <- character()
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    if (is.null(names(peaks_test))) {
+        sample_vector <- character()
         # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
         for (s in 1:number_of_samples) {
             sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
         }
-    } else if (spectra_format == "imzml" | spectra_format == "imzML") {
-        for (s in 1:number_of_samples) {
-            sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
-        }
+    } else {
+        sample_vector <- names(peaks_test)
     }
     ####### Create the library vector
-    database_vector <- character()
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    if (is.null(names(peaks_database))) {
+        database_vector <- character()
         # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
         for (s in 1:database_size) {
             database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
         }
-    } else if (spectra_format == "imzml" | spectra_format == "imzML") {
-        for (s in 1:database_size) {
-            database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
-        }
+    } else {
+        database_vector <- names(peaks_database)
     }
     # Generate the path vector
     spectra_path_vector <- character()
@@ -5203,7 +5221,7 @@ spectral_typer_score_hierarchical_distance <- function(spectra_database, spectra
 # Each sample gets compared with each entry in the database, separately.
 # Parallel implemented.
 spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = NULL, peaks_filtering_percentage_threshold = 5, low_intensity_percentage_threshold = 0, low_intensity_threshold_method = "element-wise", tof_mode = "linear", correlation_method = "spearman", intensity_correction_coefficient = 1, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = FALSE, allow_parallelization = FALSE) {
-    install_and_load_required_packages(c("MALDIquant", "corrplot", "weights", "stats", "parallel"))
+    install_and_load_required_packages(c("MALDIquant", "XML", "corrplot", "weights", "stats", "parallel"))
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     # Rename the trim function to avoid conflicts
@@ -5232,28 +5250,24 @@ spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_te
     peaks_test <- replace_sample_name(peaks_test, spectra_format = spectra_format)
     peaks_database <- replace_class_name(peaks_database, class_list = class_list_library, class_in_file_path = TRUE, spectra_format = spectra_format)
     ####### Create the sample vector
-    sample_vector <- character()
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    if (is.null(names(peaks_test))) {
+        sample_vector <- character()
         # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
         for (s in 1:number_of_samples) {
             sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
         }
-    } else if (spectra_format == "imzml" | spectra_format == "imzML") {
-        for (s in 1:number_of_samples) {
-            sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
-        }
+    } else {
+        sample_vector <- names(peaks_test)
     }
     ####### Create the library vector
-    database_vector <- character()
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    if (is.null(names(peaks_database))) {
+        database_vector <- character()
         # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
         for (s in 1:database_size) {
             database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
         }
-    } else if (spectra_format == "imzml" | spectra_format == "imzML") {
-        for (s in 1:database_size) {
-            database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
-        }
+    } else {
+        database_vector <- names(peaks_database)
     }
     # Generate the path vector
     spectra_path_vector <- character()
@@ -5560,7 +5574,7 @@ return(output)
 # Parallel implemented.
 spectral_typer_score_signal_intensity <- function(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = NULL, database_spectral_variability_list = list(), test_spectral_variability_list = list(), signal_intensity_evaluation = c("intensity percentage", "standard deviation"), peaks_filtering_percentage_threshold = 5, low_intensity_percentage_threshold = 0, low_intensity_threshold_method = "element-wise", tof_mode = "linear", intensity_tolerance_percent_threshold = 50, spectra_format = "brukerflex", spectra_path_output = TRUE, score_only = TRUE, number_of_st_dev = 1, allow_parallelization = FALSE) {
     # Load the required libraries
-    install_and_load_required_packages("MALDIquant","parallel")
+    install_and_load_required_packages(c("MALDIquant","parallel", "XML"))
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     ### Tolerance
@@ -5584,28 +5598,24 @@ spectral_typer_score_signal_intensity <- function(spectra_database, spectra_test
     peaks_test <- replace_sample_name(peaks_test, spectra_format = spectra_format)
     peaks_database <- replace_class_name(peaks_database, class_list = class_list_library, class_in_file_path = TRUE, spectra_format = spectra_format)
     ####### Create the sample vector
-    sample_vector <- character()
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    if (is.null(names(peaks_test))) {
+        sample_vector <- character()
         # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
         for (s in 1:number_of_samples) {
             sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
         }
-    } else if (spectra_format == "imzml" | spectra_format == "imzML") {
-        for (s in 1:number_of_samples) {
-            sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
-        }
+    } else {
+        sample_vector <- names(peaks_test)
     }
     ####### Create the library vector
-    database_vector <- character()
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    if (is.null(names(peaks_database))) {
+        database_vector <- character()
         # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
         for (s in 1:database_size) {
             database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
         }
-    } else if (spectra_format == "imzml" | spectra_format == "imzML") {
-        for (s in 1:database_size) {
-            database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
-        }
+    } else {
+        database_vector <- names(peaks_database)
     }
     # Generate the path vector
     spectra_path_vector <- character()
@@ -5883,28 +5893,24 @@ spectral_typer_score_similarity_index <- function(spectra_database, spectra_test
     peaks_test <- replace_sample_name(peaks_test, spectra_format = spectra_format)
     peaks_database <- replace_class_name(peaks_database, class_list = class_list_library, class_in_file_path = TRUE, spectra_format = spectra_format)
     ####### Create the sample vector
-    sample_vector <- character()
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    if (is.null(names(peaks_test))) {
+        sample_vector <- character()
         # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
         for (s in 1:number_of_samples) {
             sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
         }
-    } else if (spectra_format == "imzml" | spectra_format == "imzML") {
-        for (s in 1:number_of_samples) {
-            sample_vector <- append(sample_vector, peaks_test[[s]]@metaData$file[1])
-        }
+    } else {
+        sample_vector <- names(peaks_test)
     }
     ####### Create the library vector
-    database_vector <- character()
-    if (spectra_format == "brukerflex" || spectra_format == "xmass") {
+    if (is.null(names(peaks_database))) {
+        database_vector <- character()
         # If a spectrum is the result of the averaging of several spectra, take only the first name in the file name (the file name is a vector with all the names of the original spectra)
         for (s in 1:database_size) {
             database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
         }
-    } else if (spectra_format == "imzml" | spectra_format == "imzML") {
-        for (s in 1:database_size) {
-            database_vector <- append(database_vector, peaks_database[[s]]@metaData$file[1])
-        }
+    } else {
+        database_vector <- names(peaks_database)
     }
     # Generate the path vector
     spectra_path_vector <- character()
@@ -6289,7 +6295,7 @@ generate_adjacency_matrix <- function(peaklist_matrix, correlation_method = "spe
 # This function is suited for aligning the spectral features (of an unknown dataset) with the model features.
 generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NULL, tof_mode = "linear", preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_algorithm_parameter = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL), peak_picking_algorithm = "SuperSmoother", peak_picking_SNR = 5, peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", allow_parallelization = FALSE, deisotope_peaklist = FALSE) {
     ### Install the required packages
-    install_and_load_required_packages("MALDIquant")
+    install_and_load_required_packages(c("MALDIquant", "XML"))
     # Rename the trim function
     trim_spectra <- get(x = "trim", pos = "package:MALDIquant")
     ### Define the tolerance
@@ -6444,7 +6450,7 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
 # If space is selected, the spectral list is rearranged along the widest dimension: for example, if X is the widest dimension, the spectra are rearranged as X1,Y1 X2,Y1 X3,Y1 and so on... If the spectral list does not contain spatial coordinates (it is not an imaging dataset), nothing is performedin terms of space.
 rearrange_spectral_dataset <- function(spectra, rearranging_method = c("space","random"), seed = NULL) {
     ##### Install and load the required packages
-    install_and_load_required_packages("MALDIquant")
+    install_and_load_required_packages(c("MALDIquant", "XML"))
     ########## Do everything only if it is a list of spectra
     if (isMassSpectrumList(spectra)) {
         #################### SPACE
@@ -6539,7 +6545,7 @@ rearrange_spectral_dataset <- function(spectra, rearranging_method = c("space","
 # The function takes a list of spectra and partitions it in a certain number of subsets (defined by the user) on spatial, random or hierarchical basis. It returns a list of sub-lists of spectra.
 partition_spectral_dataset <- function(spectra, partitioning_method = c("space","random", "hca"), number_of_partitions = 3, seed = NULL, tof_mode = "reflectron") {
     ##### Install and load the required packages
-    install_and_load_required_packages("MALDIquant")
+    install_and_load_required_packages(c("MALDIquant", "XML"))
     ########## Do everything only if it is a list of spectra
     if (isMassSpectrumList(spectra)) {
         #################### SPACE
@@ -6992,7 +6998,7 @@ extract_performance_matrix_from_model_list <- function(filepath_R, model_list_ob
 # The function takes an adjacency matrix as input, converts it into a graph (using the 'igraph' package) and runs the genetic algorithm on the chromosome population generated by the graph nodes. The aim of the genetic algorithm is to identify and isolate a set of highly correlated observations (clique) from the rest of the dataset (independent set) by performing vertex and triangle mutations (free low-grade vertices and bind high-grade vertices) and selecting (fitness function) the population with a minimal change compared to the original, in such a way that the maximum amount of information is preserved.
 genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Preferential", vertex_mutation = TRUE, triangle_mutation = TRUE, allow_parallelization = FALSE, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), vertex_independency_threshold = 200, iterations_with_no_change = 5, max_GA_generations = 10, seed = 12345) {
     ##### Install and load the required packages
-    install_and_load_required_packages(c("MALDIquant", "parallel", "doParallel", "foreach", "iterators", "igraph", "GA"))
+    install_and_load_required_packages(c("MALDIquant", "XML", "parallel", "doParallel", "foreach", "iterators", "igraph", "GA"))
     ### Generate the graph
     initial_graph <- graph_from_adjacency_matrix(input_adjacency_matrix)
     ### Generate a subgraph with only the high-degree vertices
@@ -7230,7 +7236,7 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
 # The function takes the result of the genetic algorithm optimization (the genetic model object) and the list of spectra used to generate the adjacency matrix for the function 'genetic_algorithm_graph', it extracts the final chromosome (generated after the optimization) and it mirrors it onto the list of spectra, so that the output is a list of spectra belonging to the clique and a list of spectra belonging to the independent set. In addition, a list of spectra for plotting purposes is returned.
 from_GA_to_MS <- function(final_chromosome_GA, spectra, spectra_format = "imzml") {
     ##### Install and load the required packages
-    install_and_load_required_packages(c("MALDIquant", "parallel", "doParallel", "igraph", "GA"))
+    install_and_load_required_packages(c("MALDIquant", "XML", "parallel", "doParallel", "igraph", "GA"))
     ########## Isolate the final chromosome (after mutations and fitness optimization)
     ## The spectra with identified with a 0 are the spectra outside the clique, while the spectra identified by a 1 belong to the clique (take only the first row if it is a matrix)
     ## Identify the spectra belonging to the clique and to the independent set
@@ -7304,7 +7310,7 @@ from_GA_to_MS <- function(final_chromosome_GA, spectra, spectra_format = "imzml"
 # It returns a NULL value if the segmentation is not possible due to incompatibilities between the features in the dataset and the ones provided by the model.
 graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = list(mass_range = c(800,3000), transformation_algorithm = NULL, smoothing_algorithm = NULL, smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_algorithm_parameter = 200, normalization_algorithm = "TIC", normalization_mass_range = NULL, process_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL), allow_parallelization = FALSE, peak_picking_algorithm = "SuperSmoother", deisotope_peaklist = FALSE, SNR = 5, tof_mode = "reflectron", peak_filtering_frequency_threshold_percent = 5, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", custom_feature_vector = NULL, correlation_method_for_adjacency_matrix = "pearson", correlation_threshold_for_adjacency_matrix = 0.90, pvalue_threshold_for_adjacency_matrix = 0.05, number_of_high_degree_vertices_for_subgraph = 0, vertices_not_in_induced_subgraph = c("independent", "reassigned"), max_GA_generations = 10, iterations_with_no_change = 5, plot_figures = TRUE, plot_graphs = TRUE, plot_legends = c("sample name", "legend", "plot name"), number_of_spectra_partitions = 1, partitioning_method = "space", seed = 12345, spectra_format = "imzml") {
     # Install and load the required packages
-    install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "parallel", "caret", "pls", "tcltk", "kernlab", "pROC", "e1071", "igraph", "GA"))
+    install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "XML", "parallel", "caret", "pls", "tcltk", "kernlab", "pROC", "e1071", "igraph", "GA"))
     ### Import the dataset (if filepath_imzml is not already a list of spectra)
     if (!isMassSpectrumList(filepath_imzml) && !isMassSpectrum(filepath_imzml)) {
         if (!is.null(preprocessing_parameters$mass_range)) {
@@ -7552,7 +7558,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.10.3"
+R_script_version <- "2017.05.10.5"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -8529,7 +8535,7 @@ import_spectra_function <- function() {
             # Get the database folder list for the database from the workspace
             database_folder_list <- get("database_folder_list", pos = temporary_environment)
         } else {
-            spectra_database <- import_spectra(filepath_database, spectra_format = spectra_format, mass_range = mass_range, allow_parallelization = allow_parallelization)
+            spectra_database <- import_spectra(filepath_database, spectra_format = spectra_format, mass_range = mass_range, allow_parallelization = allow_parallelization, spectral_names = "name", replace_sample_name_field = FALSE)
             # Read the folder list (database class list)
             database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
             # Write the path inside the list
@@ -8539,7 +8545,7 @@ import_spectra_function <- function() {
         }
         # Progress bar
         setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
-        spectra_test <- import_spectra(filepath_test, spectra_format = spectra_format, mass_range = mass_range, allow_parallelization = allow_parallelization)
+        spectra_test <- import_spectra(filepath_test, spectra_format = spectra_format, mass_range = mass_range, allow_parallelization = allow_parallelization, spectral_names = "name", replace_sample_name_field = FALSE)
         # Read the sample folders
         test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
         # Read the sample folders (with treatment subfolder)
@@ -8621,6 +8627,28 @@ import_spectra_function <- function() {
             number_of_samples <- length(spectra_test)
         } else if (isMassSpectrum(spectra_test)) {
             number_of_samples <- 1
+        }
+        # Database size
+        if (isMassSpectrumList(spectra_database)) {
+            database_size <- length(spectra_database)
+        } else if (isMassSpectrum(spectra_database)) {
+            database_size <- 1
+        }
+        ##### Alignment of the imported spectra
+        spectral_alignment_performed <- FALSE
+        try({
+            spectra_all <- append(spectra_database, spectra_test)
+            spectra_all <- align_spectra(spectra_all, spectral_alignment_algorithm = spectral_alignment_algorithm, spectral_alignment_reference = spectral_alignment_reference, tof_mode = tof_mode, deisotope_peaklist = FALSE)
+            spectra_database <- spectra_all[1 : database_size]
+            spectra_test <- spectra_all[(database_size+1) : length(spectra_all)]
+            spectral_alignment_performed <- TRUE
+        }, silent = TRUE)
+        ### Spectral alignment messagebox
+        if (spectral_alignment_performed == TRUE) {
+            print("The spectral alignment has been succesfully performed!")
+        } else {
+            print("The spectral alignment could not be performed!")
+            #tkmessageBox(title = "Spectral alignment not possible", message = "The spectral alignment could not be performed!", icon = "warning")
         }
         # Exit the function and put the variable into the R workspace
         .GlobalEnv$spectra_database <- spectra_database
@@ -9600,6 +9628,7 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
