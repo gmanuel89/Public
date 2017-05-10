@@ -624,10 +624,11 @@ remove_low_intensity_peaks <- function(peaks, low_intensity_peak_removal_thresho
                 if (allow_parallelization == TRUE) {
                     # Detect the number of cores
                     cpu_thread_number <- detectCores(logical = TRUE)
-                    cpu_thread_number <- cpu_thread_number / 2
                     if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                        cpu_thread_number <- cpu_thread_number / 2
                         peaks_filtered <- mclapply(peaks, FUN = function (peaks) intensity_filtering_subfunction_element(peaks, low_intensity_peak_removal_threshold_percent), mc.cores = cpu_thread_number)
                     } else if (Sys.info()[1] == "Windows") {
+                        cpu_thread_number <- cpu_thread_number - 1
                         # Make the CPU cluster for parallelisation
                         cl <- makeCluster(cpu_thread_number)
                         # Make the cluster use the custom functions and the package functions along with their parameters
@@ -704,10 +705,11 @@ remove_low_intensity_peaks <- function(peaks, low_intensity_peak_removal_thresho
                 if (allow_parallelization == TRUE) {
                     # Detect the number of cores
                     cpu_thread_number <- detectCores(logical = TRUE)
-                    cpu_thread_number <- cpu_thread_number / 2
                     if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                        cpu_thread_number <- cpu_thread_number / 2
                         peaks_filtered <- mclapply(peaks, FUN = function(peaks) intensity_filtering_subfunction_whole(peaks, low_intensity_peak_removal_threshold_percent, highest_intensity), mc.cores = cpu_thread_number)
                     } else if (Sys.info()[1] == "Windows") {
+                        cpu_thread_number <- cpu_thread_number - 1
                         # Make the CPU cluster for parallelisation
                         cl <- makeCluster(cpu_thread_number)
                         # Make the cluster use the custom functions and the package functions along with their parameters
@@ -1414,11 +1416,6 @@ resample_spectra <- function(spectra, final_data_points = lowest_data_points, bi
     }
     ############# More spectra
     if (isMassSpectrumList(spectra)) {
-        # Load the required libraries
-        install_and_load_required_packages("parallel")
-        # Detect the number of cores
-        cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
         ########################
         # Calculate the lowest amount of data points, that corresponds to the maximum
         # number of data points that can be used for the binning
@@ -1448,9 +1445,15 @@ resample_spectra <- function(spectra, final_data_points = lowest_data_points, bi
                 final_data_points <- lowest_data_points
                 print("Binning at this sample rate is not possible, the highest number of data points possible will be used")
                 if (allow_parallelization == TRUE) {
+                    # Load the required libraries
+                    install_and_load_required_packages("parallel")
+                    # Detect the number of cores
+                    cpu_thread_number <- detectCores(logical = TRUE)
                     if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                        cpu_thread_number <- cpu_thread_number / 2
                         spectra_binned <- mclapply(spectra, FUN = function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores = cpu_thread_number)
                     } else if (Sys.info()[1] == "Windows") {
+                        cpu_thread_number <- cpu_thread_number - 1
                         cl <- makeCluster(cpu_thread_number)
                         # Pass the variables to the cluster for running the function
                         clusterExport(cl = cl, varlist = c("final_data_points", "binning_method"), envir = environment())
@@ -1465,9 +1468,15 @@ resample_spectra <- function(spectra, final_data_points = lowest_data_points, bi
             }
             if (final_data_points <= lowest_data_points) {
                 if (allow_parallelization == TRUE) {
+                    # Load the required libraries
+                    install_and_load_required_packages("parallel")
+                    # Detect the number of cores
+                    cpu_thread_number <- detectCores(logical = TRUE)
                     if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                        cpu_thread_number <- cpu_thread_number / 2
                         spectra_binned <- mclapply(spectra, fun = function (spectra) binning_subfunction(spectra, final_data_points, binning_method), mc.cores = cpu_thread_number)
                     } else if (Sys.info()[1] == "Windows") {
+                        cpu_thread_number <- cpu_thread_number - 1
                         cl <- makeCluster(cpu_thread_number)
                         # Pass the variables to the cluster for running the function
                         clusterExport(cl = cl, varlist = c("final_data_points", "binning_method"), envir = environment())
@@ -1605,6 +1614,8 @@ import_spectra <- function(filepath, spectra_format = "imzml", mass_range = NULL
     }
     ### Replace the backslash on Windows
     spectra <- replace_backslash(spectra, allow_parallelization = allow_parallelization)
+    ### Identify the spectra by setting the names to the spectral list
+    spectra <- replace_sample_name_list(spectra, spectra_format = spectra_format, type = "number")
     ### Return
     return(spectra)
 }
@@ -1673,10 +1684,11 @@ replace_sample_name <- function(spectra, spectra_format = "imzml", allow_paralle
         if (allow_parallelization == TRUE) {
             # Detect the number of cores
             cpu_thread_number <- detectCores(logical = TRUE)
-            cpu_thread_number <- cpu_thread_number / 2
             if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                cpu_thread_number <- cpu_thread_number / 2
                 spectra <- mclapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra, spectra_format = spectra_format), mc.cores = cpu_thread_number)
             } else if (Sys.info()[1] == "Windows") {
+                cpu_thread_number <- cpu_thread_number - 1
                 # Make the CPU cluster for parallelisation
                 cl <- makeCluster(cpu_thread_number)
                 # Make the cluster use the custom functions and the package functions along with their parameters
@@ -2099,10 +2111,11 @@ preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_param
             if (allow_parallelization == TRUE) {
                 # Detect the number of cores
                 cpu_thread_number <- detectCores(logical = TRUE)
-                cpu_thread_number <- cpu_thread_number / 2
                 if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                    cpu_thread_number <- cpu_thread_number / 2
                     spectra_temp <- mclapply(spectra_temp, FUN = function(spectra_temp) preprocessing_subfunction(spectra_temp, mass_range = mass_range, transformation_algorithm = transformation_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_half_window_size = smoothing_half_window_size, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_algorithm_parameter = baseline_subtraction_algorithm_parameter, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range), mc.cores = cpu_thread_number)
                 } else if (Sys.info()[1] == "Windows") {
+                    cpu_thread_number <- cpu_thread_number - 1
                     cl <- makeCluster(cpu_thread_number)
                     clusterEvalQ(cl, {library(MALDIquant)})
                     clusterExport(cl = cl, varlist = c("mass_range", "transformation_algorithm", "smoothing_algorithm", "smoothing_half_window_size", "baseline_subtraction_algorithm", "baseline_subtraction_algorithm_parameter", "normalization_algorithm", "normalization_mass_range", "preprocessing_subfunction"), envir = environment())
@@ -2348,10 +2361,11 @@ most_intense_signals <- function(spectra, signals_to_take = 20, tof_mode = "line
         if (allow_parallelization == TRUE) {
             # Detect the number of cores
             cpu_thread_number <- detectCores(logical = TRUE)
-            cpu_thread_number <- cpu_thread_number / 2
             if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                cpu_thread_number <- cpu_thread_number / 2
                 most_intense_peaks <- mclapply(peaks, FUN = function(peaks) picking_subfunction(peaks, signals_to_take = signals_to_take), mc.cores = cpu_thread_number)
             } else if (Sys.info()[1] == "Windows") {
+                cpu_thread_number <- cpu_thread_number - 1
                 # Make the CPU cluster for parallelisation
                 cl <- makeCluster(cpu_thread_number)
                 # Pass the variables to the cluster for running the function
@@ -2477,12 +2491,6 @@ average_replicates_by_folder <- function(spectra, folder, spectra_format = "bruk
 peak_picking <- function(spectra, peak_picking_algorithm = "SuperSmoother", tof_mode = "linear", SNR = 3, allow_parallelization = FALSE, deisotope_peaklist = FALSE) {
     ########## Load the required libraries
     install_and_load_required_packages(c("MALDIquant", "parallel"))
-    ########## Multi-core
-    if (allow_parallelization == TRUE) {
-        # Detect the number of cores
-        cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
-    }
     ##### TOF-MODE
     if (tof_mode == "linear" || tof_mode == "Linear" || tof_mode == "L") {
         half_window_size <- 20
@@ -2497,9 +2505,13 @@ peak_picking <- function(spectra, peak_picking_algorithm = "SuperSmoother", tof_
     if (isMassSpectrumList(spectra)) {
         # Peak detection
         if (allow_parallelization == TRUE) {
+            # Detect the number of cores
+            cpu_thread_number <- detectCores(logical = TRUE)
             if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                cpu_thread_number <- cpu_thread_number / 2
                 peaks <- mclapply(spectra, FUN = function(spectra) detectPeaks(spectra, method = peak_picking_algorithm, halfWindowSize = half_window_size, SNR = SNR), mc.cores = cpu_thread_number)
             } else if (Sys.info()[1] == "Windows") {
+                cpu_thread_number <- cpu_thread_number - 1
                 # Make the cluster (one for each core/thread)
                 cl <- makeCluster(cpu_thread_number)
                 clusterEvalQ(cl, {library(MALDIquant)})
@@ -2542,10 +2554,11 @@ deisotope_peaks <- function(peaks, pattern_model_correlation = 0.95, isotopic_to
         if (allow_parallelization == TRUE) {
             # Detect the number of cores
             cpu_thread_number <- detectCores(logical = TRUE)
-            cpu_thread_number <- cpu_thread_number / 2
             if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                cpu_thread_number <- cpu_thread_number / 2
                 peaks_deisotoped <- mclapply(peaks, FUN = function(peaks) monoisotopicPeaks(peaks, minCor = pattern_model_correlation, tolerance = isotopic_tolerance, distance = isotope_pattern_distance, size = isotopic_pattern_size), mc.cores = cpu_thread_number)
             } else if (Sys.info()[1] == "Windows") {
+                cpu_thread_number <- cpu_thread_number - 1
                 # Make the CPU cluster for parallelisation
                 cl <- makeCluster(cpu_thread_number)
                 # Make the cluster use the custom functions and the package functions along with their parameters
@@ -2651,11 +2664,12 @@ align_and_filter_peaks <- function(peaks, peak_picking_algorithm = "SuperSmoothe
                     if (allow_parallelization == TRUE) {
                         # Detect the number of cores
                         cpu_thread_number <- detectCores(logical = TRUE)
-                        cpu_thread_number <- cpu_thread_number / 2
                         if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                            cpu_thread_number <- cpu_thread_number / 2
                             #peaks_aligned <- mclapply(peaks_aligned, FUN = function(peaks_aligned) align_peaks_subfunction(peaks_aligned, reference_peaklist, tolerance_ppm), mc.cores = cpu_thread_number)
                             peaks_aligned <- mclapply(peaks_aligned, FUN = function(peaks_aligned) warpMassPeaks(peaks_aligned, w = warping_functions), mc.cores = cpu_thread_number)
                         } else if (Sys.info()[1] == "Windows") {
+                            cpu_thread_number <- cpu_thread_number - 1
                             # Make the CPU cluster for parallelisation
                             cl <- makeCluster(cpu_thread_number)
                             # Apply the multicore function
@@ -3957,12 +3971,13 @@ feature_selection <- function(peaklist, feature_selection_method = "ANOVA", feat
         ### PARALLEL BACKEND
         # Detect the number of cores
         cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
         if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            cpu_thread_number <- cpu_thread_number / 2
             install_and_load_required_packages("doMC")
             # Register the foreach backend
             registerDoMC(cores = cpu_thread_number)
         } else if (Sys.info()[1] == "Windows") {
+            cpu_thread_number <- cpu_thread_number - 1
             install_and_load_required_packages("doParallel")
             # Register the foreach backend
             cl <- makeCluster(cpu_thread_number, type='PSOCK')
@@ -4125,12 +4140,13 @@ wrapper_rfe <- function(peaklist, features_to_select = 20, selection_method = "p
         ### PARALLEL BACKEND
         # Detect the number of cores
         cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
         if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            cpu_thread_number <- cpu_thread_number / 2
             install_and_load_required_packages("doMC")
             # Register the foreach backend
             registerDoMC(cores = cpu_thread_number)
         } else if (Sys.info()[1] == "Windows") {
+            cpu_thread_number <- cpu_thread_number - 1
             install_and_load_required_packages("doParallel")
             # Register the foreach backend
             cl <- makeCluster(cpu_thread_number, type='PSOCK')
@@ -4277,12 +4293,13 @@ embedded_rfe <- function(peaklist, features_to_select = 20, selection_method = "
         ### PARALLEL BACKEND
         # Detect the number of cores
         cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
         if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            cpu_thread_number <- cpu_thread_number / 2
             install_and_load_required_packages("doMC")
             # Register the foreach backend
             registerDoMC(cores = cpu_thread_number)
         } else if (Sys.info()[1] == "Windows") {
+            cpu_thread_number <- cpu_thread_number - 1
             install_and_load_required_packages("doParallel")
             # Register the foreach backend
             cl <- makeCluster(cpu_thread_number, type='PSOCK')
@@ -4690,12 +4707,13 @@ single_model_training_and_tuning <- function(peaklist_feature_selection, non_fea
         ### PARALLEL BACKEND
         # Detect the number of cores
         cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
         if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            cpu_thread_number <- cpu_thread_number / 2
             install_and_load_required_packages("doMC")
             # Register the foreach backend
             registerDoMC(cores = cpu_thread_number)
         } else if (Sys.info()[1] == "Windows") {
+            cpu_thread_number <- cpu_thread_number - 1
             install_and_load_required_packages("doParallel")
             # Register the foreach backend
             cl <- makeCluster(cpu_thread_number, type='PSOCK')
@@ -5408,10 +5426,11 @@ spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_te
     if (allow_parallelization == TRUE) {
         # Detect the number of cores
         cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
         if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            cpu_thread_number <- cpu_thread_number / 2
             output_list <- mclapply(global_list, FUN = function(global_list) comparison_sample_db_subfunction_correlation(global_list), mc.cores = cpu_thread_number)
         } else if (Sys.info()[1] == "Windows") {
+            cpu_thread_number <- cpu_thread_number - 1
             # Make the CPU cluster for parallelisation
             cls <- makeCluster(cpu_thread_number)
             # Make the cluster use the custom functions and the package functions along with their parameters
@@ -5731,10 +5750,11 @@ spectral_typer_score_signal_intensity <- function(spectra_database, spectra_test
     if (allow_parallelization == TRUE) {
         # Detect the number of cores
         cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
         if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            cpu_thread_number <- cpu_thread_number / 2
             output_list <- mclapply(global_list, FUN = function(global_list) comparison_sample_db_subfunction_intensity(global_list), mc.cores = cpu_thread_number)
         } else if (Sys.info()[1] == "Windows") {
+            cpu_thread_number <- cpu_thread_number - 1
             # Make the CPU cluster for parallelisation
             cls <- makeCluster(cpu_thread_number)
             # Make the cluster use the custom functions and the package functions along with their parameters
@@ -6016,10 +6036,11 @@ spectral_typer_score_similarity_index <- function(spectra_database, spectra_test
     if (allow_parallelization == TRUE) {
         # Detect the number of cores
         cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
         if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            cpu_thread_number <- cpu_thread_number / 2
             output_list <- mclapply(global_list, FUN = function(global_list) comparison_sample_db_subfunction_similarity_index(global_list), mc.cores = cpu_thread_number)
         } else if (Sys.info()[1] == "Windows") {
+            cpu_thread_number <- cpu_thread_number - 1
             # Make the CPU cluster for parallelisation
             cls <- makeCluster(cpu_thread_number)
             # Make the cluster use the custom functions and the package functions along with their parameters
@@ -6339,10 +6360,11 @@ generate_custom_intensity_matrix <- function(spectra, custom_feature_vector = NU
                 if (allow_parallelization == TRUE) {
                     # Detect the number of cores
                     cpu_thread_number <- detectCores(logical = TRUE)
-                    cpu_thread_number <- cpu_thread_number / 2
                     if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                        cpu_thread_number <- cpu_thread_number / 2
                         peaks <- mclapply(peaks, FUN = function(peaks) peak_alignment_subfunction(peaks = peaks, reference_masses = custom_feature_vector, tolerance_ppm = tolerance_ppm), mc.cores = cpu_thread_number)
                     } else if (Sys.info()[1] == "Windows") {
+                        cpu_thread_number <- cpu_thread_number - 1
                         # Make the CPU cluster for parallelisation
                         cl <- makeCluster(cpu_thread_number)
                         # Make the cluster use the custom functions and the package functions along with their parameters
@@ -7018,12 +7040,13 @@ genetic_algorithm_graph <- function(input_adjacency_matrix, graph_type = "Prefer
         ### PARALLEL BACKEND
         # Detect the number of cores
         cpu_thread_number <- detectCores(logical = TRUE)
-        cpu_thread_number <- cpu_thread_number / 2
         if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+            cpu_thread_number <- cpu_thread_number / 2
             install_and_load_required_packages("doMC")
             # Register the foreach backend
             registerDoMC(cores = cpu_thread_number)
         } else if (Sys.info()[1] == "Windows") {
+            cpu_thread_number <- cpu_thread_number - 1
             install_and_load_required_packages("doParallel")
             # Register the foreach backend
             cls <- makeCluster(cpu_thread_number)
@@ -7529,7 +7552,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.10.2"
+R_script_version <- "2017.05.10.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -9577,6 +9600,7 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
