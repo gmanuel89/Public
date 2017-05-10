@@ -7485,7 +7485,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.09.0"
+R_script_version <- "2017.05.10.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -8481,29 +8481,16 @@ import_spectra_function <- function() {
                 test_folder_list_with_subfolders <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = TRUE, include.dirs = TRUE)
                 test_folder_list_with_treatment <- character()
                 for (t in 1:length(test_folder_list)) {
-                    if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                        sample_folder_temp <- character()
-                        for (s in 1:length(test_folder_list_with_subfolders)) {
-                            if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                                test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
-                                if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                    sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                                }
+                    sample_folder_temp <- character()
+                    for (s in 1:length(test_folder_list_with_subfolders)) {
+                        if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
+                            test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
+                            if (length(test_folder_list_with_subfolders_splitted) == 2) {
+                                sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
                             }
                         }
-                        test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
-                    } else if (Sys.info()[1] == "Windows") {
-                        sample_folder_temp <- character()
-                        for (s in 1:length(test_folder_list_with_subfolders)) {
-                            if (length(grep(paste0(test_folder_list[t], "\\\\"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                                test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "\\\\"))
-                                if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                    sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                                }
-                            }
-                        }
-                        test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
                     }
+                    test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
                 }
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
@@ -8540,29 +8527,16 @@ import_spectra_function <- function() {
                 test_folder_list_with_subfolders <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = TRUE, include.dirs = TRUE)
                 test_folder_list_with_treatment <- character()
                 for (t in 1:length(test_folder_list)) {
-                    if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                        sample_folder_temp <- character()
-                        for (s in 1:length(test_folder_list_with_subfolders)) {
-                            if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                                test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
-                                if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                    sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                                }
+                    sample_folder_temp <- character()
+                    for (s in 1:length(test_folder_list_with_subfolders)) {
+                        if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
+                            test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
+                            if (length(test_folder_list_with_subfolders_splitted) == 2) {
+                                sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
                             }
                         }
-                        test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
-                    } else if (Sys.info()[1] == "Windows") {
-                        sample_folder_temp <- character()
-                        for (s in 1:length(test_folder_list_with_subfolders)) {
-                            if (length(grep(paste0(test_folder_list[t], "\\\\"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                                test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "\\\\"))
-                                if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                    sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                                }
-                            }
-                        }
-                        test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
                     }
+                    test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
                 }
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
@@ -8602,29 +8576,16 @@ import_spectra_function <- function() {
                 test_folder_list_with_subfolders <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = TRUE, include.dirs = TRUE)
                 test_folder_list_with_treatment <- character()
                 for (t in 1:length(test_folder_list)) {
-                    if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                        sample_folder_temp <- character()
-                        for (s in 1:length(test_folder_list_with_subfolders)) {
-                            if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                                test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
-                                if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                    sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                                }
+                    sample_folder_temp <- character()
+                    for (s in 1:length(test_folder_list_with_subfolders)) {
+                        if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
+                            test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
+                            if (length(test_folder_list_with_subfolders_splitted) == 2) {
+                                sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
                             }
                         }
-                        test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
-                    } else if (Sys.info()[1] == "Windows") {
-                        sample_folder_temp <- character()
-                        for (s in 1:length(test_folder_list_with_subfolders)) {
-                            if (length(grep(paste0(test_folder_list[t], "\\\\"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                                test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "\\\\"))
-                                if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                    sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                                }
-                            }
-                        }
-                        test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
                     }
+                    test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
                 }
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
@@ -8661,29 +8622,16 @@ import_spectra_function <- function() {
                 test_folder_list_with_subfolders <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = TRUE, include.dirs = TRUE)
                 test_folder_list_with_treatment <- character()
                 for (t in 1:length(test_folder_list)) {
-                    if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
-                        sample_folder_temp <- character()
-                        for (s in 1:length(test_folder_list_with_subfolders)) {
-                            if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                                test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
-                                if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                    sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                                }
+                    sample_folder_temp <- character()
+                    for (s in 1:length(test_folder_list_with_subfolders)) {
+                        if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
+                            test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
+                            if (length(test_folder_list_with_subfolders_splitted) == 2) {
+                                sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
                             }
                         }
-                        test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
-                    } else if (Sys.info()[1] == "Windows") {
-                        sample_folder_temp <- character()
-                        for (s in 1:length(test_folder_list_with_subfolders)) {
-                            if (length(grep(paste0(test_folder_list[t], "\\\\"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                                test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "\\\\"))
-                                if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                    sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                                }
-                            }
-                        }
-                        test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
                     }
+                    test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
                 }
                 # Write the path inside the list
                 for (x in 1:length(spectra_test)) {
@@ -9730,6 +9678,7 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
