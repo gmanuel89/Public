@@ -11,7 +11,7 @@ rm(list = ls())
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.08.0"
+R_script_version <- "2017.05.10.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MASCOT%20OUTPUT%20MOD-PROCESSER.R"
 ### Name of the file when downloaded
@@ -466,22 +466,22 @@ run_mascot_output_modprocesser_function <- function() {
             # The new folder number will be the greater + 1
             try(MASCOT_new_folder_number <- MASCOT_present_folder_numbers[length(MASCOT_present_folder_numbers)] + 1)
             # Generate the new subfolder
-            subfolder <- paste("MASCOT", MASCOT_new_folder_number)
-            # Create the subfolder
-            dir.create(file.path(output_folder, subfolder))
+            MASCOT_subfolder <- paste("MASCOT", MASCOT_new_folder_number)
             # Estimate the new output folder
-            output_folder <- file.path(output_folder, subfolder)
+            subfolder <- file.path(output_folder, MASCOT_subfolder)
+            # Create the subfolder
+            dir.create(subfolder)
         } else {
             # If it not present...
             # Create the folder where to dump the files and go to it...
-            subfolder <- paste("MASCOT", "1")
-            # Create the subfolder
-            dir.create(file.path(output_folder, subfolder))
+            MASCOT_subfolder <- paste("MASCOT", "1")
             # Estimate the new output folder
-            output_folder <- file.path(output_folder, subfolder)
+            subfolder <- file.path(output_folder, MASCOT_subfolder)
+            # Create the subfolder
+            dir.create(subfolder)
         }
         # Go to the new working directory
-        setwd(output_folder)
+        setwd(subfolder)
         
         
         # Progress bar
