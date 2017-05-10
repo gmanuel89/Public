@@ -1516,6 +1516,121 @@ resample_spectra <- function(spectra, final_data_points = lowest_data_points, bi
 
 
 
+############################################################ BACKSLASH REPLACING
+# This function replaces the backslash in the sample name field with a forward slash, when imported in Windows.
+# The input can be both spectra or peaks (MALDIquant)
+replace_backslash <- function(spectra, allow_parallelization = FALSE) {
+    ### Load required packages
+    install_and_load_required_packages("parallel")
+    ##### Function for lapply
+    name_replacing_subfunction <- function(spectra) {
+        if (Sys.info()[1] == "Windows") {
+            # Replace the backslash with the forward slash
+            spectra@metaData$file <- gsub("([\\])", "/", spectra@metaData$file[1])
+        }
+        ### Return
+        return(spectra)
+    }
+    ##### More elements
+    if (isMassSpectrumList(spectra) || isMassPeaksList(spectra)) {
+        ##### Apply the function
+        if (allow_parallelization == TRUE) {
+            # Detect the number of cores
+            cpu_thread_number <- detectCores(logical = TRUE)
+            if (Sys.info()[1] == "Linux" || Sys.info()[1] == "Darwin") {
+                cpu_thread_number <- cpu_thread_number / 2
+                spectra <- mclapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra), mc.cores = cpu_thread_number)
+            } else if (Sys.info()[1] == "Windows") {
+                cpu_thread_number <- cpu_thread_number - 1
+                # Make the CPU cluster for parallelisation
+                cl <- makeCluster(cpu_thread_number)
+                # Make the cluster use the custom functions and the package functions along with their parameters
+                clusterEvalQ(cl, {library(MALDIquant)})
+                # Pass the variables to the cluster for running the function
+                clusterExport(cl = cl, varlist = c("spectra", "spectra_format"), envir = environment())
+                # Apply the multicore function
+                spectra <- parLapply(cl, spectra, fun = function(spectra) name_replacing_subfunction(spectra))
+                stopCluster(cl)
+            } else {
+                spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra))
+            }
+        } else {
+            spectra <- lapply(spectra, FUN = function(spectra) name_replacing_subfunction(spectra))
+        }
+    } else if (isMassSpectrum(spectra) || isMassPeaks(spectra)) {
+        spectra <- name_replacing_subfunction(spectra)
+    }
+    ### Return
+    return(spectra)
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
+################################################################# IMPORT SPECTRA
+import_spectra <- function(filepath, spectra_format = "imzml", mass_range = NULL, allow_parallelization = FALSE) {
+    ### Load the packages
+    install_and_load_required_packages(c("MALDIquant", "MALDIquantForeign", "XML", "parallel"))
+    ### imzML
+    if (spectra_format == "imzml" || spectra_format == "imzML") {
+        # Mass range specified
+        if (!is.null(mass_range)) {
+            spectra <- importImzMl(filepath, massRange = mass_range)
+        } else {
+            # No mass range specified
+            spectra <- importImzMl(filepath)
+        }
+    } else if (spectra_format == "brukerflex" || spectra_format == "xmass" || spectra_format == "Xmass") {
+        ### Xmass
+        # Mass range specified
+        if (!is.null(mass_range)) {
+            spectra <- importBrukerFlex(filepath, massRange = mass_range)
+        } else {
+            # No mass range specified
+            spectra <- importBrukerFlex(filepath)
+        }
+    } else if (spectra_format == "txt" || spectra_format == "text" || spectra_format == "TXT") {
+        ### Xmass
+        # Mass range specified
+        if (!is.null(mass_range)) {
+            spectra <- importTxt(filepath, massRange = mass_range)
+        } else {
+            # No mass range specified
+            spectra <- importTxt(filepath)
+        }
+    } else if (spectra_format == "csv" || spectra_format == "CSV") {
+        ### Xmass
+        # Mass range specified
+        if (!is.null(mass_range)) {
+            spectra <- importCsv(filepath, massRange = mass_range)
+        } else {
+            # No mass range specified
+            spectra <- importCsv(filepath)
+        }
+    }
+    ### Replace the backslash on Windows
+    spectra <- replace_backslash(spectra, allow_parallelization = allow_parallelization)
+    ### Return
+    return(spectra)
+}
+
+
+
+
+
+################################################################################
+
+
+
+
+
 ################################################# SAMPLE NAME REPLACING
 # This function replaces the sample name field in the spectrum with the actual sample name (keeping only the last part of the file path and discarding the folder tree)
 # The input can be both spectra or peaks (MALDIquant)
@@ -7485,7 +7600,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.10.0"
+R_script_version <- "2017.05.10.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -8444,200 +8559,55 @@ import_spectra_function <- function() {
     if (!is.null(filepath_database) && !is.null(filepath_test)) {
         # Progress bar
         import_progress_bar <- tkProgressBar(title = "Importing spectra...", label = "", min = 0, max = 1, initial = 0, width = 300)
-        setTkProgressBar(import_progress_bar, value = 0, title = NULL, label = "0 %")
+        setTkProgressBar(import_progress_bar, value = 0, title = "Loading packages...", label = "0 %")
         # Load the required libraries
         install_and_load_required_packages(c("MALDIquantForeign", "MALDIquant", "XML"))
         # Generate the list of spectra (library and test)
-        if (spectra_format == "brukerflex" || spectra_format == "xmass") {
-            ### Load the spectra
-            if (!is.null(mass_range)) {
-                # Progress bar
-                setTkProgressBar(import_progress_bar, value = 0.15, title = "Importing database spectra...", label = "15 %")
-                if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
-                    ## LOAD THE R WORKSPACE (FOR DATABASE)
-                    # Create a temporary environment
-                    temporary_environment <- new.env()
-                    # Load the workspace
-                    load(filepath_database, envir = temporary_environment)
-                    # Get the spectra for the database from the workspace
-                    spectra_database <- get("spectra_database", pos = temporary_environment)
-                    # Get the database folder list for the database from the workspace
-                    database_folder_list <- get("database_folder_list", pos = temporary_environment)
-                } else {
-                    spectra_database <- importBrukerFlex(filepath_database, massRange = mass_range)
-                    # Read the folder list (database class list)
-                    database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                    # Write the path inside the list
-                    for (x in 1:length(spectra_database)) {
-                        spectra_database[[x]]@metaData$path <- filepath_database
+        ### Load the spectra
+        # Progress bar
+        setTkProgressBar(import_progress_bar, value = 0.15, title = "Importing database spectra...", label = "15 %")
+        if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
+            ## LOAD THE R WORKSPACE (FOR DATABASE)
+            # Create a temporary environment
+            temporary_environment <- new.env()
+            # Load the workspace
+            load(filepath_database, envir = temporary_environment)
+            # Get the spectra for the database from the workspace
+            spectra_database <- get("spectra_database", pos = temporary_environment)
+            # Get the database folder list for the database from the workspace
+            database_folder_list <- get("database_folder_list", pos = temporary_environment)
+        } else {
+            spectra_database <- import_spectra(filepath_database, spectra_format = spectra_format, mass_range = mass_range, allow_parallelization = allow_parallelization)
+            # Read the folder list (database class list)
+            database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
+            # Write the path inside the list
+            for (x in 1:length(spectra_database)) {
+                spectra_database[[x]]@metaData$path <- filepath_database
+            }
+        }
+        # Progress bar
+        setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
+        spectra_test <- import_spectra(filepath_test, spectra_format = spectra_format, mass_range = mass_range, allow_parallelization = allow_parallelization)
+        # Read the sample folders
+        test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
+        # Read the sample folders (with treatment subfolder)
+        test_folder_list_with_subfolders <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = TRUE, include.dirs = TRUE)
+        test_folder_list_with_treatment <- character()
+        for (t in 1:length(test_folder_list)) {
+            sample_folder_temp <- character()
+            for (s in 1:length(test_folder_list_with_subfolders)) {
+                if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
+                    test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
+                    if (length(test_folder_list_with_subfolders_splitted) == 2) {
+                        sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
                     }
-                }
-                # Progress bar
-                setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
-                spectra_test <- importBrukerFlex(filepath_test, massRange = mass_range)
-                # Read the sample folders
-                test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                # Read the sample folders (with treatment subfolder)
-                test_folder_list_with_subfolders <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = TRUE, include.dirs = TRUE)
-                test_folder_list_with_treatment <- character()
-                for (t in 1:length(test_folder_list)) {
-                    sample_folder_temp <- character()
-                    for (s in 1:length(test_folder_list_with_subfolders)) {
-                        if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                            test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
-                            if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                            }
-                        }
-                    }
-                    test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
-                }
-                # Write the path inside the list
-                for (x in 1:length(spectra_test)) {
-                    spectra_test[[x]]@metaData$path <- filepath_test
-                }
-            } else {
-                # Progress bar
-                setTkProgressBar(import_progress_bar, value = 0.15, title = "Importing database spectra...", label = "15 %")
-                if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
-                    ## LOAD THE R WORKSPACE (FOR DATABASE)
-                    # Create a temporary environment
-                    temporary_environment <- new.env()
-                    # Load the workspace
-                    load(filepath_database, envir = temporary_environment)
-                    # Get the spectra for the database from the workspace
-                    spectra_database <- get("spectra_database", pos = temporary_environment)
-                    # Get the database folder list from the workspace
-                    database_folder_list <- get("database_folder_list", pos = temporary_environment)
-                } else {
-                    spectra_database <- importBrukerFlex(filepath_database)
-                    # Write the path inside the list
-                    for (x in 1:length(spectra_database)) {
-                        spectra_database[[x]]@metaData$path <- filepath_database
-                    }
-                    # Read the folder list (database class list)
-                    database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                }
-                # Progress bar
-                setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
-                spectra_test <- importBrukerFlex(filepath_test)
-                # Read the sample folders
-                test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                # Read the sample folders (with treatment subfolder)
-                test_folder_list_with_subfolders <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = TRUE, include.dirs = TRUE)
-                test_folder_list_with_treatment <- character()
-                for (t in 1:length(test_folder_list)) {
-                    sample_folder_temp <- character()
-                    for (s in 1:length(test_folder_list_with_subfolders)) {
-                        if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                            test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
-                            if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                            }
-                        }
-                    }
-                    test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
-                }
-                # Write the path inside the list
-                for (x in 1:length(spectra_test)) {
-                    spectra_test[[x]]@metaData$path <- filepath_test
                 }
             }
-        } else if (spectra_format == "imzml" | spectra_format == "imzML") {
-            ### Load the spectra
-            if (!is.null(mass_range)) {
-                # Progress bar
-                setTkProgressBar(import_progress_bar, value = 0.15, title = "Importing database spectra...", label = "15 %")
-                if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
-                    ## LOAD THE R WORKSPACE (FOR DATABASE)
-                    # Create a temporary environment
-                    temporary_environment <- new.env()
-                    # Load the workspace
-                    load(filepath_database, envir = temporary_environment)
-                    # Get the spectra for the database from the workspace
-                    spectra_database <- get("spectra_database", pos = temporary_environment)
-                    # Get the database folder list from the workspace
-                    database_folder_list <- get("database_folder_list", pos = temporary_environment)
-                } else {
-                    spectra_database <- importImzMl(filepath_database, massRange = mass_range)
-                    # Write the path inside the list
-                    for (x in 1:length(spectra_database)) {
-                        spectra_database[[x]]@metaData$path <- filepath_database
-                    }
-                    # Read the folder list (database class list)
-                    database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                }
-                # Progress bar
-                setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
-                spectra_test <- importImzMl(filepath_test, massRange = mass_range)
-                # Read the sample folders
-                test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                # Read the sample folders (with treatment subfolder)
-                test_folder_list_with_subfolders <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = TRUE, include.dirs = TRUE)
-                test_folder_list_with_treatment <- character()
-                for (t in 1:length(test_folder_list)) {
-                    sample_folder_temp <- character()
-                    for (s in 1:length(test_folder_list_with_subfolders)) {
-                        if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                            test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
-                            if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                            }
-                        }
-                    }
-                    test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
-                }
-                # Write the path inside the list
-                for (x in 1:length(spectra_test)) {
-                    spectra_test[[x]]@metaData$path <- filepath_test
-                }
-            } else {
-                # Progress bar
-                setTkProgressBar(import_progress_bar, value = 0.15, title = "Importing database spectra...", label = "15 %")
-                if (length(grep(".RData", filepath_database, fixed = TRUE)) > 0) {
-                    ## LOAD THE R WORKSPACE (FOR DATABASE)
-                    # Create a temporary environment
-                    temporary_environment <- new.env()
-                    # Load the workspace
-                    load(filepath_database, envir = temporary_environment)
-                    # Get the spectra for the database from the workspace
-                    spectra_database <- get("spectra_database", pos = temporary_environment)
-                    # Get the database folder list from the workspace
-                    database_folder_list <- get("database_folder_list", pos = temporary_environment)
-                } else {
-                    spectra_database <- importImzMl(filepath_database)
-                    # Write the path inside the list
-                    for (x in 1:length(spectra_database)) {
-                        spectra_database[[x]]@metaData$path <- filepath_database
-                    }
-                    # Read the folder list (database class list)
-                    database_folder_list <- dir(filepath_database, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                }
-                # Progress bar
-                setTkProgressBar(import_progress_bar, value = 0.30, title = "Importing sample spectra...", label = "30 %")
-                spectra_test <- importImzMl(filepath_test)
-                # Read the sample folders
-                test_folder_list <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = FALSE, include.dirs = TRUE)
-                # Read the sample folders (with treatment subfolder)
-                test_folder_list_with_subfolders <- dir(filepath_test, ignore.case = TRUE, full.names = FALSE, recursive = TRUE, include.dirs = TRUE)
-                test_folder_list_with_treatment <- character()
-                for (t in 1:length(test_folder_list)) {
-                    sample_folder_temp <- character()
-                    for (s in 1:length(test_folder_list_with_subfolders)) {
-                        if (length(grep(paste0(test_folder_list[t], "/"), test_folder_list_with_subfolders[s], fixed = TRUE)) > 0) {
-                            test_folder_list_with_subfolders_splitted <- unlist(strsplit(test_folder_list_with_subfolders[s], "/"))
-                            if (length(test_folder_list_with_subfolders_splitted) == 2) {
-                                sample_folder_temp <- append(sample_folder_temp, test_folder_list_with_subfolders[s])
-                            }
-                        }
-                    }
-                    test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
-                }
-                # Write the path inside the list
-                for (x in 1:length(spectra_test)) {
-                    spectra_test[[x]]@metaData$path <- filepath_test
-                }
-            }
+            test_folder_list_with_treatment <- append(test_folder_list_with_treatment, sample_folder_temp)
+        }
+        # Write the path inside the list
+        for (x in 1:length(spectra_test)) {
+            spectra_test[[x]]@metaData$path <- filepath_test
         }
         ### Preprocessing
         # Progress bar
@@ -9678,6 +9648,7 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
