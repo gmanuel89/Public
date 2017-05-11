@@ -5456,7 +5456,7 @@ spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_te
             # Make the cluster use the custom functions and the package functions along with their parameters
             clusterEvalQ(cls, {library(MALDIquant)})
             # Pass the variables to the cluster for running the function
-            clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "check_internet_connection", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient"), envir = environment())
+            clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "check_internet_connection", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "correlation_method"), envir = environment())
             output_list <- parLapply(cls, global_list, fun = function(global_list) comparison_sample_db_subfunction_correlation(global_list))
             stopCluster(cls)
         } else {
@@ -7565,7 +7565,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.11.0"
+R_script_version <- "2017.05.11.1"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
@@ -8912,31 +8912,31 @@ run_spectral_typer_function <- function() {
         score_si_matrix <- NULL
         ############### CORRELATION
         # Progress bar
-        setTkProgressBar(st_progress_bar, value = 0.20, title = NULL, label = "20 %")
+        setTkProgressBar(st_progress_bar, value = 0.20, title = "Computing correlation...", label = "20 %")
         if ("correlation" %in% similarity_criteria) {
             score_correlation_matrix <- spectral_typer_score_correlation_matrix(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, correlation_method = correlation_method, intensity_correction_coefficient = intensity_correction_coefficient, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
         }
         ############### HIERARCHICAL CLUSTERING ANALYSIS
         # Progress bar
-        setTkProgressBar(st_progress_bar, value = 0.40, title = NULL, label = "40 %")
+        setTkProgressBar(st_progress_bar, value = 0.40, title = "Computing distance...", label = "40 %")
         if ("hca" %in% similarity_criteria) {
             score_hca <- spectral_typer_score_hierarchical_distance(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, spectra_path_output = spectra_path_output, score_only = score_only, spectra_format = spectra_format, hierarchical_distance_method = hierarchical_distance_method, normalize_distances = TRUE, normalization_method = "sum", allow_parallelization = allow_parallelization)
         }
         ############### SIMILARITY INDEX
         # Progress bar
-        setTkProgressBar(st_progress_bar, value = 0.60, title = NULL, label = "60 %")
+        setTkProgressBar(st_progress_bar, value = 0.60, title = "Computing similarity index...", label = "60 %")
         if ("similarity index" %in% similarity_criteria) {
             score_si_matrix <- spectral_typer_score_similarity_index(spectra_database, spectra_test, peaks_database, peaks_test, filepath_database, filepath_test, class_list_library = database_folder_list, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, allow_parallelization = allow_parallelization)
         }
         ############### INTENSITY
         # Progress bar
-        setTkProgressBar(st_progress_bar, value = 0.80, title = NULL, label = "80 %")
+        setTkProgressBar(st_progress_bar, value = 0.80, title = "Comparing signal intensities...", label = "80 %")
         if ("signal intensity" %in% similarity_criteria) {
             score_intensity_matrix <- spectral_typer_score_signal_intensity(spectra_database, spectra_test, peaks_database, peaks_test, class_list_library = database_folder_list, database_spectral_variability_list = database_spectral_variability_list, test_spectral_variability_list = test_spectral_variability_list, signal_intensity_evaluation = signal_intensity_evaluation, peaks_filtering_percentage_threshold = peaks_filtering_threshold_percent, low_intensity_percentage_threshold = low_intensity_peak_removal_percentage_threshold, low_intensity_threshold_method = low_intensity_peak_removal_threshold_method, tof_mode = tof_mode, intensity_tolerance_percent_threshold = intensity_tolerance_percent, spectra_format = spectra_format, spectra_path_output = spectra_path_output, score_only = score_only, number_of_st_dev = 1, allow_parallelization = allow_parallelization)
         }
         ### Parameters matrices
         # Progress bar
-        setTkProgressBar(st_progress_bar, value = 0.90, title = NULL, label = "90 %")
+        setTkProgressBar(st_progress_bar, value = 0.90, title = "Finalizing...", label = "90 %")
         # Parameters vector
         parameters_vector <- c(file_type_export, filepath_database, filepath_test, mass_range_value, tof_mode_value, spectra_format_value, preprocess_spectra_in_packages_of_value, peak_picking_mode, peak_picking_algorithm_value, signals_to_take_value, intensity_tolerance_percent_value, similarity_criteria_value, intensity_correction_coefficient_value, SNR_value, peaks_filtering_threshold_percent_value, low_intensity_peak_removal_percentage_threshold_value, average_replicates_in_database_value, average_replicates_in_test_value, score_only_value, spectra_path_output_value)
         names(parameters_vector) <- c("File type", "Database folder", "Samples folder", "Mass range", "TOF mode", "Spectra format", "Preprocess spectra in packages of", "Peak picking mode", "Peak picking algorithm", "Most intense signals taken", "Intensity tolerance percent", "Similarity criteria", "Intensity correction coefficient", "Signal-to-noise ratio", "Peaks filtering threshold percentage", "Low intensity peaks removal threshold percent", "Average replicates in the database", "Average replicates in the samples", "Score only", "Spectra path in the output")
@@ -9002,6 +9002,8 @@ run_spectral_typer_function <- function() {
         if (!is.null(test_cv_matrix)) {
             .GlobalEnv$test_cv_matrix <- test_cv_matrix
         }
+        # Progress bar
+        setTkProgressBar(st_progress_bar, value = 0.95, title = "Saving files...", label = "95 %")
         ### Save the files (CSV)
         if (file_type_export == "csv") {
             # Intensity
@@ -9112,7 +9114,7 @@ run_spectral_typer_function <- function() {
             }
         }
         # Progress bar
-        setTkProgressBar(st_progress_bar, value = 1.00, title = NULL, label = "100 %")
+        setTkProgressBar(st_progress_bar, value = 1.00, title = "Done!", label = "100 %")
         close(st_progress_bar)
         ### Messagebox
         tkmessageBox(title = "Done!", message = "The file(s) have been dumped\n\nLegend:\nF: Fit\nRF: Retrofit\nCorr: intensity correlation coefficient\nIntMtch: signal intensity matching\nsl: slope of the regression curve\nns: number of signals\nSI: Similarity Index\n\n\nFit = number of sample-database matching signals / number of signals in the sample\nRetrofit = number of database-sample matching signals / number of signals in the database entry", icon = "info")
@@ -9635,6 +9637,7 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
