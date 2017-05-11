@@ -11,7 +11,7 @@ rm(list = ls())
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.10.0"
+R_script_version <- "2017.05.11.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/MASCOT%20OUTPUT%20MOD-PROCESSER.R"
 ### Name of the file when downloaded
@@ -117,7 +117,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
     }
 }
 
-install_and_load_required_packages(c("tcltk", "plyr"), update_packages = TRUE)
+install_and_load_required_packages("tcltk", update_packages = TRUE)
 
 
 
@@ -329,7 +329,11 @@ file_import_function <- function() {
     # Import data only if a file path is specified
     if (input_file != "") {
         #################### IMPORT THE DATA FROM THE FILE
+        ### Progress bar
+        import_progress_bar <- tkProgressBar(title = "Importing file...", label = "", min = 0, max = 1, initial = 0, width = 300)
+        setTkProgressBar(import_progress_bar, value = 0, title = NULL, label = "0 %")
         ### Remove all the lines that are not the desired lines (the useless header)
+        setTkProgressBar(import_progress_bar, value = 0.10, title = "Discarding header...", label = "10 %")
         input_file_lines <- readLines(input_file)
         # Start to read from the matrix header: "prot_hit"
         input_file_header_line_number <- 0
@@ -345,12 +349,17 @@ file_import_function <- function() {
         } else {
             final_input_file_lines <- character()
         }
+        setTkProgressBar(import_progress_bar, value = 0.40, title = "Reading CSV table...", label = "40 %")
         # Read the CSV file from the lines
         if (length(final_input_file_lines) > 0) {
             input_data <- read.csv(text = final_input_file_lines, header = TRUE)
+            if (is.null(rownames(input_data))) {
+                rownames(input_data) <- seq(from = 1, to = nrow(input_data), by = 1)
+            }
         } else {
             input_data <- NULL
         }
+        setTkProgressBar(import_progress_bar, value = 0.95, title = "Setting file name...", label = "95 %")
         ### Retrieve the input file name
         input_filename <- NULL
         try({
@@ -368,6 +377,8 @@ file_import_function <- function() {
         .GlobalEnv$input_file <- input_file
         .GlobalEnv$input_filename <- input_filename
         .GlobalEnv$input_data <- input_data
+        setTkProgressBar(import_progress_bar, value = 1.00, title = "Done!", label = "100 %")
+        close(import_progress_bar)
         # Message
         if (!is.null(input_data)) {
             tkmessageBox(title = "File imported", message = "The file has been successfully imported!", icon = "info")
@@ -548,9 +559,28 @@ run_mascot_output_modprocesser_function <- function() {
         non_modified_peptides_df <- non_modified_peptides_df[order(non_modified_peptides_df$prot_acc, non_modified_peptides_df$pep_seq, -non_modified_peptides_df$pep_score), ]
         
         # Extract the unique values (keep unique prot_acc and pep_seq and only the highest score for prot_acc/pep_seq duplicates)
-        non_modified_peptides_df <- ddply(.data = non_modified_peptides_df, .variables = c("prot_acc", "pep_seq"), .fun = head, n = 1)
+        row_ID_to_keep <- vector()
+        # Determine the unique values of the prot_acc column
+        prot_acc_unique <- unique(non_modified_peptides_df$prot_acc)
+        # For each prot_acc...
+        for (pa in 1:length(prot_acc_unique)) {
+            # Rows with the prot_acc_value
+            non_modified_peptides_df_prot_acc <- non_modified_peptides_df[non_modified_peptides_df$prot_acc == prot_acc_unique[pa],]
+            # Determine the unique values of the pep_seq column
+            pep_seq_unique <- unique(non_modified_peptides_df_prot_acc$pep_seq)
+            # For each pep_seq...
+            for (ps in 1:length(pep_seq_unique)) {
+                # Rows with the pep_seq_value
+                non_modified_peptides_df_prot_acc_pep_seq <- non_modified_peptides_df_prot_acc[non_modified_peptides_df_prot_acc$pep_seq == pep_seq_unique[ps],]
+                # Keep only the first (with the highest pep_score) (store the row ID)
+                row_ID_to_keep <- append(row_ID_to_keep, rownames(non_modified_peptides_df_prot_acc_pep_seq[1,]))
+            }
+        }
+        # Retrieve the rows to keep
+        final_df <- non_modified_peptides_df[rownames(non_modified_peptides_df) %in% row_ID_to_keep, ]
+        non_modified_peptides_df <- final_df
         
-        # Display the 'identity' forst
+        # Display the 'identity' first
         non_modified_peptides_df <- non_modified_peptides_df[order(non_modified_peptides_df$pep_score, non_modified_peptides_df$identity, non_modified_peptides_df$prot_acc, decreasing = TRUE), ]
         
         # Progress bar
@@ -565,9 +595,43 @@ run_mascot_output_modprocesser_function <- function() {
         modified_peptides_df <- modified_peptides_df[order(modified_peptides_df$prot_acc, modified_peptides_df$pep_seq, modified_peptides_df$pep_var_mod, modified_peptides_df$pep_var_mod_pos, -modified_peptides_df$pep_score), ]
         
         # Extract the unique values (keep unique prot_acc, pep_seq, pep_var_mod and pep_var_mod_pos and only the highest score for prot_acc/pep_seq/pep_var_mod/pep_var_mod_pos duplicates)
-        modified_peptides_df <- ddply(.data = modified_peptides_df, .variables = c("prot_acc", "pep_seq", "pep_var_mod", "pep_var_mod_pos"), .fun = head, n = 1)
+        row_ID_to_keep <- vector()
+        # Determine the unique values of the prot_acc column
+        prot_acc_unique <- unique(modified_peptides_df$prot_acc)
+        # For each prot_acc...
+        for (pa in 1:length(prot_acc_unique)) {
+            # Rows with the prot_acc_value
+            modified_peptides_df_prot_acc <- modified_peptides_df[modified_peptides_df$prot_acc == prot_acc_unique[pa],]
+            # Determine the unique values of the pep_seq column
+            pep_seq_unique <- unique(modified_peptides_df_prot_acc$pep_seq)
+            # For each pep_seq...
+            for (ps in 1:length(pep_seq_unique)) {
+                # Rows with the pep_seq_value
+                modified_peptides_df_prot_acc_pep_seq <- modified_peptides_df_prot_acc[modified_peptides_df_prot_acc$pep_seq == pep_seq_unique[ps],]
+                # Determine the unique values of the pep_var_mod column
+                pep_var_mod_unique <- unique(modified_peptides_df_prot_acc_pep_seq$pep_var_mod)
+                # For each pep_var_mod...
+                for (pvm in 1:length(pep_var_mod_unique)) {
+                    # Rows with the pep_var_mod_value
+                    modified_peptides_df_prot_acc_pep_seq_pep_var_mod <- modified_peptides_df_prot_acc_pep_seq[modified_peptides_df_prot_acc_pep_seq$pep_var_mod == pep_var_mod_unique[pvm],]
+                    # Determine the unique values of the pep_var_mod_pos column
+                    modified_peptides_df_prot_acc_pep_seq_pep_var_mod$pep_var_mod_pos <- as.character(modified_peptides_df_prot_acc_pep_seq_pep_var_mod$pep_var_mod_pos)
+                    pep_var_mod_pos_unique <- unique(modified_peptides_df_prot_acc_pep_seq_pep_var_mod$pep_var_mod_pos)
+                    # For each pep_var_mod_pos...
+                    for (pvmp in 1:length(pep_var_mod_pos_unique)) {
+                        # Rows with the pep_var_mod_pos_value
+                        modified_peptides_df_prot_acc_pep_seq_pep_var_mod_pep_var_mod_pos <- modified_peptides_df_prot_acc_pep_seq_pep_var_mod[modified_peptides_df_prot_acc_pep_seq_pep_var_mod$pep_var_mod_pos == pep_var_mod_pos_unique[pvmp],]
+                        # Keep only the first (with the highest pep_score) (store the row ID)
+                        row_ID_to_keep <- append(row_ID_to_keep, rownames(modified_peptides_df_prot_acc_pep_seq_pep_var_mod_pep_var_mod_pos[1,]))
+                    }
+                }
+            }
+        }
+        # Retrieve the rows to keep
+        final_df <- modified_peptides_df[rownames(modified_peptides_df) %in% row_ID_to_keep, ]
+        modified_peptides_df <- final_df
         
-        # Display the 'identity' forst
+        # Display the 'identity' first
         modified_peptides_df <- modified_peptides_df[order(modified_peptides_df$pep_score, modified_peptides_df$identity, modified_peptides_df$prot_acc, decreasing = TRUE), ]
         
         # Progress bar
@@ -581,7 +645,26 @@ run_mascot_output_modprocesser_function <- function() {
         modified_peptides_df_sequences <- modified_peptides_df_sequences[order(modified_peptides_df_sequences$prot_acc, modified_peptides_df_sequences$pep_seq, -modified_peptides_df_sequences$pep_score), ]
         
         # Extract the unique values (keep unique prot_acc and pep_seq, and only the highest score for prot_acc/pep_seq duplicates)
-        modified_peptides_df_sequences <- ddply(.data = modified_peptides_df_sequences, .variables = c("prot_acc", "pep_seq"), .fun = head, n = 1)
+        row_ID_to_keep <- vector()
+        # Determine the unique values of the prot_acc column
+        prot_acc_unique <- unique(modified_peptides_df_sequences$prot_acc)
+        # For each prot_acc...
+        for (pa in 1:length(prot_acc_unique)) {
+            # Rows with the prot_acc_value
+            modified_peptides_df_sequences_prot_acc <- modified_peptides_df_sequences[modified_peptides_df_sequences$prot_acc == prot_acc_unique[pa],]
+            # Determine the unique values of the pep_seq column
+            pep_seq_unique <- unique(modified_peptides_df_sequences_prot_acc$pep_seq)
+            # For each pep_seq...
+            for (ps in 1:length(pep_seq_unique)) {
+                # Rows with the pep_seq_value
+                modified_peptides_df_sequences_prot_acc_pep_seq <- modified_peptides_df_sequences_prot_acc[modified_peptides_df_sequences_prot_acc$pep_seq == pep_seq_unique[ps],]
+                # Keep only the first (with the highest pep_score) (store the row ID)
+                row_ID_to_keep <- append(row_ID_to_keep, rownames(modified_peptides_df_sequences_prot_acc_pep_seq[1,]))
+            }
+        }
+        # Retrieve the rows to keep
+        final_df <- modified_peptides_df_sequences[rownames(modified_peptides_df_sequences) %in% row_ID_to_keep, ]
+        modified_peptides_df_sequences <- final_df
         
         # Display the 'identity' forst
         modified_peptides_df_sequences <- modified_peptides_df_sequences[order(modified_peptides_df_sequences$pep_score, modified_peptides_df_sequences$identity, modified_peptides_df_sequences$prot_acc, decreasing = TRUE), ]
