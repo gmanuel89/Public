@@ -1,4 +1,4 @@
-#################### FUNCTIONS - MASS SPECTROMETRY 2017.05.10 ##################
+#################### FUNCTIONS - MASS SPECTROMETRY 2017.05.11 ##################
 
 
 # Clear the console
@@ -79,12 +79,7 @@ install_and_load_required_packages <- function(required_packages, repository = "
     ##### Retrieve the installed packages
     installed_packages <- installed.packages()[,1]
     ##### Determine the missing packages
-    missing_packages <- character()
-    for (p in 1:length(required_packages)) {
-        if ((required_packages[p] %in% installed_packages) == FALSE) {
-            missing_packages <- append(missing_packages, required_packages[p])
-        }
-    }
+    missing_packages <- required_packages[!(required_packages %in% installed_packages)]
     ##### If there are packages to install...
     if (length(missing_packages) > 0) {
         ### If there is internet...
@@ -97,21 +92,27 @@ install_and_load_required_packages <- function(required_packages, repository = "
                 install.packages(missing_packages, quiet = TRUE, verbose = FALSE)
             }
             print("All the required packages have been installed")
+            all_needed_packages_are_installed <- TRUE
         } else {
             ### If there is NO internet...
             print("Some packages cannot be installed due to internet connection problems")
+            all_needed_packages_are_installed <- FALSE
         }
     } else {
         print("All the required packages are installed")
+        all_needed_packages_are_installed <- TRUE
     }
     ##### Load the packages (if there are all the packages)
     if ((length(missing_packages) > 0 && there_is_internet == TRUE) || length(missing_packages) == 0) {
         for (i in 1:length(required_packages)) {
             library(required_packages[i], character.only = TRUE)
         }
+        all_needed_packages_are_installed <- TRUE
     } else {
         print("Packages cannot be installed/loaded... Expect issues...")
+        all_needed_packages_are_installed <- FALSE
     }
+    .GlobalEnv$all_needed_packages_are_installed <- all_needed_packages_are_installed
 }
 
 
@@ -5455,7 +5456,7 @@ spectral_typer_score_correlation_matrix <- function(spectra_database, spectra_te
             # Make the cluster use the custom functions and the package functions along with their parameters
             clusterEvalQ(cls, {library(MALDIquant)})
             # Pass the variables to the cluster for running the function
-            clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient"), envir = environment())
+            clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "check_internet_connection", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient"), envir = environment())
             output_list <- parLapply(cls, global_list, fun = function(global_list) comparison_sample_db_subfunction_correlation(global_list))
             stopCluster(cls)
         } else {
@@ -5775,7 +5776,7 @@ spectral_typer_score_signal_intensity <- function(spectra_database, spectra_test
             # Make the cluster use the custom functions and the package functions along with their parameters
             clusterEvalQ(cls, {library(MALDIquant)})
             # Pass the variables to the cluster for running the function
-            clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_intensity", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "intensity_tolerance_percent_threshold", "signal_intenity_evaluation"), envir = environment())
+            clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "check_internet_connection", "comparison_sample_db_subfunction_intensity", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_percentage_threshold", "low_intensity_threshold_method", "intensity_correction_coefficient", "intensity_tolerance_percent_threshold", "signal_intenity_evaluation"), envir = environment())
             output_list <- parLapply(cls, global_list, fun = function(global_list) comparison_sample_db_subfunction_intensity(global_list))
             stopCluster(cls)
         }
@@ -6057,7 +6058,7 @@ spectral_typer_score_similarity_index <- function(spectra_database, spectra_test
             cls <- makeCluster(cpu_thread_number)
             # Make the cluster use the custom functions and the package functions along with their parameters
             clusterEvalQ(cls, {library(MALDIquant)})
-            clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_percentage_threshold", "low_intensity_threshold_method"), envir = environment())
+            clusterExport(cl = cls, varlist = c("align_and_filter_peaks", "install_and_load_required_packages", "check_internet_connection", "comparison_sample_db_subfunction_correlation", "database_size", "tof_mode", "peaks_filtering_percentage_threshold", "remove_low_intensity_peaks", "low_intensity_percentage_threshold", "low_intensity_threshold_method"), envir = environment())
             output_list <- parLapply(cls, global_list, fun = function(global_list) comparison_sample_db_subfunction_similarity_index(global_list))
             stopCluster(cls)
         }
@@ -7564,13 +7565,13 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.10.6"
+R_script_version <- "2017.05.11.0"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/SPECTRAL%20TYPER.R"
 ### Name of the file when downloaded
 script_file_name <- "SPECTRAL TYPER"
 # Change log
-change_log <- "1. Bugfix\n2. Added the possibility to dump the spectral files\n3. Variability estimation (mean signal CV)"
+change_log <- "1. Bugfix\n2. Added the possibility to dump the spectral files\n3. Variability estimation (mean signal CV)\n4.Parallel on Windows fixed!"
 
 
 
@@ -9634,6 +9635,7 @@ tkgrid(run_spectral_typer_button, row = 10, column = 3, padx = c(5, 5), pady = c
 tkgrid(database_peaklist_dump_button, row = 10, column = 4, padx = c(5, 5), pady = c(5, 5))
 tkgrid(dump_spectra_files_button, row = 10, column = 5, padx = c(5, 5), pady = c(5, 5))
 tkgrid(end_session_button, row = 10, column = 6, padx = c(5, 5), pady = c(5, 5))
+
 
 
 
