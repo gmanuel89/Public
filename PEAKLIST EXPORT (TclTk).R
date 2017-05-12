@@ -1641,7 +1641,7 @@ import_spectra <- function(filepath, spectra_format = "imzml", mass_range = NULL
 # The input can be both spectra or peaks (MALDIquant)
 replace_sample_name <- function(spectra, spectra_format = "imzml", allow_parallelization = FALSE) {
     # Replace backslash first
-    spectra <- replacebackslash(spectra, allow_parallelization = allow_parallelization)
+    spectra <- replace_backslash(spectra, allow_parallelization = allow_parallelization)
     ##### Function for lapply
     name_replacing_subfunction <- function(spectra, spectra_format) {
         ### imzML
@@ -7621,7 +7621,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.12.1"
+R_script_version <- "2017.05.12.2"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -7677,7 +7677,7 @@ filepath_import_value <- NULL
 output_folder_value <- output_folder
 spectra_format_value <- "imzML"
 peak_picking_mode_value <- "all"
-peak_picking_algorithm_value <- "Median Absolute Deviation"
+peak_picking_algorithm_value <- "Median\nAbsolute Deviation"
 low_intensity_peak_removal_threshold_method_value <- "element-wise"
 spectra_format_value <- "imzML"
 allow_parallelization_value <- "NO"
@@ -8258,7 +8258,7 @@ peak_picking_algorithm_choice <- function() {
     # Set the value of the displaying label
     peak_picking_algorithm_value <- peak_picking_algorithm
     if (peak_picking_algorithm_value == "MAD") {
-        peak_picking_algorithm_value <- "Median Absolute Deviation"
+        peak_picking_algorithm_value <- "Median\nAbsolute Deviation"
     } else if (peak_picking_algorithm_value == "SuperSmoother") {
         peak_picking_algorithm_value <- "Super Smoother"
     }
@@ -8997,6 +8997,7 @@ tkgrid(dump_spectra_files_button, row = 8, column = 5, padx = c(10, 10), pady = 
 tkgrid(end_session_button, row = 8, column = 6, padx = c(10, 10), pady = c(10, 10))
 tkgrid(download_updates_button, row = 1, column = 5, padx = c(10, 10), pady = c(10, 10))
 tkgrid(check_for_updates_value_label, row = 1, column = 6, padx = c(10, 10), pady = c(10, 10))
+
 
 
 
