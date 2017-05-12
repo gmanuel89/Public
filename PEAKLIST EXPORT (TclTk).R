@@ -7621,7 +7621,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.12.3"
+R_script_version <- "2017.05.12.4"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -8427,8 +8427,6 @@ import_spectra_function <- function() {
                     for (imzml in 1:length(imzml_files)) {
                         # Read and import the imzML file
                         spectra_imzml <- importImzMl(imzml_files[imzml], massRange = mass_range)
-                        # Replace sample name
-                        spectra_imzml <- replace_sample_name_list(spectra_imzml, spectra_format = spectra_format, type = "name", replace_sample_name_field = FALSE)
                         # Preprocessing
                         spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_algorithm_parameter = baseline_subtraction_algorithm_parameter, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range, spectral_alignment_algorithm = NULL, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of), allow_parallelization = allow_parallelization)
                         # Average the replicates (one AVG spectrum for each imzML file)
@@ -8449,8 +8447,6 @@ import_spectra_function <- function() {
                     for (imzml in 1:length(imzml_files)) {
                         # Read and import the imzML file
                         spectra_imzml <- importImzMl(imzml_files[imzml])
-                        # Replace sample name
-                        spectra_imzml <- replace_sample_name_list(spectra_imzml, spectra_format = spectra_format, type = "name", replace_sample_name_field = FALSE)
                         # Preprocessing
                         spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_algorithm_parameter = baseline_subtraction_algorithm_parameter, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range, spectral_alignment_algorithm = NULL, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of), allow_parallelization = allow_parallelization)
                         # Average the replicates (one AVG spectrum for each imzML file)
@@ -8465,6 +8461,8 @@ import_spectra_function <- function() {
                     setTkProgressBar(import_progress_bar, value = 0.75, title = NULL, label = "75 %")
                 }
             }
+            # Replace sample name
+            spectra <- replace_sample_name_list(spectra, spectra_format = spectra_format, type = "name", replace_sample_name_field = FALSE)
         }
         ##### Alignment of the imported spectra
         spectral_alignment_performed <- FALSE
@@ -8628,7 +8626,7 @@ dump_spectra_files_function <- function() {
         dir.create(spectra_files_subfolder)
         setwd(spectra_files_subfolder)
         # Replace the sample path with the sample name in the metadata
-        #spectra <- replace_sample_name(spectra, spectra_format = spectra_format, allow_parallelization = allow_parallelization)
+        spectra <- replace_sample_name(spectra, spectra_format = spectra_format, allow_parallelization = allow_parallelization)
         # Get the names of the spectra and generate a vector of names
         spectra_name_vector <- character()
         if (isMassSpectrumList(spectra)) {
@@ -9005,6 +9003,7 @@ tkgrid(dump_spectra_files_button, row = 8, column = 5, padx = c(10, 10), pady = 
 tkgrid(end_session_button, row = 8, column = 6, padx = c(10, 10), pady = c(10, 10))
 tkgrid(download_updates_button, row = 1, column = 5, padx = c(10, 10), pady = c(10, 10))
 tkgrid(check_for_updates_value_label, row = 1, column = 6, padx = c(10, 10), pady = c(10, 10))
+
 
 
 
