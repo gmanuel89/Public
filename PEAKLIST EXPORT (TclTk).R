@@ -7621,7 +7621,7 @@ graph_MSI_segmentation <- function(filepath_imzml, preprocessing_parameters = li
 
 
 ### Program version (Specified by the program writer!!!!)
-R_script_version <- "2017.05.12.2"
+R_script_version <- "2017.05.12.3"
 ### GitHub URL where the R file is
 github_R_url <- "https://raw.githubusercontent.com/gmanuel89/Public-R-UNIMIB/master/PEAKLIST%20EXPORT.R"
 ### Name of the file when downloaded
@@ -8405,7 +8405,7 @@ import_spectra_function <- function() {
         if (spectra_format == "brukerflex" || spectra_format == "xmass" || spectra_format == "txt" || spectra_format == "TXT" || spectra_format == "text" || spectra_format == "csv" || spectra_format == "CSV") {
             ### Load the spectra
             setTkProgressBar(import_progress_bar, value = 0.25, title = NULL, label = "25 %")
-            spectra <- import_spectra(filepath_import, spectra_format = spectra_format, mass_range = mass_range, allow_parallelization = allow_parallelization, spectral_names = "name", replace_sample_name_field = TRUE)
+            spectra <- import_spectra(filepath_import, spectra_format = spectra_format, mass_range = mass_range, allow_parallelization = allow_parallelization, spectral_names = "name", replace_sample_name_field = FALSE)
             # Preprocessing
             setTkProgressBar(import_progress_bar, value = 0.50, title = NULL, label = "50 %")
             spectra <- preprocess_spectra(spectra, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_algorithm_parameter = baseline_subtraction_algorithm_parameter, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range, spectral_alignment_algorithm = NULL, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of), allow_parallelization = allow_parallelization)
@@ -8428,7 +8428,7 @@ import_spectra_function <- function() {
                         # Read and import the imzML file
                         spectra_imzml <- importImzMl(imzml_files[imzml], massRange = mass_range)
                         # Replace sample name
-                        spectra_imzml <- replace_sample_name_list(spectra_imzml, spectra_format = spectra_format, type = "name", replace_sample_name_field = TRUE)
+                        spectra_imzml <- replace_sample_name_list(spectra_imzml, spectra_format = spectra_format, type = "name", replace_sample_name_field = FALSE)
                         # Preprocessing
                         spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_algorithm_parameter = baseline_subtraction_algorithm_parameter, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range, spectral_alignment_algorithm = NULL, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of), allow_parallelization = allow_parallelization)
                         # Average the replicates (one AVG spectrum for each imzML file)
@@ -8450,7 +8450,7 @@ import_spectra_function <- function() {
                         # Read and import the imzML file
                         spectra_imzml <- importImzMl(imzml_files[imzml])
                         # Replace sample name
-                        spectra_imzml <- replace_sample_name_list(spectra_imzml, spectra_format = spectra_format, type = "name", replace_sample_name_field = TRUE)
+                        spectra_imzml <- replace_sample_name_list(spectra_imzml, spectra_format = spectra_format, type = "name", replace_sample_name_field = FALSE)
                         # Preprocessing
                         spectra_imzml <- preprocess_spectra(spectra_imzml, tof_mode = tof_mode, preprocessing_parameters = list(mass_range = NULL, transformation_algorithm = transform_data_algorithm, smoothing_algorithm = smoothing_algorithm, smoothing_strength = smoothing_strength, baseline_subtraction_algorithm = baseline_subtraction_algorithm, baseline_subtraction_algorithm_parameter = baseline_subtraction_algorithm_parameter, normalization_algorithm = normalization_algorithm, normalization_mass_range = normalization_mass_range, spectral_alignment_algorithm = NULL, preprocess_spectra_in_packages_of = preprocess_spectra_in_packages_of), allow_parallelization = allow_parallelization)
                         # Average the replicates (one AVG spectrum for each imzML file)
@@ -8632,11 +8632,19 @@ dump_spectra_files_function <- function() {
         # Get the names of the spectra and generate a vector of names
         spectra_name_vector <- character()
         if (isMassSpectrumList(spectra)) {
-            for (s in 1:length(spectra)) {
-                spectra_name_vector <- append(spectra_name_vector, spectra[[s]]@metaData$file[1])
+            if (is.null(names(spectra))) {
+                for (s in 1:length(spectra)) {
+                    spectra_name_vector <- append(spectra_name_vector, spectra[[s]]@metaData$file[1])
+                }
+            } else {
+                spectra_name_vector <- names(spectra)
             }
         } else if (isMassSpectrum(spectra)) {
-            spectra_name_vector <- spectra@metaData$file[1]
+            if (is.null(names(spectra))) {
+                spectra_name_vector <- spectra@metaData$file[1]
+            } else {
+                spectra_name_vector <- names(spectra)
+            }
         }
         # If there are already unique names, leave the spectra_name_vector as it is...
         if (length(spectra_name_vector) == length(unique(spectra_name_vector))) {
