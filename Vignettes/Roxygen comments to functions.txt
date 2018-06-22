@@ -1,0 +1,150 @@
+######### ROXYGEN COMMENTS TO R FUNCTIONS
+
+#####
+import_spectra
+### roxygen comments
+    #' Import spectra from files
+    #' @description The function imports the spectral files from the filepath specified. The spectral type can be specified, along with the mass range to cut the spectra during the import phase. The function automatically transforms the backslash in the forward slash on Windows and replace the list names (and the sample name if needed) for a better identification of spectra.
+    #' @param filepath character, folder in which the spectral files are stored.
+    #' @param spectra_format character, the format in which the spectra are stored. It can be one among "imzML", "fid", "txt", "csv" or "msd".
+    #' @param mass_range numeric, the mass range to which the spectra are cut to: the first number is the lower boundary, while the second number is the upper boundary. If NULL, the spectra are brought to the same scale by using highest overlapping mass range.
+    #' @param allow_parallelization logical, if the parallel computation should be exploited. It uses \code{lapply} for parallel computation (\code{mclapply} on UNIX and \code{parLapply} on Windows). Otherwise, the type of parallel computation can be specified as a character: "foreach" uses the \code{foreach} package, while "lapply" provides the same parallelization as TRUE.
+    #' @param spectral_names character, how to set the list names: "name" uses the spectrum name (sample name) as the name for the items in the list, while "number" uses sequential integer numbers as list names.
+    #' @param replace_sample_name_field logical, if the file path in the spectrum should be replaced by the sample name.
+    #' @param remove_empty_spectra logical, if the empty spectra should be automatically discarded in the import phase.
+    #' @return The function returns a list of MALDIquant spectra, in which each item corresponds to a spectrum. The list can be either named or not. It returns NULL if no spectra were found in the specified filepath.
+    #' @examples
+    #' # Import the spectra from files
+    #' spectra <- import_spectra (filepath = "/folder/where/the/spectra/are", spectra_format = "imzML", mass_range = c(3000, 15000), allow_parallelization = FALSE, spectral_names = "name", replace_sample_name_field = TRUE, remove_empty_spectra = TRUE)
+    #' @author Manuel Galli m.galli27@campus.unimib.it
+    
+    
+    
+
+
+#####    
+preprocess_spectra
+### roxygen comments
+    #' Performs spectral preprocessing
+    #' @description The function performs the preprocessing on the spectra: smoothing, baseline subtraction, normalization and alignment.
+    #' @param spectra list, a list of MALDIquant spectra.
+    #' @param tof_mode character, the mode in which the Time of Flight (TOF) is used. It can be either "linear" or "reflectron".
+    #' @param preprocessing_parameters list, a named list of preprocessing parameters to be used.
+    #' @param mass_range numeric, the mass range to which the spectra are cut to: the first number is the lower boundary, while the second number is the upper boundary. If NULL, the spectra are brought to the same scale by using highest overlapping mass range.
+    #' @param transformation_algorithm character, the algorithm to be used for data transformation. It can be "sqrt", "log", "log2", "log10", "sin", "cos", or "exp". If NULL, no smoothing is performed.
+    #' @param smoothing_algorithm character, the algorithm to be used for smoothing. It can be "SavitzkyGolay" or "MovingAverage". If NULL, no smoothing is performed.
+    #' @param smoothing_strength character, the width of the smoothing filter to use. It can be "medium", "strong" or "stronger".
+    #' @param baseline_subtraction_algorithm character, the algorithm to be used for baseline subtraction. It can be "SNIP", "TopHat", "ConvexHull", or "median". If NULL, no baseline subtraction is performed.
+    #' @param baseline_subtraction_algorithm_parameter character, the parameter to be used for defining the filter width for baseline subtraction.
+    #' @param normalization_algorithm character, the algorithm to be used for normalization. It can be "TIC", "RMS", "PQN", or "median". If NULL, no normalization is performed.
+    #' @param normalization_mass_range numeric, the mass range to use for normalization: the first number is the lower boundary, while the second number is the upper boundary. If NULL, the entire spectrum is used as the window for normalization.
+    #' @param preprocess_spectra_in_packages_of integer, the number of spectra to be processed simultaneously, in packets. If NULL or less or equal than 0, all the spectra are preprocessed at once.
+    #' @param spectral_alignment_algorithm character, the algorithm to be used for peak-based spectral alignment. It can be "cubic", "quadratic" or "linear". If NULL, no spectral alignment is performed.
+    #' @param spectral_alignment_reference character, the peak list to be used as reference for peak-based spectral alignment. It can be "average spectrum", "skyline spectrum" or "auto": the first two options allow to use the peaks of the average spectrum or the skyline spectrum as the reference for alignment, while the third option automatically estimates the peaks to be used for alignment as the most frequent peaks in the spectral list.
+    #' @param allow_parallelization logical, if the parallel computation should be exploited. It uses \code{lapply} for parallel computation (\code{mclapply} on UNIX and \code{parLapply} on Windows). Otherwise, the type of parallel computation can be specified as a character: "foreach" uses the \code{foreach} package, while "lapply" provides the same parallelization as TRUE.
+    #' @param tolerance_ppm numeric, the tolerance (in ppm) for the peak-based spectral alignment. If NULL, the tolerance is set to 1000 ppm for "linear" TOF mode and to 100 ppm for "reflectron" TOF mode.
+    #' @return The function returns a list of MALDIquant spectra, in which each item corresponds to a preprocessed spectrum.
+    #' @examples
+    #' # Import the spectra from files
+    #' spectra <- import_spectra(filepath = "/folder/where/the/spectra/are", spectra_format = "imzML", mass_range = c(3000, 15000), allow_parallelization = FALSE, spectral_names = "name", replace_sample_name_field = TRUE, remove_empty_spectra = TRUE)
+    #' # Preprocess the imported spectra
+    #' spectra <- preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = c(3000, 15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_algorithm_parameter = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "average_spectrum"), allow_parallelization = FALSE, tolerance_ppm = 1000)
+    #' @author Manuel Galli m.galli27@campus.unimib.it
+
+
+
+
+
+#####
+peak picking
+### roxygen comments
+    #' Computes peak picking onto the spectra
+    #' @description The function computes the peak picking (feature extraction). It computes also the peak deisotoping or enveloping.
+    #' @param spectra list, a list of MALDIquant spectra.
+    #' @param peak_picking_algorithm character, the algorithm to be used for peak picking. It can be either "SuperSmoother" or "MAD".
+    #' @param tof_mode character, the mode in which the Time of Flight (TOF) is used. It can be either "linear" or "reflectron".
+    #' @param SNR numeric, the signal-to-noise ratio to be used for peak picking.
+    #' @param allow_parallelization logical, if the parallel computation should be exploited. It uses \code{lapply} for parallel computation (\code{mclapply} on UNIX and \code{parLapply} on Windows). Otherwise, the type of parallel computation can be specified as a character: "foreach" uses the \code{foreach} package, while "lapply" provides the same parallelization as TRUE.
+    #' @param deisotope_peaklist logical, if the peak deisotoping should be performed.
+    #' @param envelope_peaklist logical, if the peak enveloping should be performed.
+    #' @param signals_to_take integer, number of maximum number of peaks to retain. If less or equal than 0, all the peaks are retained.
+    #' @return The function returns a list of MALDIquant peaks, in which each item corresponds to the peaks of a spectrum.
+    #' @examples
+    #' # Import the spectra from files
+    #' spectra <- import_spectra(filepath = "/folder/where/the/spectra/are", spectra_format = "imzML", mass_range = c(3000, 15000), allow_parallelization = FALSE, spectral_names = "name", replace_sample_name_field = TRUE, remove_empty_spectra = TRUE)
+    #' # Preprocess the imported spectra
+    #' spectra <- preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = c(3000, 15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_algorithm_parameter = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "average_spectrum"), allow_parallelization = FALSE, tolerance_ppm = 1000)
+    #' # Perform peak picking
+    #' peaks <- peak_picking(spectra, peak_picking_algorithm = "SuperSmoother", tof_mode = "linear", SNR = 3, allow_parallelization = FALSE, deisotope_peaklist = FALSE, envelope_peaklist = FALSE, signals_to_take = 50)
+    #' @author Manuel Galli m.galli27@campus.unimib.it
+
+
+
+
+
+#####
+align_and_filter_peaks
+### roxygen comments
+    #' Computes peak alignment and filtering onto the peaks
+    #' @description The function computes the peak alignment and peak filtering, along with the false positive peaks removal (classwise if a class vector corresponding to the spectra list is specified) and the removal of low-intensity peaks.
+    #' @param peaks list, a list of MALDIquant peaks.
+    #' @param peak_picking_algorithm character, the algorithm to be used for peak picking. It can be either "SuperSmoother" or "MAD".
+    #' @param tof_mode character, the mode in which the Time of Flight (TOF) is used. It can be either "linear" or "reflectron".
+    #' @param peak_filtering_frequency_threshold_percent numeric, the percentage of spectra in which a peak has to be present for being preserved. Peaks under the percentage frequency are discarded.
+    #' @param class_vector_for_peak_filtering character, a vector of the same length of the peaks list, to be used for class-wise peak frequency estimation. If NULL, the peak frequency is estimated onto the entire peaks list.
+    #' @param low_intensity_peak_removal_threshold_percent numeric, the percentage of the most intense peak intensity to be used as threshold for peak filtering: peaks with an intensity below the percentage of intensity of the most intense peak are discarded.
+    #' @param low_intensity_peak_removal_threshold_method character, how to determine the most intense peak. It can be "element-wise", the most intense peak is identified for each spectrum, or "whole dataset", the most intense peak corresponds to the most intense peak of the entire spectral dataset.
+    #' @param reference_peaklist numeric, a vector of numbers to be considered as absolute reference values to which the peaks should be aligned to; character, a peaklist to be used as reference for alignment (it can be "average spectrum" or "skyline spectrum"). If NULL, no absolute reference values are taken, and peaks are simply aligned to each other.
+    #' @param spectra list, a list of MALDIquant spectra.
+    #' @param alignment_iterations integer, number of peak alignment iterations to be performed.
+    #' @param allow_parallelization logical, if the parallel computation should be exploited. It uses \code{lapply} for parallel computation (\code{mclapply} on UNIX and \code{parLapply} on Windows). Otherwise, the type of parallel computation can be specified as a character: "foreach" uses the \code{foreach} package, while "lapply" provides the same parallelization as TRUE.
+    #' @param tolerance_ppm numeric, the tolerance (in ppm) for the peak alignment. If NULL, the tolerance is set to 1000 ppm for "linear" TOF mode and to 100 ppm for "reflectron" TOF mode.
+    #' @return The function returns a list of aligned and filtered MALDIquant peaks.
+    #' @examples
+    #' # Import the spectra from files
+    #' spectra <- import_spectra(filepath = "/folder/where/the/spectra/are", spectra_format = "imzML", mass_range = c(3000, 15000), allow_parallelization = FALSE, spectral_names = "name", replace_sample_name_field = TRUE, remove_empty_spectra = TRUE)
+    #' # Preprocess the imported spectra
+    #' spectra <- preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = c(3000, 15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_algorithm_parameter = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "average_spectrum"), allow_parallelization = FALSE, tolerance_ppm = 1000)
+    #' # Perform peak picking
+    #' peaks <- peak_picking(spectra, peak_picking_algorithm = "SuperSmoother", tof_mode = "linear", SNR = 3, allow_parallelization = FALSE, deisotope_peaklist = FALSE, envelope_peaklist = FALSE, signals_to_take = 50)
+    #' # Perform peak alignment and filtering
+    #' peaks <- align_and_filter_peaks(peaks, peak_picking_algorithm = "SuperSmoother", tof_mode = "linear", peak_filtering_frequency_threshold_percent = 5, class_vector_for_peak_filtering = NULL, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", reference_peaklist = NULL, spectra = spectra, alignment_iterations = 5, allow_parallelization = FALSE, tolerance_ppm = 1000)
+    #' @author Manuel Galli m.galli27@campus.unimib.it
+
+
+
+
+
+#####
+matrix_add_class_and_sample
+### roxygen comments
+    #' Adds the sample ID and the class to the intensity matrix
+    #' @description The function adds the sample ID and the class columns to the intensity matrix generated by the \code{intensityMatrix} function in the MALDIquant package.
+    #' @param signal_matrix matrix or data frame, the matrix output by the \code{{intensityMatrix(peaks, spectra)} function in the MALDIquant package.
+    #' @param peaks list, a list of MALDIquant peaks, used to determine the sample IDs.
+    #' @param class_list character, a character vector listing the class list, used to determine the class for each sample, by matching the class name in the file path of the spectrum file.
+    #' @param spectra_format character, the format in which the spectra are stored. It can be one among "imzML", "fid", "txt", "csv" or "msd".
+    #' @param sample_output logical, if the "Sample" column should be added to the matrix.
+    #' @param class_output logical, if the "Class" column should be added to the matrix.
+    #' @param row_labels character, which column between "Sample" and "Class" should be used as row names. If NULL, the row names are left empty.
+    #' @return The function returns a matrix of spectra as rows and aligned peaks as columns, with the columns "Sample" and "Class" added, for statistical analysis.
+    #' @examples
+    #' # Import the spectra from files
+    #' spectra <- import_spectra(filepath = "/folder/where/the/spectra/are", spectra_format = "imzML", mass_range = c(3000, 15000), allow_parallelization = FALSE, spectral_names = "name", replace_sample_name_field = TRUE, remove_empty_spectra = TRUE)
+    #' # Preprocess the imported spectra
+    #' spectra <- preprocess_spectra <- function(spectra, tof_mode = "linear", preprocessing_parameters = list(mass_range = c(3000, 15000), transformation_algorithm = NULL, smoothing_algorithm = "SavitzkyGolay", smoothing_strength = "medium", baseline_subtraction_algorithm = "SNIP", baseline_subtraction_algorithm_parameter = 100, normalization_algorithm = "TIC", normalization_mass_range = NULL, preprocess_spectra_in_packages_of = 0, spectral_alignment_algorithm = NULL, spectral_alignment_reference = "average_spectrum"), allow_parallelization = FALSE, tolerance_ppm = 1000)
+    #' # Perform peak picking
+    #' peaks <- peak_picking(spectra, peak_picking_algorithm = "SuperSmoother", tof_mode = "linear", SNR = 3, allow_parallelization = FALSE, deisotope_peaklist = FALSE, envelope_peaklist = FALSE, signals_to_take = 50)
+    #' # Perform peak alignment and filtering
+    #' peaks <- align_and_filter_peaks(peaks, peak_picking_algorithm = "SuperSmoother", tof_mode = "linear", peak_filtering_frequency_threshold_percent = 5, class_vector_for_peak_filtering = NULL, low_intensity_peak_removal_threshold_percent = 0, low_intensity_peak_removal_threshold_method = "element-wise", reference_peaklist = NULL, spectra = spectra, alignment_iterations = 5, allow_parallelization = FALSE, tolerance_ppm = 1000)
+    #' # Generate the intensity matrix
+    #' peaklist_matrix <- intensityMatrix(peaks = peaks, spectra = spectra)
+    #' # Add the "Class" and the "Sample" columns
+    #' peaklist_matrix <- matrix_add_class_and_sample(peaklist_matrix, peaks = peaks, class_list = c("benign", "malignant"), spectra_format = "imzML", sample_output = TRUE, class_output = TRUE, row_labels = "Sample")
+    #' @author Manuel Galli m.galli27@campus.unimib.it
+
+
+
+
+
+

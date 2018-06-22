@@ -1,4 +1,4 @@
-###################### R WORKSPACE DATA DUMPER - 2017.02.01
+###################### R WORKSPACE DATA DUMPER - 2017.12.21.1
 
 
 
@@ -8,7 +8,7 @@
 
 
 # Update the packages
-update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
+update.packages(repos = NULL, ask=FALSE)
 
 
 
@@ -16,7 +16,7 @@ update.packages(repos = "http://cran.mirror.garr.it/mirrors/CRAN/", ask=FALSE)
 
 ##################################################### INSTALL REQUIRED PACKAGES
 # This function installs and loads the selected packages
-install_and_load_required_packages <- function(required_packages, repository="http://cran.mirror.garr.it/mirrors/CRAN/") {
+install_and_load_required_packages <- function(required_packages, repository=NULL) {
 	# Retrieve the installed packages
 	installed_packages <- installed.packages() [,1]
 	# Determine the missing packages
